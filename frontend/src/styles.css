@@ -1,0 +1,42 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0d12;
+  --panel: #121622;
+  --panel-2: #0f131d;
+  --ink: #e7ebf5;
+  --muted: #98a1b4;
+  --accent: #6ee7ff;
+  --accent-2: #9b7bff;
+  --warn: #ff8d8d;
+  --ok: #7dffb5;
+  --ring: rgba(110, 231, 255, 0.35);
+  --grid: rgba(255, 255, 255, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background:
+    radial-gradient(1200px 800px at 10% -10%, #18203a 0%, transparent 55%),
+    radial-gradient(900px 600px at 90% 10%, #1b1635 0%, transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  letter-spacing: 0.2px;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: "Fraunces", serif;
+  margin: 0;
+}
+
+button, input, select {
+  font-family: inherit;
+}

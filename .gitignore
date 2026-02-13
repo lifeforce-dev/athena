@@ -44,3 +44,6 @@ frontend/dist/
 .env
 .env.*
 !.env.example
+
+# Real config data (use data.example.json as a template)
+data.json
