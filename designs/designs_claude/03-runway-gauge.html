@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Runway Gauge — Cash Flow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0b0d10;
+      --bg-card: #111418;
+      --bg-elevated: #181c22;
+      --bg-input: #0d0f12;
+      --text-white: #f0f2f5;
+      --text-gray: #9ca3af;
+      --text-muted: #4b5563;
+      --safe: #22c55e;
+      --safe-dim: #166534;
+      --caution: #eab308;
+      --caution-dim: #854d0e;
+      --danger: #ef4444;
+      --danger-dim: #991b1b;
+      --accent: #3b82f6;
+      --accent-dim: #1e40af;
+      --ring: rgba(255,255,255,0.08);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--bg-base);
+      color: var(--text-white);
+      min-height: 100vh;
+    }
+
+    .dashboard {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 40px;
+    }
+
+    .header-left h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header-left .date {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .quick-stats {
+      display: flex;
+      gap: 24px;
+    }
+
+    .quick-stat {
+      text-align: right;
+    }
+
+    .quick-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    .quick-stat-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    /* Central Gauge */
+    .gauge-section {
+      display: grid;
+      grid-template-columns: 1fr 360px 1fr;
+      gap: 32px;
+      margin-bottom: 48px;
+    }
+
+    .gauge-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .gauge {
+      width: 320px;
+      height: 180px;
+      position: relative;
+    }
+
+    .gauge svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .gauge-track {
+      fill: none;
+      stroke: var(--bg-elevated);
+      stroke-width: 24;
+      stroke-linecap: round;
+    }
+
+    .gauge-fill {
+      fill: none;
+      stroke-width: 24;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .gauge-fill.safe { stroke: url(#safeGradient); }
+    .gauge-fill.caution { stroke: url(#cautionGradient); }
+    .gauge-fill.danger { stroke: url(#dangerGradient); }
+
+    .gauge-center {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+    }
+
+    .gauge-amount {
+      font-family: 'Outfit', sans-serif;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .gauge-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 4px;
+    }
+
+    .gauge-markers {
+      display: flex;
+      justify-content: space-between;
+      width: 280px;
+      margin-top: 16px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Info Panels */
+    .info-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--ring);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .panel-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .panel-icon.rent { background: rgba(234, 179, 8, 0.15); }
+    .panel-icon.paycheck { background: rgba(34, 197, 94, 0.15); }
+
+    .panel-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-gray);
+    }
+
+    .panel-main {
+      font-family: 'Outfit', sans-serif;
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .panel-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .panel-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    .status-dot.safe { background: var(--safe); box-shadow: 0 0 8px var(--safe); }
+    .status-dot.caution { background: var(--caution); box-shadow: 0 0 8px var(--caution); }
+    .status-dot.danger { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+    /* Runway Bars */
+    .runway-section {
+      margin-bottom: 40px;
+    }
+
+    .section-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--ring);
+    }
+
+    .runway-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .runway-row {
+      display: grid;
+      grid-template-columns: 140px 1fr 100px 100px;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--ring);
+      border-radius: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .runway-row:hover {
+      border-color: rgba(255,255,255,0.12);
+    }
+
+    .runway-row.highlight {
+      border-color: var(--caution);
+      background: linear-gradient(90deg, rgba(234, 179, 8, 0.04) 0%, var(--bg-card) 40%);
+    }
+
+    .runway-period {
+      font-size: 13px;
+      color: var(--text-white);
+    }
+
+    .runway-period span {
+      display: block;
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .runway-bar-wrap {
+      height: 28px;
+      background: var(--bg-input);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .runway-bar {
+      height: 100%;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      padding-left: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--bg-base);
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .runway-bar.safe { background: linear-gradient(90deg, var(--safe), #16a34a); }
+    .runway-bar.caution { background: linear-gradient(90deg, var(--caution), #ca8a04); }
+    .runway-bar.danger { background: linear-gradient(90deg, var(--danger), #dc2626); }
+
+    .runway-outflow {
+      font-size: 13px;
+      color: var(--danger);
+      text-align: right;
+    }
+
+    .runway-end {
+      font-size: 13px;
+      color: var(--text-gray);
+      text-align: right;
+    }
+
+    /* Bottom Cards */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--ring);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .metric-value {
+      font-family: 'Outfit', sans-serif;
+      font-size: 26px;
+      font-weight: 600;
+    }
+
+    .metric-value.safe { color: var(--safe); }
+    .metric-value.caution { color: var(--caution); }
+    .metric-value.danger { color: var(--danger); }
+    .metric-value.accent { color: var(--accent); }
+
+    .metric-note {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .runway-row {
+      animation: fadeIn 0.4s ease-out both;
+    }
+
+    .runway-row:nth-child(1) { animation-delay: 0.1s; }
+    .runway-row:nth-child(2) { animation-delay: 0.15s; }
+    .runway-row:nth-child(3) { animation-delay: 0.2s; }
+    .runway-row:nth-child(4) { animation-delay: 0.25s; }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <h1>Cash Runway</h1>
+        <span class="date">February 8, 2026 · Saturday</span>
+      </div>
+      <div class="quick-stats">
+        <div class="quick-stat">
+          <div class="quick-stat-label">Next Check</div>
+          <div class="quick-stat-value" style="color: var(--safe);">12 days</div>
+        </div>
+        <div class="quick-stat">
+          <div class="quick-stat-label">Rent Due</div>
+          <div class="quick-stat-value" style="color: var(--caution);">25 days</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Gauge Section -->
+    <div class="gauge-section">
+      <!-- Rent Panel -->
+      <div class="info-panel">
+        <div class="panel-header">
+          <div class="panel-icon rent">🏠</div>
+          <span class="panel-title">Rent Status</span>
+        </div>
+        <div class="panel-main" style="color: var(--caution);">$2,650</div>
+        <div class="panel-sub">Due March 5 · 25 days away</div>
+        <div class="panel-status">
+          <span class="status-dot safe"></span>
+          <span style="color: var(--text-gray);">Covered — you'll have $2,719 before rent</span>
+        </div>
+      </div>
+
+      <!-- Central Gauge -->
+      <div class="gauge-container">
+        <div class="gauge">
+          <svg viewBox="0 0 200 120">
+            <defs>
+              <linearGradient id="safeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#22c55e"/>
+                <stop offset="100%" style="stop-color:#16a34a"/>
+              </linearGradient>
+              <linearGradient id="cautionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#eab308"/>
+                <stop offset="100%" style="stop-color:#ca8a04"/>
+              </linearGradient>
+              <linearGradient id="dangerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" style="stop-color:#ef4444"/>
+                <stop offset="100%" style="stop-color:#dc2626"/>
+              </linearGradient>
+            </defs>
+            <!-- Track -->
+            <path class="gauge-track" d="M 20 100 A 80 80 0 0 1 180 100"/>
+            <!-- Fill -->
+            <path class="gauge-fill safe" d="M 20 100 A 80 80 0 0 1 180 100"
+                  stroke-dasharray="251"
+                  stroke-dashoffset="188"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="gauge-amount">$2,528</div>
+            <div class="gauge-label">Current Balance</div>
+          </div>
+        </div>
+        <div class="gauge-markers">
+          <span>$0</span>
+          <span>$5k</span>
+          <span>$10k</span>
+        </div>
+      </div>
+
+      <!-- Paycheck Panel -->
+      <div class="info-panel">
+        <div class="panel-header">
+          <div class="panel-icon paycheck">💰</div>
+          <span class="panel-title">Next Paycheck</span>
+        </div>
+        <div class="panel-main" style="color: var(--safe);">+$3,877</div>
+        <div class="panel-sub">February 20 · 12 days away</div>
+        <div class="panel-status">
+          <span class="status-dot safe"></span>
+          <span style="color: var(--text-gray);">Balance after: ~$5,389</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Runway Bars -->
+    <div class="runway-section">
+      <div class="section-title">Pay Period Runway</div>
+      <div class="runway-grid">
+        <div class="runway-row">
+          <div class="runway-period">
+            Feb 8 → Feb 20
+            <span>Current period</span>
+          </div>
+          <div class="runway-bar-wrap">
+            <div class="runway-bar safe" style="width: 42%;">
+              <span>$2,241 min</span>
+            </div>
+          </div>
+          <div class="runway-outflow">-$287</div>
+          <div class="runway-end">$5,389</div>
+        </div>
+
+        <div class="runway-row highlight">
+          <div class="runway-period">
+            Feb 20 → Mar 6
+            <span>⚠ Rent period</span>
+          </div>
+          <div class="runway-bar-wrap">
+            <div class="runway-bar caution" style="width: 22%;">
+              <span>$1,068 min</span>
+            </div>
+          </div>
+          <div class="runway-outflow">-$4,321</div>
+          <div class="runway-end">$4,945</div>
+        </div>
+
+        <div class="runway-row">
+          <div class="runway-period">
+            Mar 6 → Mar 20
+            <span>Recovery period</span>
+          </div>
+          <div class="runway-bar-wrap">
+            <div class="runway-bar safe" style="width: 58%;">
+              <span>$3,617 min</span>
+            </div>
+          </div>
+          <div class="runway-outflow">-$1,328</div>
+          <div class="runway-end">$7,494</div>
+        </div>
+
+        <div class="runway-row">
+          <div class="runway-period">
+            Mar 20 → Apr 3
+            <span>Building cushion</span>
+          </div>
+          <div class="runway-bar-wrap">
+            <div class="runway-bar safe" style="width: 74%;">
+              <span>$6,432 min</span>
+            </div>
+          </div>
+          <div class="runway-outflow">-$1,774</div>
+          <div class="runway-end">$9,597</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Metrics -->
+    <div class="bottom-grid">
+      <div class="metric-card">
+        <div class="metric-label">Before Next Check</div>
+        <div class="metric-value danger">-$287</div>
+        <div class="metric-note">Outflows remaining</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Following Period</div>
+        <div class="metric-value danger">-$4,321</div>
+        <div class="metric-note">Includes $2,650 rent</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Lowest Point</div>
+        <div class="metric-value caution">$1,068</div>
+        <div class="metric-note">After rent, before check</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">End of March</div>
+        <div class="metric-value safe">$6,932</div>
+        <div class="metric-note">Projected balance</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

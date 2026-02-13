@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resource HQ — RTS Command</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;500;600;700&family=Source+Code+Pro:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0c0e;
+      --bg-panel: #0f1214;
+      --bg-card: #141820;
+      --bg-hover: #1a2028;
+      --border: #252a35;
+      --border-light: #303845;
+      --text: #dce4f0;
+      --text-mid: #8895a8;
+      --text-dim: #4a5568;
+      --minerals: #00d4ff;
+      --minerals-dim: rgba(0, 212, 255, 0.15);
+      --gas: #a855f7;
+      --supply: #22c55e;
+      --supply-dim: rgba(34, 197, 94, 0.15);
+      --alert: #f59e0b;
+      --alert-dim: rgba(245, 158, 11, 0.15);
+      --danger: #ef4444;
+      --danger-dim: rgba(239, 68, 68, 0.15);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Exo 2', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .hq {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Top Resource Bar - StarCraft style */
+    .resource-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: linear-gradient(180deg, #1a1e25 0%, #0f1214 100%);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+
+    .resource-group {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .resource-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .resource-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .resource-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .resource-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .resource-value {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .resource-value.minerals { color: var(--minerals); }
+    .resource-value.supply { color: var(--supply); }
+    .resource-value.alert { color: var(--alert); }
+    .resource-value.danger { color: var(--danger); }
+
+    .resource-delta {
+      font-size: 11px;
+      margin-left: 4px;
+    }
+
+    .resource-delta.positive { color: var(--supply); }
+    .resource-delta.negative { color: var(--danger); }
+
+    .game-time {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 13px;
+      color: var(--text-mid);
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+
+    /* Left: Production Queue */
+    .production-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: var(--text-mid);
+      text-transform: uppercase;
+    }
+
+    .panel-badge {
+      font-size: 10px;
+      padding: 4px 10px;
+      background: var(--alert-dim);
+      color: var(--alert);
+      border-radius: 10px;
+      font-weight: 500;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    /* Production Queue */
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .queue-item {
+      display: grid;
+      grid-template-columns: 50px 36px 1fr auto 90px;
+      gap: 14px;
+      padding: 12px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      align-items: center;
+      transition: all 0.15s;
+    }
+
+    .queue-item:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-light);
+    }
+
+    .queue-item.inflow {
+      border-left: 3px solid var(--supply);
+    }
+
+    .queue-item.outflow {
+      border-left: 3px solid var(--danger);
+    }
+
+    .queue-item.major {
+      border-left: 3px solid var(--alert);
+      background: var(--alert-dim);
+    }
+
+    .queue-eta {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .queue-eta span {
+      font-size: 10px;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    .queue-icon {
+      font-size: 18px;
+      text-align: center;
+    }
+
+    .queue-name {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .queue-type {
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    .queue-amount {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: right;
+    }
+
+    .queue-amount.inflow { color: var(--supply); }
+    .queue-amount.outflow { color: var(--danger); }
+
+    .queue-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 4px;
+      background: var(--bg-dark);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--minerals);
+      border-radius: 2px;
+    }
+
+    .progress-text {
+      font-size: 10px;
+      color: var(--text-dim);
+      width: 32px;
+      text-align: right;
+    }
+
+    /* Minimap / Timeline */
+    .minimap-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .minimap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .minimap-title {
+      font-size: 11px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .minimap-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      gap: 3px;
+    }
+
+    .minimap-day {
+      aspect-ratio: 1;
+      background: var(--bg-card);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+
+    .minimap-day:hover {
+      background: var(--bg-hover);
+      transform: scale(1.1);
+      z-index: 10;
+    }
+
+    .minimap-day.today {
+      border: 1px solid var(--minerals);
+      color: var(--minerals);
+    }
+
+    .minimap-day.income::after {
+      content: '';
+      position: absolute;
+      bottom: 2px;
+      width: 4px;
+      height: 4px;
+      background: var(--supply);
+      border-radius: 50%;
+    }
+
+    .minimap-day.expense::after {
+      content: '';
+      position: absolute;
+      bottom: 2px;
+      width: 4px;
+      height: 4px;
+      background: var(--danger);
+      border-radius: 50%;
+    }
+
+    .minimap-day.major::after {
+      content: '';
+      position: absolute;
+      bottom: 2px;
+      width: 4px;
+      height: 4px;
+      background: var(--alert);
+      border-radius: 50%;
+    }
+
+    /* Right: Stats Panel */
+    .stats-section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-icon {
+      font-size: 14px;
+    }
+
+    .stat-value {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 28px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .stat-value.minerals { color: var(--minerals); }
+    .stat-value.supply { color: var(--supply); }
+    .stat-value.alert { color: var(--alert); }
+    .stat-value.danger { color: var(--danger); }
+
+    .stat-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 6px;
+    }
+
+    /* Resource Bar in stats */
+    .resource-gauge {
+      margin-top: 12px;
+    }
+
+    .gauge-track {
+      height: 8px;
+      background: var(--bg-dark);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .gauge-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease-out;
+    }
+
+    .gauge-fill.minerals {
+      background: linear-gradient(90deg, #0088cc, var(--minerals));
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
+    .gauge-fill.supply {
+      background: linear-gradient(90deg, #16a34a, var(--supply));
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+    }
+
+    .gauge-fill.alert {
+      background: linear-gradient(90deg, #d97706, var(--alert));
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+    }
+
+    .gauge-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 9px;
+      color: var(--text-dim);
+    }
+
+    /* Shield/Armor Status */
+    .shield-card {
+      background: linear-gradient(135deg, var(--supply-dim) 0%, var(--bg-panel) 50%);
+      border-color: var(--supply);
+    }
+
+    .shield-card.warning {
+      background: linear-gradient(135deg, var(--alert-dim) 0%, var(--bg-panel) 50%);
+      border-color: var(--alert);
+    }
+
+    .shield-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .shield-icon {
+      font-size: 20px;
+    }
+
+    .shield-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--supply);
+    }
+
+    .shield-card.warning .shield-text {
+      color: var(--alert);
+    }
+
+    .shield-detail {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Summary Row */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .summary-cell {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .summary-cell-label {
+      font-size: 9px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    .summary-cell-value {
+      font-family: 'Source Code Pro', monospace;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    /* Animations */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-10px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .queue-item {
+      animation: slideIn 0.25s ease-out both;
+    }
+
+    .queue-item:nth-child(1) { animation-delay: 0.02s; }
+    .queue-item:nth-child(2) { animation-delay: 0.04s; }
+    .queue-item:nth-child(3) { animation-delay: 0.06s; }
+    .queue-item:nth-child(4) { animation-delay: 0.08s; }
+    .queue-item:nth-child(5) { animation-delay: 0.1s; }
+    .queue-item:nth-child(6) { animation-delay: 0.12s; }
+    .queue-item:nth-child(7) { animation-delay: 0.14s; }
+    .queue-item:nth-child(8) { animation-delay: 0.16s; }
+  </style>
+</head>
+<body>
+  <div class="hq">
+    <!-- Top Resource Bar -->
+    <div class="resource-bar">
+      <div class="resource-group">
+        <div class="resource-item">
+          <div class="resource-icon">💎</div>
+          <div class="resource-info">
+            <span class="resource-label">Minerals</span>
+            <span class="resource-value minerals">$2,528</span>
+          </div>
+        </div>
+        <div class="resource-item">
+          <div class="resource-icon">⏳</div>
+          <div class="resource-info">
+            <span class="resource-label">Days to Zero</span>
+            <span class="resource-value supply">42</span>
+          </div>
+        </div>
+        <div class="resource-item">
+          <div class="resource-icon">📥</div>
+          <div class="resource-info">
+            <span class="resource-label">Next Income</span>
+            <span class="resource-value supply">12d <span class="resource-delta positive">+$3,877</span></span>
+          </div>
+        </div>
+        <div class="resource-item">
+          <div class="resource-icon">📤</div>
+          <div class="resource-info">
+            <span class="resource-label">Drains Until</span>
+            <span class="resource-value danger">-$287</span>
+          </div>
+        </div>
+      </div>
+      <div class="game-time">SAT FEB 08 2026 • 02:00</div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Left: Production -->
+      <div class="production-section">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Production Queue</span>
+            <span class="panel-badge">⚠ RENT IN 25 DAYS</span>
+          </div>
+          <div class="panel-body">
+            <div class="queue-list">
+              <div class="queue-item outflow">
+                <div class="queue-eta">NOW</div>
+                <div class="queue-icon">🍕</div>
+                <div>
+                  <div class="queue-name">Weekly Food</div>
+                  <div class="queue-type">Supply drain</div>
+                </div>
+                <div class="queue-amount outflow">-$120</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 100%;"></div></div>
+                  <span class="progress-text">100%</span>
+                </div>
+              </div>
+
+              <div class="queue-item outflow">
+                <div class="queue-eta">4<span>d</span></div>
+                <div class="queue-icon">🎻</div>
+                <div>
+                  <div class="queue-name">Lisle Violin</div>
+                  <div class="queue-type">Equipment</div>
+                </div>
+                <div class="queue-amount outflow">-$47</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 66%;"></div></div>
+                  <span class="progress-text">66%</span>
+                </div>
+              </div>
+
+              <div class="queue-item outflow">
+                <div class="queue-eta">7<span>d</span></div>
+                <div class="queue-icon">🍕</div>
+                <div>
+                  <div class="queue-name">Weekly Food</div>
+                  <div class="queue-type">Supply drain</div>
+                </div>
+                <div class="queue-amount outflow">-$120</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 42%;"></div></div>
+                  <span class="progress-text">42%</span>
+                </div>
+              </div>
+
+              <div class="queue-item inflow">
+                <div class="queue-eta">12<span>d</span></div>
+                <div class="queue-icon">💰</div>
+                <div>
+                  <div class="queue-name">BLIZZARD PAYCHECK</div>
+                  <div class="queue-type">Income</div>
+                </div>
+                <div class="queue-amount inflow">+$3,877</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
+                  <span class="progress-text">0%</span>
+                </div>
+              </div>
+
+              <div class="queue-item outflow">
+                <div class="queue-eta">12<span>d</span></div>
+                <div class="queue-icon">💳</div>
+                <div>
+                  <div class="queue-name">BeyondFinance + Gas</div>
+                  <div class="queue-type">Debt service</div>
+                </div>
+                <div class="queue-amount outflow">-$659</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
+                  <span class="progress-text">0%</span>
+                </div>
+              </div>
+
+              <div class="queue-item major">
+                <div class="queue-eta">25<span>d</span></div>
+                <div class="queue-icon">🏠</div>
+                <div>
+                  <div class="queue-name">⚠️ RENT (Calypso)</div>
+                  <div class="queue-type">Major expense</div>
+                </div>
+                <div class="queue-amount outflow">-$2,650</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
+                  <span class="progress-text">0%</span>
+                </div>
+              </div>
+
+              <div class="queue-item inflow">
+                <div class="queue-eta">26<span>d</span></div>
+                <div class="queue-icon">💰</div>
+                <div>
+                  <div class="queue-name">BLIZZARD PAYCHECK</div>
+                  <div class="queue-type">Income</div>
+                </div>
+                <div class="queue-amount inflow">+$3,877</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
+                  <span class="progress-text">0%</span>
+                </div>
+              </div>
+
+              <div class="queue-item outflow">
+                <div class="queue-eta">26<span>d</span></div>
+                <div class="queue-icon">📚</div>
+                <div>
+                  <div class="queue-name">Student Loan</div>
+                  <div class="queue-type">Debt service</div>
+                </div>
+                <div class="queue-amount outflow">-$324</div>
+                <div class="queue-progress">
+                  <div class="progress-bar"><div class="progress-fill" style="width: 0%;"></div></div>
+                  <span class="progress-text">0%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Minimap -->
+        <div class="minimap-panel">
+          <div class="minimap-header">
+            <span class="minimap-title">30-Day Minimap</span>
+          </div>
+          <div class="minimap-grid">
+            <div class="minimap-day today expense">8</div>
+            <div class="minimap-day">9</div>
+            <div class="minimap-day">10</div>
+            <div class="minimap-day">11</div>
+            <div class="minimap-day expense">12</div>
+            <div class="minimap-day">13</div>
+            <div class="minimap-day">14</div>
+            <div class="minimap-day expense">15</div>
+            <div class="minimap-day">16</div>
+            <div class="minimap-day">17</div>
+            <div class="minimap-day">18</div>
+            <div class="minimap-day">19</div>
+            <div class="minimap-day income">20</div>
+            <div class="minimap-day">21</div>
+            <div class="minimap-day expense">22</div>
+            <div class="minimap-day expense">23</div>
+            <div class="minimap-day">24</div>
+            <div class="minimap-day">25</div>
+            <div class="minimap-day">26</div>
+            <div class="minimap-day expense">27</div>
+            <div class="minimap-day expense">28</div>
+            <div class="minimap-day expense">1</div>
+            <div class="minimap-day expense">2</div>
+            <div class="minimap-day">3</div>
+            <div class="minimap-day">4</div>
+            <div class="minimap-day major">5</div>
+            <div class="minimap-day income">6</div>
+            <div class="minimap-day expense">7</div>
+            <div class="minimap-day expense">8</div>
+            <div class="minimap-day">9</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Stats -->
+      <div class="stats-section">
+        <div class="stat-card shield-card">
+          <div class="shield-status">
+            <span class="shield-icon">🛡️</span>
+            <span class="shield-text">RENT SHIELD: ACTIVE</span>
+          </div>
+          <div class="shield-detail">$2,719 minerals available after Feb 20 income</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">After Next Income</span>
+            <span class="stat-icon">💎</span>
+          </div>
+          <div class="stat-value supply">$5,389</div>
+          <div class="stat-sub">Balance after Feb 20 paycheck</div>
+          <div class="resource-gauge">
+            <div class="gauge-track">
+              <div class="gauge-fill supply" style="width: 72%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Danger Zone</span>
+            <span class="stat-icon">⚠️</span>
+          </div>
+          <div class="stat-value alert">$1,068</div>
+          <div class="stat-sub">Lowest point after rent, before Mar 6</div>
+          <div class="resource-gauge">
+            <div class="gauge-track">
+              <div class="gauge-fill alert" style="width: 18%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">End of March</span>
+            <span class="stat-icon">📈</span>
+          </div>
+          <div class="stat-value minerals">$6,932</div>
+          <div class="stat-sub">Projected balance</div>
+          <div class="resource-gauge">
+            <div class="gauge-track">
+              <div class="gauge-fill minerals" style="width: 88%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-header">
+            <span class="stat-label">Monthly Net</span>
+            <span class="stat-icon">📊</span>
+          </div>
+          <div class="stat-value supply">+$1,863</div>
+          <div class="stat-sub">March projected gain</div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-row">
+          <div class="summary-cell">
+            <div class="summary-cell-label">Pre-Check</div>
+            <div class="summary-cell-value" style="color: var(--danger);">-$287</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-cell-label">Post-Check</div>
+            <div class="summary-cell-value" style="color: var(--supply);">$5,389</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-cell-label">Lowest</div>
+            <div class="summary-cell-value" style="color: var(--alert);">$1,068</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-cell-label">EOM</div>
+            <div class="summary-cell-value" style="color: var(--minerals);">$6,932</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

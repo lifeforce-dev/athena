@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paycheck Pulse — Cash Flow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void: #050607;
+      --surface: #0c0e11;
+      --card: #121519;
+      --raised: #1a1e24;
+      --border: rgba(255,255,255,0.06);
+      --white: #f5f6f8;
+      --silver: #b4b9c4;
+      --slate: #6b7280;
+      --dim: #3d4451;
+      --mint: #10b981;
+      --mint-glow: rgba(16, 185, 129, 0.4);
+      --coral: #f87171;
+      --coral-glow: rgba(248, 113, 113, 0.4);
+      --gold: #fbbf24;
+      --gold-glow: rgba(251, 191, 36, 0.4);
+      --sky: #38bdf8;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Geist Mono', monospace;
+      background: var(--void);
+      color: var(--white);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 32px;
+    }
+
+    /* Page Header */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 48px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--mint) 0%, var(--sky) 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .brand-text h1 {
+      font-family: 'Sora', sans-serif;
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-text span {
+      font-size: 11px;
+      color: var(--slate);
+    }
+
+    .header-balance {
+      text-align: right;
+    }
+
+    .header-balance-label {
+      font-size: 10px;
+      color: var(--slate);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .header-balance-amount {
+      font-family: 'Sora', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 32px;
+    }
+
+    /* Left Sidebar - Key Questions */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .question-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .question-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+    }
+
+    .question-card.rent::before { background: var(--gold); }
+    .question-card.outflows::before { background: var(--coral); }
+    .question-card.safety::before { background: var(--mint); }
+
+    .question-label {
+      font-size: 11px;
+      color: var(--slate);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 12px;
+    }
+
+    .question-answer {
+      font-family: 'Sora', sans-serif;
+      font-size: 26px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .question-answer.yes { color: var(--mint); }
+    .question-answer.warning { color: var(--gold); }
+    .question-answer.no { color: var(--coral); }
+
+    .question-detail {
+      font-size: 12px;
+      color: var(--silver);
+      line-height: 1.6;
+    }
+
+    .question-progress {
+      margin-top: 16px;
+      height: 6px;
+      background: var(--raised);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .question-progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .question-progress-fill.safe { background: var(--mint); }
+    .question-progress-fill.warning { background: var(--gold); }
+
+    /* Main Content - Pulse Timeline */
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .content-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .content-title {
+      font-family: 'Sora', sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--silver);
+    }
+
+    .time-range {
+      font-size: 11px;
+      color: var(--dim);
+    }
+
+    /* Pulse Cards */
+    .pulse-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .pulse-card {
+      display: grid;
+      grid-template-columns: 1fr 200px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .pulse-card:hover {
+      transform: translateX(4px);
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .pulse-card.active {
+      border-color: var(--sky);
+      box-shadow: 0 0 0 1px var(--sky);
+    }
+
+    .pulse-main {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .pulse-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .pulse-dates {
+      font-size: 14px;
+      color: var(--white);
+      font-weight: 500;
+    }
+
+    .pulse-dates span {
+      color: var(--dim);
+    }
+
+    .pulse-tag {
+      font-size: 10px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .pulse-tag.current {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--sky);
+    }
+
+    .pulse-tag.rent {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--gold);
+    }
+
+    /* Pulse Bar */
+    .pulse-bar-container {
+      position: relative;
+    }
+
+    .pulse-bar-track {
+      height: 32px;
+      background: var(--surface);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pulse-bar-fill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      border-radius: 6px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .pulse-bar-fill.start {
+      background: linear-gradient(90deg, var(--mint), rgba(16, 185, 129, 0.3));
+    }
+
+    .pulse-bar-fill.end {
+      background: linear-gradient(90deg, rgba(248, 113, 113, 0.3), var(--coral));
+      right: 0;
+      left: auto;
+    }
+
+    .pulse-bar-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+
+    .pulse-bar-labels .start-label { color: var(--mint); }
+    .pulse-bar-labels .end-label { color: var(--silver); }
+
+    /* Pulse Stats */
+    .pulse-stats {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 20px;
+      background: var(--raised);
+      gap: 12px;
+    }
+
+    .pulse-stat {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .pulse-stat-label { color: var(--slate); }
+    .pulse-stat-value { color: var(--white); font-weight: 500; }
+    .pulse-stat-value.negative { color: var(--coral); }
+    .pulse-stat-value.positive { color: var(--mint); }
+    .pulse-stat-value.warning { color: var(--gold); }
+
+    /* Transaction Preview */
+    .transactions-preview {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .tx-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .tx-title {
+      font-size: 13px;
+      color: var(--silver);
+    }
+
+    .tx-toggle {
+      font-size: 11px;
+      color: var(--dim);
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tx-toggle:hover {
+      background: var(--raised);
+      color: var(--silver);
+    }
+
+    .tx-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tx-item {
+      display: grid;
+      grid-template-columns: 80px 1fr auto;
+      gap: 12px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border-radius: 8px;
+      font-size: 12px;
+      align-items: center;
+    }
+
+    .tx-date { color: var(--dim); }
+    .tx-name { color: var(--silver); }
+    .tx-amount { font-weight: 500; }
+    .tx-amount.inflow { color: var(--mint); }
+    .tx-amount.outflow { color: var(--coral); }
+
+    /* Footer Summary */
+    .summary-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .summary-cell {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      text-align: center;
+    }
+
+    .summary-cell-label {
+      font-size: 10px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .summary-cell-value {
+      font-family: 'Sora', sans-serif;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .pulse-card {
+      animation: slideIn 0.4s ease-out both;
+    }
+
+    .pulse-card:nth-child(1) { animation-delay: 0.05s; }
+    .pulse-card:nth-child(2) { animation-delay: 0.1s; }
+    .pulse-card:nth-child(3) { animation-delay: 0.15s; }
+    .pulse-card:nth-child(4) { animation-delay: 0.2s; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="page-header">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>Paycheck Pulse</h1>
+          <span>February 8, 2026</span>
+        </div>
+      </div>
+      <div class="header-balance">
+        <div class="header-balance-label">Current Balance</div>
+        <div class="header-balance-amount">$2,528.36</div>
+      </div>
+    </header>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Sidebar - Key Questions -->
+      <aside class="sidebar">
+        <div class="question-card rent">
+          <div class="question-label">Am I making rent?</div>
+          <div class="question-answer yes">Yes ✓</div>
+          <div class="question-detail">
+            Rent is <strong>$2,650</strong> due Mar 5.<br>
+            You'll have <strong>$2,719</strong> available after Feb 20 paycheck.
+          </div>
+          <div class="question-progress">
+            <div class="question-progress-fill safe" style="width: 100%"></div>
+          </div>
+        </div>
+
+        <div class="question-card outflows">
+          <div class="question-label">Before next check?</div>
+          <div class="question-answer warning">-$287</div>
+          <div class="question-detail">
+            Food ($240), violin ($47) left to pay before Feb 20.
+          </div>
+        </div>
+
+        <div class="question-card outflows">
+          <div class="question-label">Check after that?</div>
+          <div class="question-answer warning">-$4,321</div>
+          <div class="question-detail">
+            Big period: rent ($2,650), utilities, insurance, food, subscriptions.
+          </div>
+        </div>
+
+        <div class="question-card safety">
+          <div class="question-label">Lowest point?</div>
+          <div class="question-answer warning">$1,068</div>
+          <div class="question-detail">
+            After rent posts Mar 5, before paycheck arrives Mar 6.
+          </div>
+          <div class="question-progress">
+            <div class="question-progress-fill warning" style="width: 22%"></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Content - Pulse Timeline -->
+      <main class="content">
+        <div class="content-header">
+          <span class="content-title">Pay Period Overview</span>
+          <span class="time-range">Feb 8 → Mar 20</span>
+        </div>
+
+        <div class="pulse-container">
+          <!-- Current Period -->
+          <div class="pulse-card active">
+            <div class="pulse-main">
+              <div class="pulse-header">
+                <span class="pulse-dates">Feb 8 <span>→</span> Feb 20</span>
+                <span class="pulse-tag current">Now</span>
+              </div>
+              <div class="pulse-bar-container">
+                <div class="pulse-bar-track">
+                  <div class="pulse-bar-fill start" style="width: 28%;"></div>
+                </div>
+                <div class="pulse-bar-labels">
+                  <span class="start-label">$2,528</span>
+                  <span class="end-label">→ $2,241 (before check)</span>
+                </div>
+              </div>
+            </div>
+            <div class="pulse-stats">
+              <div class="pulse-stat">
+                <span class="pulse-stat-label">Outflows</span>
+                <span class="pulse-stat-value negative">-$287</span>
+              </div>
+              <div class="pulse-stat">
+                <span class="pulse-stat-label">After Check</span>
+                <span class="pulse-stat-value positive">$5,389</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rent Period -->
+          <div class="pulse-card">
+            <div class="pulse-main">
+              <div class="pulse-header">
+                <span class="pulse-dates">Feb 20 <span>→</span> Mar 6</span>
+                <span class="pulse-tag rent">⚠ Rent</span>
+              </div>
+              <div class="pulse-bar-container">
+                <div class="pulse-bar-track">
+                  <div class="pulse-bar-fill start" style="width: 58%;"></div>
+                  <div class="pulse-bar-fill end" style="width: 22%;"></div>
+                </div>
+                <div class="pulse-bar-labels">
+                  <span class="start-label">$5,389</span>
+                  <span class="end-label">→ $1,068 min</span>
+                </div>
+              </div>
+            </div>
+            <div class="pulse-stats">
+              <div class="pulse-stat">
+                <span class="pulse-stat-label">Outflows</span>
+                <span class="pulse-stat-value negative">-$4,321</span>
+              </div>
+              <div class="pulse-stat">
+                <span class="pulse-stat-label">After Check</span>
+                <span class="pulse-stat-value positive">$4,945</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recovery Period -->
+          <div class="pulse-card">
+            <div class="pulse-main">
+              <div class="pulse-header">
+                <span class="pulse-dates">Mar 6 <span>→</span> Mar 20</span>
+              </div>
+              <div class="pulse-bar-container">
+                <div class="pulse-bar-track">
+                  <div class="pulse-bar-fill start" style="width: 52%;"></div>
+                </div>
+                <div class="pulse-bar-labels">
+                  <span class="start-label">$4,945</span>
+                  <span class="end-label">→ $3,617 min</span>
+                </div>
+              </div>
+            </div>
+            <div class="pulse-stats">
+              <div class="pulse-stat">
+                <span class="pulse-stat-label">Outflows</span>
+                <span class="pulse-stat-value negative">-$1,328</span>
+              </div>
+              <div class="pulse-stat">
+                <span class="pulse-stat-label">After Check</span>
+                <span class="pulse-stat-value positive">$7,494</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transaction Preview -->
+        <div class="transactions-preview">
+          <div class="tx-header">
+            <span class="tx-title">Current Period Transactions</span>
+            <button class="tx-toggle">Show all periods</button>
+          </div>
+          <div class="tx-list">
+            <div class="tx-item">
+              <span class="tx-date">Feb 08</span>
+              <span class="tx-name">FOOD (weekly)</span>
+              <span class="tx-amount outflow">-$120.00</span>
+            </div>
+            <div class="tx-item">
+              <span class="tx-date">Feb 12</span>
+              <span class="tx-name">Lisle Violin Shop</span>
+              <span class="tx-amount outflow">-$47.00</span>
+            </div>
+            <div class="tx-item">
+              <span class="tx-date">Feb 15</span>
+              <span class="tx-name">FOOD (weekly)</span>
+              <span class="tx-amount outflow">-$120.00</span>
+            </div>
+            <div class="tx-item">
+              <span class="tx-date">Feb 20</span>
+              <span class="tx-name">Paycheck</span>
+              <span class="tx-amount inflow">+$3,877.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary Row -->
+        <div class="summary-row">
+          <div class="summary-cell">
+            <div class="summary-cell-label">This Period</div>
+            <div class="summary-cell-value" style="color: var(--coral);">-$287</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-cell-label">Next Period</div>
+            <div class="summary-cell-value" style="color: var(--coral);">-$4,321</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-cell-label">Lowest</div>
+            <div class="summary-cell-value" style="color: var(--gold);">$1,068</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-cell-label">Mar 20</div>
+            <div class="summary-cell-value" style="color: var(--mint);">$6,932</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

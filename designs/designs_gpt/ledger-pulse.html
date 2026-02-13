@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ledger + Pulse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Spline+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0b10;
+      --panel: #131620;
+      --ink: #e8edf7;
+      --muted: #8b94a7;
+      --accent: #79f2c0;
+      --pulse: #7fb6ff;
+      --warn: #ff8a8a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Spline Sans", system-ui, sans-serif;
+      background: radial-gradient(900px 500px at 15% -10%, #1a2238 0%, transparent 60%),
+                  radial-gradient(900px 700px at 85% 15%, #211a3b 0%, transparent 55%),
+                  var(--bg);
+      color: var(--ink);
+    }
+    .wrap { max-width: 1200px; margin: 40px auto; padding: 0 24px 60px; }
+    header { display:flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
+    h1 { font-family: "Playfair Display", serif; font-size: 36px; margin: 0; }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    .grid { display: grid; grid-template-columns: 0.9fr 1.4fr; gap: 22px; }
+    .panel { background: var(--panel); border: 1px solid rgba(255,255,255,0.06); border-radius: 18px; padding: 18px; }
+    .stack { display: grid; gap: 14px; }
+    .metric { padding: 14px; border-radius: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); }
+    .metric .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+    .metric .value { font-size: 26px; font-weight: 600; margin-top: 6px; }
+    .metric .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    .pulse {
+      position: relative; height: 380px; border-radius: 16px; overflow: hidden;
+      background: linear-gradient(180deg, rgba(127,182,255,0.08), rgba(10,11,16,0));
+      border: 1px solid rgba(127,182,255,0.16);
+    }
+    .pulse svg { width: 100%; height: 100%; }
+    .pulse .tag {
+      position: absolute; top: 14px; right: 16px; padding: 6px 10px; font-size: 12px;
+      background: rgba(255,138,138,0.14); border: 1px solid rgba(255,138,138,0.3);
+      color: var(--warn); border-radius: 999px;
+    }
+
+    .ledger { margin-top: 18px; display: grid; gap: 8px; }
+    .row { display: grid; grid-template-columns: 80px 1fr 100px; padding: 8px 10px; border-radius: 10px; }
+    .row:nth-child(odd) { background: rgba(255,255,255,0.02); }
+    .amt { text-align: right; font-weight: 600; color: var(--warn); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Ledger + Pulse</h1>
+        <div class="hint">Spend vs. balance trend with rent pressure markers.</div>
+      </div>
+      <div class="hint">As of 2026‑02‑28</div>
+    </header>
+
+    <div class="grid">
+      <div class="panel stack">
+        <div class="metric">
+          <div class="label">Current Balance</div>
+          <div class="value">$5,068.70</div>
+          <div class="sub">Projected min before next check: $1,779</div>
+        </div>
+        <div class="metric">
+          <div class="label">Outflows Before Next Check</div>
+          <div class="value">$4,321.43</div>
+          <div class="sub">Next check: Mar 06</div>
+        </div>
+        <div class="metric">
+          <div class="label">Rent Risk</div>
+          <div class="value">Tight</div>
+          <div class="sub">Rent $2,650 vs min $1,779</div>
+        </div>
+        <div class="panel" style="padding: 0;">
+          <div class="ledger">
+            <div class="row"><div>Feb 22</div><div>SoCalGas</div><div class="amt">-$19.04</div></div>
+            <div class="row"><div>Feb 23</div><div>OpenAI ChatGPT</div><div class="amt">-$20.00</div></div>
+            <div class="row"><div>Feb 27</div><div>Plus Excalidraw</div><div class="amt">-$7.00</div></div>
+            <div class="row"><div>Feb 28</div><div>Spotify</div><div class="amt">-$11.99</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="pulse">
+          <span class="tag">Rent due Mar 5</span>
+          <svg viewBox="0 0 640 360" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="pulseLine" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#7fb6ff" />
+                <stop offset="1" stop-color="#79f2c0" />
+              </linearGradient>
+              <linearGradient id="pulseFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="rgba(127,182,255,0.25)" />
+                <stop offset="1" stop-color="rgba(127,182,255,0)" />
+              </linearGradient>
+            </defs>
+            <path d="M0,250 L120,240 L200,220 L260,140 L340,180 L430,150 L520,120 L640,160" fill="none" stroke="url(#pulseLine)" stroke-width="3" />
+            <path d="M0,250 L120,240 L200,220 L260,140 L340,180 L430,150 L520,120 L640,160 L640,360 L0,360 Z" fill="url(#pulseFill)" />
+            <line x1="380" y1="0" x2="380" y2="360" stroke="rgba(255,138,138,0.5)" stroke-dasharray="4 6" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

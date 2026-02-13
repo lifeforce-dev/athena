@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bunker Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600&family=Public+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#06070a; --panel:#10141c; --ink:#e6edf7; --muted:#8d98ad; --accent:#6ef2b2; --warn:#ff8a8a; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "Public Sans", system-ui, sans-serif; color: var(--ink);
+      background: radial-gradient(900px 600px at 20% -10%, rgba(60,80,120,0.3), transparent 60%),
+                  radial-gradient(800px 500px at 85% 10%, rgba(40,60,90,0.25), transparent 55%),
+                  var(--bg);
+    }
+    .wrap { max-width: 1200px; margin: 40px auto; padding: 0 24px 60px; }
+    h1 { font-family: "Chakra Petch", sans-serif; font-size: 30px; margin: 0; }
+    .hint { color: var(--muted); font-size: 12px; }
+
+    .grid { display: grid; grid-template-columns: 420px 1fr; gap: 18px; margin-top: 20px; }
+    .panel { background: var(--panel); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px; }
+
+    .tank {
+      height: 300px; border-radius: 14px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+      display: grid; place-items: center; position: relative; overflow: hidden;
+    }
+    .fill { position: absolute; bottom: 0; width: 100%; height: 38%; background: linear-gradient(180deg, #5cf2c0, #2b7a5a); }
+    .tank .value { font-family: "Chakra Petch"; font-size: 28px; z-index: 1; }
+    .threshold { position: absolute; bottom: 60%; left: 0; right: 0; height: 2px; background: rgba(255,138,138,0.8); }
+    .threshold span { position: absolute; right: 12px; top: -18px; font-size: 11px; color: var(--warn); background: rgba(255,138,138,0.15); padding: 4px 8px; border-radius: 8px; }
+
+    .queue { margin-top: 16px; }
+    .row { display: grid; grid-template-columns: 90px 1fr 90px; font-size: 12px; padding: 6px 0; }
+    .row + .row { border-top: 1px dashed rgba(255,255,255,0.06); }
+    .amt { text-align: right; color: var(--warn); font-weight: 600; }
+    .amt.pos { color: var(--accent); }
+
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+    .card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; }
+    .card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; }
+    .card .value { font-size: 18px; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Bunker Control</h1>
+    <div class="hint">Fuel tank + outflow pipeline for fast risk checks.</div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="tank">
+          <div class="threshold"><span>Rent $2,650</span></div>
+          <div class="fill"></div>
+          <div class="value">$2,528.36</div>
+        </div>
+        <div class="queue">
+          <div class="row"><div>Feb 08</div><div>Food (weekly)</div><div class="amt">-$120</div></div>
+          <div class="row"><div>Feb 15</div><div>Food (weekly)</div><div class="amt">-$120</div></div>
+          <div class="row"><div>Feb 23</div><div>Paycheck</div><div class="amt pos">+$3,877</div></div>
+          <div class="row"><div>Mar 05</div><div>Rent</div><div class="amt">-$2,650</div></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="cards">
+          <div class="card"><div class="label">Days to Zero</div><div class="value">42</div></div>
+          <div class="card"><div class="label">Next Inflow</div><div class="value">$3,877 • Feb 23</div></div>
+          <div class="card"><div class="label">Between Checks</div><div class="value">Spent $4,321</div></div>
+        </div>
+        <div style="margin-top:16px; background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:12px;">
+          <div style="font-size:13px; color:var(--muted);">Min balance before rent</div>
+          <div style="font-size:22px; margin-top:6px; color:var(--warn);">$1,779</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

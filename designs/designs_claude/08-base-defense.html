@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Base Defense — Resource Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Teko:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-black: #050708;
+      --bg-dark: #0a0d10;
+      --bg-panel: #101418;
+      --bg-card: #161a20;
+      --border: #2a3040;
+      --text: #d0d8e8;
+      --text-dim: #6070880;
+      --text-muted: #404858;
+      --hp-green: #00ff88;
+      --hp-yellow: #ffcc00;
+      --hp-red: #ff3355;
+      --shield: #00ccff;
+      --energy: #aa66ff;
+      --gold: #ffaa00;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Rajdhani', sans-serif;
+      background: var(--bg-black);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .base {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Top HUD */
+    .hud {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    /* HP Bar (Main Balance) */
+    .hp-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .hp-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .hp-label {
+      font-family: 'Teko', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      color: var(--text-muted);
+    }
+
+    .hp-value {
+      font-family: 'Teko', sans-serif;
+      font-size: 42px;
+      font-weight: 600;
+      color: var(--hp-green);
+      line-height: 1;
+    }
+
+    .hp-bar-container {
+      height: 24px;
+      background: var(--bg-black);
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hp-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.6s ease-out;
+      position: relative;
+    }
+
+    .hp-bar.healthy {
+      background: linear-gradient(90deg, #00aa55, var(--hp-green));
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+    }
+
+    .hp-bar.warning {
+      background: linear-gradient(90deg, #cc8800, var(--hp-yellow));
+      box-shadow: 0 0 20px rgba(255, 204, 0, 0.3);
+    }
+
+    .hp-bar.critical {
+      background: linear-gradient(90deg, #aa2244, var(--hp-red));
+      box-shadow: 0 0 20px rgba(255, 51, 85, 0.3);
+      animation: criticalPulse 1s ease-in-out infinite;
+    }
+
+    @keyframes criticalPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .hp-markers {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Center: Wave Status */
+    .wave-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+    }
+
+    .wave-stat {
+      text-align: center;
+    }
+
+    .wave-stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      margin-bottom: 4px;
+    }
+
+    .wave-stat-value {
+      font-family: 'Teko', sans-serif;
+      font-size: 36px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .wave-stat-value.safe { color: var(--hp-green); }
+    .wave-stat-value.warning { color: var(--hp-yellow); }
+    .wave-stat-value.danger { color: var(--hp-red); }
+
+    .wave-divider {
+      width: 1px;
+      height: 50px;
+      background: var(--border);
+    }
+
+    /* Shield Bar (Rent Protection) */
+    .shield-section {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .shield-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .shield-icon {
+      font-size: 24px;
+    }
+
+    .shield-text {
+      font-family: 'Teko', sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--shield);
+    }
+
+    .shield-bar-container {
+      height: 12px;
+      background: var(--bg-black);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .shield-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #0088cc, var(--shield));
+      box-shadow: 0 0 15px rgba(0, 204, 255, 0.3);
+      border-radius: 6px;
+      transition: width 0.6s ease-out;
+    }
+
+    .shield-detail {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
+    }
+
+    /* Main Content */
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+    }
+
+    /* Wave Queue */
+    .wave-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-family: 'Teko', sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: var(--text);
+    }
+
+    .wave-queue {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .wave-item {
+      display: grid;
+      grid-template-columns: 60px 40px 1fr auto;
+      gap: 16px;
+      padding: 14px 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      align-items: center;
+      transition: all 0.2s;
+    }
+
+    .wave-item:hover {
+      border-color: #3a4458;
+      transform: translateX(4px);
+    }
+
+    .wave-item.supply {
+      border-left: 3px solid var(--hp-green);
+    }
+
+    .wave-item.attack {
+      border-left: 3px solid var(--hp-red);
+    }
+
+    .wave-item.boss {
+      border-left: 3px solid var(--gold);
+      background: linear-gradient(90deg, rgba(255, 170, 0, 0.08) 0%, var(--bg-card) 30%);
+    }
+
+    .wave-eta {
+      font-family: 'Teko', sans-serif;
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .wave-eta span {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .wave-type-icon {
+      font-size: 20px;
+      text-align: center;
+    }
+
+    .wave-name {
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    .wave-damage {
+      font-family: 'Teko', sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .wave-damage.attack { color: var(--hp-red); }
+    .wave-damage.supply { color: var(--hp-green); }
+
+    /* Right Panel: Stats */
+    .stats-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .stat-card {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .stat-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .stat-card-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+
+    .stat-card-icon {
+      font-size: 16px;
+    }
+
+    .stat-card-value {
+      font-family: 'Teko', sans-serif;
+      font-size: 32px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    .stat-card-value.green { color: var(--hp-green); }
+    .stat-card-value.yellow { color: var(--hp-yellow); }
+    .stat-card-value.red { color: var(--hp-red); }
+    .stat-card-value.blue { color: var(--shield); }
+
+    .stat-card-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Mini HP Bar in stats */
+    .mini-hp {
+      height: 6px;
+      background: var(--bg-black);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .mini-hp-fill {
+      height: 100%;
+      border-radius: 3px;
+    }
+
+    .mini-hp-fill.green { background: var(--hp-green); }
+    .mini-hp-fill.yellow { background: var(--hp-yellow); }
+    .mini-hp-fill.red { background: var(--hp-red); }
+
+    /* Timeline Strip */
+    .timeline-strip {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-top: 20px;
+    }
+
+    .timeline-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .timeline-days {
+      display: flex;
+      gap: 3px;
+    }
+
+    .timeline-day {
+      width: 28px;
+      height: 36px;
+      background: var(--bg-card);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .timeline-day:hover {
+      transform: translateY(-2px);
+      background: var(--border);
+    }
+
+    .timeline-day.today {
+      border: 1px solid var(--shield);
+      color: var(--shield);
+    }
+
+    .timeline-day.supply-day::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      width: 6px;
+      height: 6px;
+      background: var(--hp-green);
+      border-radius: 50%;
+    }
+
+    .timeline-day.attack-day::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      width: 6px;
+      height: 6px;
+      background: var(--hp-red);
+      border-radius: 50%;
+    }
+
+    .timeline-day.boss-day::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      width: 6px;
+      height: 6px;
+      background: var(--gold);
+      border-radius: 50%;
+    }
+
+    .timeline-legend {
+      display: flex;
+      gap: 16px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .legend-dot.supply { background: var(--hp-green); }
+    .legend-dot.attack { background: var(--hp-red); }
+    .legend-dot.boss { background: var(--gold); }
+
+    /* Animations */
+    @keyframes slideRight {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .wave-item {
+      animation: slideRight 0.3s ease-out both;
+    }
+
+    .wave-item:nth-child(1) { animation-delay: 0.05s; }
+    .wave-item:nth-child(2) { animation-delay: 0.1s; }
+    .wave-item:nth-child(3) { animation-delay: 0.15s; }
+    .wave-item:nth-child(4) { animation-delay: 0.2s; }
+    .wave-item:nth-child(5) { animation-delay: 0.25s; }
+    .wave-item:nth-child(6) { animation-delay: 0.3s; }
+    .wave-item:nth-child(7) { animation-delay: 0.35s; }
+  </style>
+</head>
+<body>
+  <div class="base">
+    <!-- Top HUD -->
+    <div class="hud">
+      <!-- HP Bar -->
+      <div class="hp-section">
+        <div class="hp-header">
+          <span class="hp-label">RESOURCES</span>
+          <span class="hp-value">$2,528</span>
+        </div>
+        <div class="hp-bar-container">
+          <div class="hp-bar healthy" style="width: 42%;"></div>
+        </div>
+        <div class="hp-markers">
+          <span>$0</span>
+          <span>$3K</span>
+          <span>$6K</span>
+        </div>
+      </div>
+
+      <!-- Wave Stats -->
+      <div class="wave-section">
+        <div class="wave-stat">
+          <div class="wave-stat-label">DAYS TO ZERO</div>
+          <div class="wave-stat-value safe">42</div>
+        </div>
+        <div class="wave-divider"></div>
+        <div class="wave-stat">
+          <div class="wave-stat-label">NEXT SUPPLY DROP</div>
+          <div class="wave-stat-value safe">12d</div>
+        </div>
+        <div class="wave-divider"></div>
+        <div class="wave-stat">
+          <div class="wave-stat-label">BOSS WAVE (RENT)</div>
+          <div class="wave-stat-value warning">25d</div>
+        </div>
+        <div class="wave-divider"></div>
+        <div class="wave-stat">
+          <div class="wave-stat-label">INCOMING DMG</div>
+          <div class="wave-stat-value danger">-$287</div>
+        </div>
+      </div>
+
+      <!-- Shield Status -->
+      <div class="shield-section">
+        <div class="shield-status">
+          <span class="shield-icon">🛡️</span>
+          <span class="shield-text">RENT SHIELD: ACTIVE</span>
+        </div>
+        <div class="shield-bar-container">
+          <div class="shield-bar" style="width: 100%;"></div>
+        </div>
+        <div class="shield-detail">$2,719 available after Feb 20 supply drop</div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Wave Queue -->
+      <div class="wave-panel">
+        <div class="panel-header">
+          <span class="panel-title">INCOMING WAVES</span>
+        </div>
+
+        <div class="wave-queue">
+          <div class="wave-item attack">
+            <div class="wave-eta">NOW<span></span></div>
+            <div class="wave-type-icon">🍕</div>
+            <div class="wave-name">Weekly Food Supply</div>
+            <div class="wave-damage attack">-$120</div>
+          </div>
+
+          <div class="wave-item attack">
+            <div class="wave-eta">4<span>d</span></div>
+            <div class="wave-type-icon">🎻</div>
+            <div class="wave-name">Lisle Violin</div>
+            <div class="wave-damage attack">-$47</div>
+          </div>
+
+          <div class="wave-item attack">
+            <div class="wave-eta">7<span>d</span></div>
+            <div class="wave-type-icon">🍕</div>
+            <div class="wave-name">Weekly Food Supply</div>
+            <div class="wave-damage attack">-$120</div>
+          </div>
+
+          <div class="wave-item supply">
+            <div class="wave-eta">12<span>d</span></div>
+            <div class="wave-type-icon">💰</div>
+            <div class="wave-name">BLIZZARD PAYCHECK</div>
+            <div class="wave-damage supply">+$3,877</div>
+          </div>
+
+          <div class="wave-item attack">
+            <div class="wave-eta">12<span>d</span></div>
+            <div class="wave-type-icon">💳</div>
+            <div class="wave-name">BeyondFinance + Gas</div>
+            <div class="wave-damage attack">-$659</div>
+          </div>
+
+          <div class="wave-item boss">
+            <div class="wave-eta">25<span>d</span></div>
+            <div class="wave-type-icon">🏠</div>
+            <div class="wave-name">⚠️ BOSS: RENT (Calypso)</div>
+            <div class="wave-damage attack">-$2,650</div>
+          </div>
+
+          <div class="wave-item supply">
+            <div class="wave-eta">26<span>d</span></div>
+            <div class="wave-type-icon">💰</div>
+            <div class="wave-name">BLIZZARD PAYCHECK</div>
+            <div class="wave-damage supply">+$3,877</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Panel -->
+      <div class="stats-panel">
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">DAMAGE BEFORE SUPPLY</span>
+            <span class="stat-card-icon">💥</span>
+          </div>
+          <div class="stat-card-value red">-$287</div>
+          <div class="stat-card-sub">Food & subscriptions until Feb 20</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">HP AFTER SUPPLY</span>
+            <span class="stat-card-icon">❤️</span>
+          </div>
+          <div class="stat-card-value green">$5,389</div>
+          <div class="stat-card-sub">After Feb 20 paycheck</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">LOWEST HP (DANGER ZONE)</span>
+            <span class="stat-card-icon">⚠️</span>
+          </div>
+          <div class="stat-card-value yellow">$1,068</div>
+          <div class="stat-card-sub">After rent, before Mar 6 supply</div>
+          <div class="mini-hp">
+            <div class="mini-hp-fill yellow" style="width: 18%;"></div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">END OF MARCH HP</span>
+            <span class="stat-card-icon">📈</span>
+          </div>
+          <div class="stat-card-value green">$6,932</div>
+          <div class="stat-card-sub">+$4,404 net gained</div>
+          <div class="mini-hp">
+            <div class="mini-hp-fill green" style="width: 88%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline Strip -->
+    <div class="timeline-strip">
+      <div class="timeline-header">
+        <span class="panel-title">30-DAY FORECAST</span>
+        <div class="timeline-legend">
+          <div class="legend-item"><div class="legend-dot supply"></div>Supply</div>
+          <div class="legend-item"><div class="legend-dot attack"></div>Attack</div>
+          <div class="legend-item"><div class="legend-dot boss"></div>Boss</div>
+        </div>
+      </div>
+      <div class="timeline-days">
+        <div class="timeline-day today attack-day">8</div>
+        <div class="timeline-day">9</div>
+        <div class="timeline-day">10</div>
+        <div class="timeline-day">11</div>
+        <div class="timeline-day attack-day">12</div>
+        <div class="timeline-day">13</div>
+        <div class="timeline-day">14</div>
+        <div class="timeline-day attack-day">15</div>
+        <div class="timeline-day">16</div>
+        <div class="timeline-day">17</div>
+        <div class="timeline-day">18</div>
+        <div class="timeline-day">19</div>
+        <div class="timeline-day supply-day">20</div>
+        <div class="timeline-day">21</div>
+        <div class="timeline-day attack-day">22</div>
+        <div class="timeline-day attack-day">23</div>
+        <div class="timeline-day">24</div>
+        <div class="timeline-day">25</div>
+        <div class="timeline-day">26</div>
+        <div class="timeline-day">27</div>
+        <div class="timeline-day attack-day">28</div>
+        <div class="timeline-day attack-day">1</div>
+        <div class="timeline-day attack-day">2</div>
+        <div class="timeline-day">3</div>
+        <div class="timeline-day">4</div>
+        <div class="timeline-day boss-day">5</div>
+        <div class="timeline-day supply-day">6</div>
+        <div class="timeline-day attack-day">7</div>
+        <div class="timeline-day attack-day">8</div>
+        <div class="timeline-day">9</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

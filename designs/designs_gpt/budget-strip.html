@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Budget Strip</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@500;700&family=Urbanist:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0b0d12; --panel:#141827; --ink:#e8edf6; --muted:#98a1b4; --accent:#7bd0ff; --warn:#ff8d8d; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Urbanist", system-ui, sans-serif;
+      background: radial-gradient(900px 600px at 20% -5%, #1f2a47 0%, transparent 60%),
+                  radial-gradient(700px 500px at 80% 10%, #1b1734 0%, transparent 55%),
+                  var(--bg);
+      color: var(--ink);
+    }
+    .wrap { max-width: 1200px; margin: 40px auto; padding: 0 24px 60px; }
+    h1 { font-family: "EB Garamond", serif; font-size: 36px; margin: 0 0 6px; }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    .strip {
+      margin-top: 28px; background: var(--panel); border-radius: 18px; border: 1px solid rgba(255,255,255,0.06);
+      padding: 20px;
+    }
+    .bar {
+      height: 140px; position: relative; border-radius: 14px; background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05); overflow: hidden;
+    }
+    .bar svg { width: 100%; height: 100%; }
+    .chip {
+      position: absolute; top: 18px; font-size: 11px; padding: 4px 8px; border-radius: 999px;
+      background: rgba(255,141,141,0.18); color: var(--warn); border: 1px solid rgba(255,141,141,0.35);
+    }
+    .chip.rent { left: 58%; }
+    .chip.pay { left: 20%; background: rgba(123,208,255,0.15); color: var(--accent); border-color: rgba(123,208,255,0.3); }
+
+    .legend { display: flex; gap: 14px; margin-top: 12px; font-size: 12px; color: var(--muted); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+
+    .summary { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; margin-top: 18px; }
+    .card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; padding: 14px; }
+    .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; }
+    .value { font-size: 22px; margin-top: 6px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Budget Strip</h1>
+    <div class="hint">The strip shows balance flow with paycheck spikes and rent pressure.</div>
+
+    <div class="strip">
+      <div class="bar">
+        <span class="chip pay">Paycheck</span>
+        <span class="chip rent">Rent</span>
+        <svg viewBox="0 0 900 140" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="line" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#7bd0ff" />
+              <stop offset="1" stop-color="#9d7bff" />
+            </linearGradient>
+          </defs>
+          <path d="M0,100 L140,90 L220,60 L300,72 L380,55 L460,65 L540,62 L620,70 L700,68 L900,75" fill="none" stroke="url(#line)" stroke-width="3" />
+          <circle cx="220" cy="60" r="5" fill="#7bd0ff" />
+          <circle cx="540" cy="62" r="5" fill="#9d7bff" />
+        </svg>
+      </div>
+      <div class="legend">
+        <span><span class="dot" style="background:#7bd0ff;"></span>Paycheck</span>
+        <span><span class="dot" style="background:#ff8d8d;"></span>Rent due</span>
+        <span><span class="dot" style="background:#9d7bff;"></span>Low balance</span>
+      </div>
+
+      <div class="summary">
+        <div class="card"><div class="label">Current Balance</div><div class="value">$5,068.70</div></div>
+        <div class="card"><div class="label">Outflows → Next Check</div><div class="value">$4,321.43</div></div>
+        <div class="card"><div class="label">Min Before Rent</div><div class="value">$1,779</div></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

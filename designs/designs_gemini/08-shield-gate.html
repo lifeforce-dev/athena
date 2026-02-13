@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHIELD GATE // DEFENSE</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050510;
+            --shield-cyan: #00e5ff;
+            --shield-orange: #ff9100;
+            --core-red: #ff1744;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: #fff;
+            font-family: 'Teko', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #101025 0%, #000 100%);
+        }
+
+        .hud-container {
+            position: relative;
+            width: 800px;
+            height: 800px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Circular Rings */
+        .ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .s-ring-outer {
+            width: 700px; height: 700px;
+            border: 2px dashed rgba(0, 229, 255, 0.3);
+            animation: spin 60s linear infinite;
+        }
+        
+        .s-ring-mid {
+            width: 500px; height: 500px;
+            border: 1px solid rgba(255, 145, 0, 0.2);
+        }
+
+        .s-core {
+            width: 300px; height: 300px;
+            background: radial-gradient(circle, rgba(0, 229, 255, 0.1), transparent);
+            border: 2px solid var(--shield-cyan);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 50px var(--shield-cyan);
+            z-index: 10;
+        }
+
+        .core-val {
+            font-size: 5rem;
+            line-height: 1;
+            text-shadow: 0 0 20px var(--shield-cyan);
+        }
+        
+        .core-label { font-size: 1.5rem; letter-spacing: 2px; color: var(--shield-cyan); opacity: 0.8; }
+
+        /* Threats (Incoming Projectiles) */
+        .projectile {
+            position: absolute;
+            height: 4px;
+            background: #fff;
+            transform-origin: left center;
+            display: flex;
+            align-items: center;
+        }
+        
+        /* The logic: Render threats on a polar coordinate system around the center.
+           Angle = Date (Clockwise). Distance = Time until impact. Size = Cost.
+        */
+        
+        .threat-beam {
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 0; height: 0;
+        }
+
+        .beam-body {
+            position: absolute;
+            height: 6px;
+            background: var(--shield-orange);
+            top: -3px;
+            box-shadow: 0 0 10px var(--shield-orange);
+            border-radius: 3px;
+            transform-origin: left center;
+        }
+        
+        .beam-label {
+            position: absolute;
+            color: var(--shield-orange);
+            font-size: 1.2rem;
+            white-space: nowrap;
+            transform: rotate(90deg); /* align with beam roughly? */
+            left: 100%;
+            margin-left: 10px;
+        }
+        
+        .rent-beam .beam-body {
+            background: var(--core-red);
+            height: 12px;
+            top: -6px;
+            box-shadow: 0 0 20px red;
+        }
+
+        /* Paycheck (Repair Drones) */
+        .repair-node {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #0f0;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #0f0;
+        }
+
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Side Info */
+        .scan-readout {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 250px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid var(--shield-cyan);
+            padding: 20px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="scan-readout">
+        <h3 style="color:var(--shield-cyan); margin:0 0 10px 0;">IMPACT ANALYSIS</h3>
+        <ul style="list-style:none; padding:0; font-size: 1.2rem;">
+            <li>Current Integrity: <span style="color:#fff">42%</span></li>
+            <li>Shield Recharge: <span style="color:#0f0">T-15 Days</span></li>
+            <li style="color:var(--core-red); margin-top:10px;">WARN: MASSIVE IMPACT DETECTED [RENT]</li>
+        </ul>
+    </div>
+
+    <div class="hud-container" id="radar">
+        <div class="ring s-ring-outer"></div>
+        <div class="ring s-ring-mid"></div>
+        
+        <div class="s-core">
+            <div class="core-val">2,528</div>
+            <div class="core-label">SHIELD HP</div>
+        </div>
+        
+        <!-- Generated Beams -->
+    </div>
+
+    <script>
+        const radar = document.getElementById('radar');
+        const centerX = 400; // half of 800
+        const centerY = 400;
+        
+        // Items. Angle = day projection (360 deg = 30 days, so 12 deg per day)
+        // Distance from center = time (closer is sooner? No, usually radar is center out. 
+        // Let's say Center is YOU (Time 0). But visually it's shield integrity.
+        // Let's make "Angle" correspond to "Time" like a clock. 
+        // 12 o'clock = Today. 
+        
+        const items = [
+            { day: 0, val: 120, name: "Food", type: 'hit' },
+            { day: 7, val: 120, name: "Food", type: 'hit' },
+            { day: 15, val: 3877, name: "REPAIR", type: 'heal' },
+            { day: 15, val: 579, name: "Debt", type: 'hit' },
+            { day: 25, val: 2650, name: "RENT", type: 'crit' },
+        ];
+        
+        items.forEach(item => {
+            const angleDeg = (item.day / 30) * 360 - 90; // -90 to start at 12'oclock
+            
+            // Container wrapper rotated to correct angle
+            const wrapper = document.createElement('div');
+            wrapper.className = 'threat-beam';
+            wrapper.style.transform = `rotate(${angleDeg + 90}deg)`; // rotate from center
+            
+            if (item.type === 'heal') {
+                // Green dot on the ring
+                const dot = document.createElement('div');
+                dot.className = 'repair-node';
+                // push out to radius
+                const radius = 250; 
+                // Convert polar to cartesian relative to center
+                const rad = (angleDeg) * Math.PI / 180;
+                const x = Math.cos(rad) * radius;
+                const y = Math.sin(rad) * radius;
+                
+                dot.style.transform = `translate(${x}px, ${y}px)`;
+                wrapper.appendChild(dot);
+                
+            } else {
+                // Red Beam coming from outside in? Or just a spike?
+                // Let's draw a spike at the radius distance
+                const spike = document.createElement('div');
+                spike.className = `beam-body ${item.type === 'crit' ? 'rent-beam' : ''}`;
+                
+                // Length based on cost. 1px = $5?
+                const len = Math.max(20, item.val / 10);
+                spike.style.width = len + 'px';
+                
+                // Position at radius 200 (core edge is 150)
+                // We want it pointing OUT from the core, indicating a hit AT that time
+                // distance from center
+                const dist = 160; 
+                spike.style.left = dist + 'px'; // push out from center
+                
+                const lbl = document.createElement('div');
+                lbl.className = 'beam-label';
+                lbl.innerText = item.name;
+                lbl.style.left = (dist + len + 10) + 'px';
+                lbl.style.transform = `rotate(-${angleDeg + 90}deg)`; // counter rotate text? no, keep it readable
+                // Actually simple rotation is fine for sci fi
+                
+                wrapper.appendChild(spike);
+                wrapper.appendChild(lbl);
+            }
+            
+            radar.appendChild(wrapper);
+            
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Check Cards</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Neuton:wght@400;700&family=Plus+Jakarta+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg:#0b0c11; --panel:#141826; --ink:#edf1f9; --muted:#9aa4b8; --warn:#ff9a9a; --ok:#7dffc4; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background: radial-gradient(900px 600px at 12% -10%, #202845 0%, transparent 60%),
+                  radial-gradient(800px 500px at 85% 10%, #1a1733 0%, transparent 55%),
+                  var(--bg);
+      color: var(--ink);
+    }
+    .wrap { max-width: 1200px; margin: 40px auto; padding: 0 24px 70px; }
+    h1 { font-family: "Neuton", serif; font-size: 36px; margin: 0 0 8px; }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 18px; margin-top: 26px; }
+    .card { background: var(--panel); border-radius: 16px; border: 1px solid rgba(255,255,255,0.06); padding: 16px; position: relative; }
+    .card.rocky { border-color: rgba(255,154,154,0.45); box-shadow: 0 0 0 2px rgba(255,154,154,0.2); }
+    .tag { position: absolute; top: 14px; right: 14px; font-size: 11px; padding: 4px 8px; border-radius: 999px; background: rgba(255,154,154,0.15); color: var(--warn); }
+    .card h3 { margin: 0; font-size: 16px; }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 4px; }
+    .stats { margin-top: 12px; display: grid; gap: 6px; font-size: 13px; }
+    .stats span { color: var(--muted); }
+    .big { font-size: 22px; font-weight: 600; margin-top: 8px; }
+
+    .footer { margin-top: 24px; background: var(--panel); border-radius: 16px; padding: 16px; border: 1px solid rgba(255,255,255,0.06); }
+    .row { display: grid; grid-template-columns: 120px 1fr 90px; padding: 8px 0; font-size: 13px; border-top: 1px dashed rgba(255,255,255,0.06); }
+    .row:first-of-type { border-top: none; }
+    .amt { text-align: right; color: var(--warn); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Check Cards</h1>
+    <div class="hint">Each card is a paycheck interval. The rockiest check is highlighted.</div>
+
+    <div class="cards">
+      <div class="card rocky">
+        <span class="tag">Rockiest</span>
+        <h3>Feb 20 → Mar 06</h3>
+        <div class="sub">Rent due inside this window</div>
+        <div class="big">Min $1,779</div>
+        <div class="stats">
+          <div><span>Spent:</span> $4,321</div>
+          <div><span>Net:</span> -$4,321</div>
+          <div><span>Start:</span> $6,100</div>
+          <div><span>End:</span> $1,779</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mar 06 → Mar 20</h3>
+        <div class="sub">Steadier interval</div>
+        <div class="big">Min $4,328</div>
+        <div class="stats">
+          <div><span>Spent:</span> $1,327</div>
+          <div><span>Net:</span> -$1,327</div>
+          <div><span>Start:</span> $5,656</div>
+          <div><span>End:</span> $4,328</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mar 20 → Apr 03</h3>
+        <div class="sub">Utilities + subs</div>
+        <div class="big">Min $6,431</div>
+        <div class="stats">
+          <div><span>Spent:</span> $1,774</div>
+          <div><span>Net:</span> -$1,774</div>
+          <div><span>Start:</span> $8,205</div>
+          <div><span>End:</span> $6,431</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="row"><div>Feb 22</div><div>SoCalGas</div><div class="amt">-$19.04</div></div>
+      <div class="row"><div>Feb 23</div><div>OpenAI ChatGPT</div><div class="amt">-$20.00</div></div>
+      <div class="row"><div>Feb 28</div><div>Spotify</div><div class="amt">-$11.99</div></div>
+    </div>
+  </div>
+</body>
+</html>

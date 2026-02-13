@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dungeon Run — Cash Journey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0e17;
+      --bg-light: #1a1826;
+      --bg-card: #232136;
+      --border: #3d3a50;
+      --text: #e0def4;
+      --text-dim: #6e6a86;
+      --gold: #f6c177;
+      --gold-dim: rgba(246, 193, 119, 0.2);
+      --hp-green: #9ccfd8;
+      --hp-red: #eb6f92;
+      --hp-yellow: #f6c177;
+      --mana: #c4a7e7;
+      --treasure: #3e8fb0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'VT323', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 18px;
+    }
+
+    .dungeon {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* Top Status - RPG Style */
+    .status-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding: 20px;
+      background: var(--bg-light);
+      border: 3px solid var(--border);
+      border-radius: 4px;
+    }
+
+    .player-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .player-avatar {
+      width: 64px;
+      height: 64px;
+      background: var(--bg-card);
+      border: 2px solid var(--gold);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+
+    .player-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .player-name {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+      color: var(--gold);
+    }
+
+    .hp-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hp-label {
+      font-size: 14px;
+      color: var(--text-dim);
+      width: 30px;
+    }
+
+    .hp-bar {
+      width: 200px;
+      height: 20px;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .hp-fill {
+      height: 100%;
+      transition: width 0.5s ease-out;
+    }
+
+    .hp-fill.healthy { background: var(--hp-green); }
+    .hp-fill.warning { background: var(--hp-yellow); }
+    .hp-fill.danger { background: var(--hp-red); }
+
+    .hp-text {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: var(--bg);
+      text-shadow: 1px 1px 0 rgba(255,255,255,0.3);
+    }
+
+    .gold-display {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gold-icon {
+      font-size: 20px;
+    }
+
+    .gold-amount {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 16px;
+      color: var(--gold);
+    }
+
+    .quest-info {
+      text-align: right;
+    }
+
+    .quest-label {
+      font-size: 14px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+
+    .quest-text {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 10px;
+      color: var(--hp-yellow);
+    }
+
+    /* Main Grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 20px;
+    }
+
+    /* Journey Path */
+    .journey-section {
+      background: var(--bg-light);
+      border: 3px solid var(--border);
+      border-radius: 4px;
+      padding: 20px;
+    }
+
+    .section-title {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 10px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      letter-spacing: 0.05em;
+    }
+
+    .journey-path {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    /* Path connection line */
+    .journey-path::before {
+      content: '';
+      position: absolute;
+      left: 24px;
+      top: 24px;
+      bottom: 24px;
+      width: 4px;
+      background: repeating-linear-gradient(
+        0deg,
+        var(--border) 0px,
+        var(--border) 8px,
+        transparent 8px,
+        transparent 16px
+      );
+    }
+
+    .path-node {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      gap: 16px;
+      padding: 16px;
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 8px;
+      position: relative;
+      z-index: 1;
+      transition: all 0.2s;
+    }
+
+    .path-node:hover {
+      border-color: var(--gold);
+      transform: translateX(4px);
+    }
+
+    .path-node.current {
+      border-color: var(--hp-green);
+      box-shadow: 0 0 20px rgba(156, 207, 216, 0.2);
+    }
+
+    .path-node.treasure {
+      border-color: var(--treasure);
+      background: linear-gradient(90deg, rgba(62, 143, 176, 0.1) 0%, var(--bg-card) 30%);
+    }
+
+    .path-node.boss {
+      border-color: var(--hp-yellow);
+      background: linear-gradient(90deg, var(--gold-dim) 0%, var(--bg-card) 30%);
+    }
+
+    .path-node.monster {
+      border-color: var(--hp-red);
+    }
+
+    .node-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+    }
+
+    .node-icon.treasure { border-color: var(--treasure); }
+    .node-icon.boss { border-color: var(--hp-yellow); }
+    .node-icon.monster { border-color: var(--hp-red); }
+
+    .node-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .node-name {
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .node-eta {
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .node-eta strong {
+      color: var(--text);
+    }
+
+    .node-effect {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 4px;
+    }
+
+    .effect-amount {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+    }
+
+    .effect-amount.damage { color: var(--hp-red); }
+    .effect-amount.heal { color: var(--hp-green); }
+
+    .effect-label {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    /* Right Panel */
+    .info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-card {
+      background: var(--bg-light);
+      border: 3px solid var(--border);
+      border-radius: 4px;
+      padding: 16px;
+    }
+
+    .info-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .info-card-title {
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .info-card-icon {
+      font-size: 18px;
+    }
+
+    .info-card-value {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .info-card-value.gold { color: var(--gold); }
+    .info-card-value.green { color: var(--hp-green); }
+    .info-card-value.yellow { color: var(--hp-yellow); }
+    .info-card-value.red { color: var(--hp-red); }
+
+    .info-card-sub {
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    /* Mini HP bar in cards */
+    .mini-bar {
+      height: 8px;
+      background: var(--bg);
+      border: 2px solid var(--border);
+      border-radius: 2px;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .mini-bar-fill {
+      height: 100%;
+    }
+
+    .mini-bar-fill.green { background: var(--hp-green); }
+    .mini-bar-fill.yellow { background: var(--hp-yellow); }
+    .mini-bar-fill.red { background: var(--hp-red); }
+
+    /* Boss Status Card */
+    .boss-card {
+      border-color: var(--hp-yellow);
+      background: linear-gradient(135deg, var(--gold-dim) 0%, var(--bg-light) 50%);
+    }
+
+    .boss-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .boss-icon {
+      font-size: 28px;
+    }
+
+    .boss-name {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 10px;
+      color: var(--hp-yellow);
+    }
+
+    .boss-detail {
+      font-size: 14px;
+      color: var(--text-dim);
+    }
+
+    .boss-shield {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 12px;
+      padding: 10px;
+      background: var(--bg);
+      border-radius: 4px;
+    }
+
+    .boss-shield-icon {
+      font-size: 16px;
+    }
+
+    .boss-shield-text {
+      font-size: 14px;
+      color: var(--hp-green);
+    }
+
+    /* Summary Grid */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .summary-cell {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .summary-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .summary-value {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 12px;
+    }
+
+    /* Animation */
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+
+    .path-node.current .node-icon {
+      animation: bounce 1s ease-in-out infinite;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .path-node {
+      animation: fadeSlide 0.3s ease-out both;
+    }
+
+    .path-node:nth-child(1) { animation-delay: 0.05s; }
+    .path-node:nth-child(2) { animation-delay: 0.1s; }
+    .path-node:nth-child(3) { animation-delay: 0.15s; }
+    .path-node:nth-child(4) { animation-delay: 0.2s; }
+    .path-node:nth-child(5) { animation-delay: 0.25s; }
+    .path-node:nth-child(6) { animation-delay: 0.3s; }
+    .path-node:nth-child(7) { animation-delay: 0.35s; }
+  </style>
+</head>
+<body>
+  <div class="dungeon">
+    <!-- Top HUD -->
+    <div class="status-hud">
+      <div class="player-info">
+        <div class="player-avatar">🧙</div>
+        <div class="player-stats">
+          <div class="player-name">CASH WIZARD LV.42</div>
+          <div class="hp-container">
+            <span class="hp-label">HP</span>
+            <div class="hp-bar">
+              <div class="hp-fill healthy" style="width: 42%;"></div>
+              <span class="hp-text">$2,528</span>
+            </div>
+          </div>
+          <div class="gold-display">
+            <span class="gold-icon">💰</span>
+            <span class="gold-amount">2,528 GP</span>
+          </div>
+        </div>
+      </div>
+      <div class="quest-info">
+        <div class="quest-label">Current Quest</div>
+        <div class="quest-text">SURVIVE THE RENT BOSS</div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="main-grid">
+      <!-- Journey Path -->
+      <div class="journey-section">
+        <div class="section-title">&gt;&gt; UPCOMING ENCOUNTERS</div>
+        
+        <div class="journey-path">
+          <div class="path-node current monster">
+            <div class="node-icon monster">🍕</div>
+            <div class="node-content">
+              <div class="node-name">Hungry Stomach</div>
+              <div class="node-eta">⚔ <strong>NOW</strong> - Weekly food raid</div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount damage">-120 GP</div>
+              <div class="effect-label">HP drain</div>
+            </div>
+          </div>
+
+          <div class="path-node monster">
+            <div class="node-icon monster">🎻</div>
+            <div class="node-content">
+              <div class="node-name">Violin Merchant</div>
+              <div class="node-eta">In <strong>4 days</strong></div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount damage">-47 GP</div>
+              <div class="effect-label">Equipment fee</div>
+            </div>
+          </div>
+
+          <div class="path-node monster">
+            <div class="node-icon monster">🍕</div>
+            <div class="node-content">
+              <div class="node-name">Hungry Stomach II</div>
+              <div class="node-eta">In <strong>7 days</strong></div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount damage">-120 GP</div>
+              <div class="effect-label">HP drain</div>
+            </div>
+          </div>
+
+          <div class="path-node treasure">
+            <div class="node-icon treasure">💎</div>
+            <div class="node-content">
+              <div class="node-name">BLIZZARD TREASURE CHEST</div>
+              <div class="node-eta">In <strong>12 days</strong> - Payday!</div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount heal">+3,877 GP</div>
+              <div class="effect-label">Full heal!</div>
+            </div>
+          </div>
+
+          <div class="path-node monster">
+            <div class="node-icon monster">💳</div>
+            <div class="node-content">
+              <div class="node-name">Debt Collector Gang</div>
+              <div class="node-eta">In <strong>12 days</strong></div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount damage">-659 GP</div>
+              <div class="effect-label">Ambush!</div>
+            </div>
+          </div>
+
+          <div class="path-node boss">
+            <div class="node-icon boss">🏰</div>
+            <div class="node-content">
+              <div class="node-name">⚠️ BOSS: THE LANDLORD</div>
+              <div class="node-eta">In <strong>25 days</strong> - Rent due!</div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount damage">-2,650 GP</div>
+              <div class="effect-label">MASSIVE</div>
+            </div>
+          </div>
+
+          <div class="path-node treasure">
+            <div class="node-icon treasure">💎</div>
+            <div class="node-content">
+              <div class="node-name">BLIZZARD TREASURE CHEST</div>
+              <div class="node-eta">In <strong>26 days</strong> - Recovery!</div>
+            </div>
+            <div class="node-effect">
+              <div class="effect-amount heal">+3,877 GP</div>
+              <div class="effect-label">Reinforcements!</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <aside class="info-section">
+        <!-- Boss Card -->
+        <div class="info-card boss-card">
+          <div class="boss-status">
+            <span class="boss-icon">🏰</span>
+            <span class="boss-name">RENT BOSS</span>
+          </div>
+          <div class="info-card-value yellow">25 DAYS</div>
+          <div class="boss-detail">Attacks for 2,650 GP damage</div>
+          <div class="boss-shield">
+            <span class="boss-shield-icon">🛡️</span>
+            <span class="boss-shield-text">SHIELD READY - Will survive!</span>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            <span class="info-card-title">Damage Before Heal</span>
+            <span class="info-card-icon">💥</span>
+          </div>
+          <div class="info-card-value red">-287 GP</div>
+          <div class="info-card-sub">Until payday treasure</div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            <span class="info-card-title">HP After Treasure</span>
+            <span class="info-card-icon">❤️</span>
+          </div>
+          <div class="info-card-value green">5,389 GP</div>
+          <div class="info-card-sub">Post-payday balance</div>
+          <div class="mini-bar">
+            <div class="mini-bar-fill green" style="width: 72%;"></div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            <span class="info-card-title">Danger Zone HP</span>
+            <span class="info-card-icon">⚠️</span>
+          </div>
+          <div class="info-card-value yellow">1,068 GP</div>
+          <div class="info-card-sub">Lowest point after boss</div>
+          <div class="mini-bar">
+            <div class="mini-bar-fill yellow" style="width: 18%;"></div>
+          </div>
+        </div>
+
+        <div class="info-card">
+          <div class="info-card-header">
+            <span class="info-card-title">End of Run</span>
+            <span class="info-card-icon">🏆</span>
+          </div>
+          <div class="info-card-value gold">6,932 GP</div>
+          <div class="info-card-sub">End of March projection</div>
+          <div class="mini-bar">
+            <div class="mini-bar-fill green" style="width: 88%;"></div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-grid">
+          <div class="summary-cell">
+            <div class="summary-label">Days to Zero</div>
+            <div class="summary-value" style="color: var(--hp-green);">42</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-label">Next Heal</div>
+            <div class="summary-value" style="color: var(--treasure);">12d</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-label">Monthly XP</div>
+            <div class="summary-value" style="color: var(--hp-green);">+1,863</div>
+          </div>
+          <div class="summary-cell">
+            <div class="summary-label">Run Status</div>
+            <div class="summary-value" style="color: var(--gold);">ALIVE</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

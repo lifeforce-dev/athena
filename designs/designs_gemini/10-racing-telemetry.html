@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TELEMETRY // RACING HUD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Racing+Sans+One&family=Roboto:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #101010;
+            --gauge-bg: #222;
+            --fuel-green: #76ff03;
+            --fuel-yellow: #ffea00;
+            --fuel-red: #ff1744;
+            --panel-grey: #263238;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: #fff;
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .dashboard {
+            width: 900px;
+            height: 500px;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        /* Large Fuel Gauge */
+        .gauge-panel {
+            background: var(--panel-grey);
+            border-radius: 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 2px solid #37474f;
+        }
+
+        .gauge-arc {
+            width: 250px; height: 125px; /* Half circle */
+            background: var(--gauge-bg);
+            border-radius: 250px 250px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-fill {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: conic-gradient(from 180deg, var(--fuel-red) 0deg, var(--fuel-yellow) 60deg, var(--fuel-green) 120deg, transparent 180deg);
+            transform-origin: bottom center;
+            transform: rotate(-60deg); /* Adjust fill */
+            border-radius: 250px 250px 0 0;
+        }
+        
+        .gauge-cover {
+            position: absolute;
+            bottom: 0; left: 25px; width: 200px; height: 100px;
+            background: var(--panel-grey);
+            border-radius: 200px 200px 0 0;
+            z-index: 2;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            padding-bottom: 0px;
+        }
+
+        .digital-readout {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .big-val {
+            font-family: 'Racing Sans One', cursive;
+            font-size: 3.5rem;
+            line-height: 1;
+        }
+        
+        .lbl { font-size: 0.8rem; color: #90a4ae; letter-spacing: 2px; }
+
+        .range-est {
+            margin-top: 30px;
+            background: #000;
+            padding: 10px 20px;
+            border-radius: 4px;
+            border-left: 4px solid var(--fuel-green);
+        }
+
+        /* Track Map (Timeline) */
+        .track-panel {
+            background: var(--panel-grey);
+            border-radius: 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            border: 2px solid #37474f;
+        }
+
+        .track-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #455a64;
+            padding-bottom: 10px;
+        }
+
+        .minimap {
+            flex: 1;
+            position: relative;
+            background: #111;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+        }
+
+        .check-point {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .check-point:hover { opacity: 1; }
+        .check-point.major { transform: scale(1.02); opacity: 1; font-weight: bold; }
+
+        .node-icon {
+            width: 20px; height: 20px;
+            background: #333;
+            border-radius: 50%;
+            border: 2px solid #555;
+            position: relative;
+        }
+        
+        /* Line connecting nodes */
+        .node-icon::after {
+            content: '';
+            position: absolute;
+            top: 20px; left: 7px;
+            width: 2px; height: 35px;
+            background: #333;
+        }
+        
+        .check-point:last-child .node-icon::after { display: none; }
+
+        .pit-stop .node-icon { background: var(--fuel-green); border-color: #fff; box-shadow: 0 0 10px var(--fuel-green); }
+        .hazard .node-icon { background: var(--fuel-red); border-color: #fff; }
+
+        .cp-info { flex: 1; display:flex; justify-content: space-between; align-items: center;}
+        .cp-text { font-size: 0.9rem; }
+        .cp-dist { color: #aaa; font-size: 0.8rem; }
+        .cp-amt { font-family: 'Racing Sans One'; font-size: 1.1rem; }
+
+        .lap-time {
+            color: var(--fuel-yellow);
+            font-family: 'Racing Sans One';
+            font-size: 1.5rem;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <!-- Fuel Gauge -->
+        <div class="gauge-panel">
+            <h3 style="margin: 0 0 20px 0; color: #90a4ae;">TANK LEVEL</h3>
+            <div class="gauge-arc">
+                <div class="gauge-fill"></div>
+                <div class="gauge-cover"></div>
+            </div>
+            
+            <div class="digital-readout">
+                <div class="big-val">42%</div>
+                <div class="lbl">$2,528.36 / $6,000</div>
+            </div>
+
+            <div class="range-est">
+                <div style="font-size:0.8rem; color:#aaa;">ESTIMATED RANGE</div>
+                <div style="font-size:1.2rem; font-weight:bold;">42 DAYS <small>to Empty</small></div>
+            </div>
+        </div>
+
+        <!-- Track Map -->
+        <div class="track-panel">
+            <div class="track-header">
+                <div style="font-weight: 700;">UPCOMING TURNS</div>
+                <div>
+                    <span style="font-size: 0.8rem; color: #aaa;">NEXT PIT STOP</span>
+                    <div class="lap-time">15 DAYS</div>
+                </div>
+            </div>
+
+            <div class="minimap">
+                <div class="check-point">
+                    <div class="node-icon"></div>
+                    <div class="cp-info">
+                        <div>
+                            <div class="cp-text">Start Line</div>
+                            <div class="cp-dist">Today</div>
+                        </div>
+                        <div class="cp-amt">$2,528</div>
+                    </div>
+                </div>
+                
+                <div class="check-point">
+                    <div class="node-icon"></div>
+                    <div class="cp-info">
+                        <div>
+                            <div class="cp-text">Food Stop</div>
+                            <div class="cp-dist">T+0</div>
+                        </div>
+                        <div class="cp-amt" style="color:red">-120</div>
+                    </div>
+                </div>
+
+                <div class="check-point major pit-stop">
+                    <div class="node-icon"></div>
+                    <div class="cp-info">
+                        <div>
+                            <div class="cp-text">PIT STOP (Paycheck)</div>
+                            <div class="cp-dist">T+15</div>
+                        </div>
+                        <div class="cp-amt" style="color:var(--fuel-green)">+3,877</div>
+                    </div>
+                </div>
+
+                <div class="check-point major hazard">
+                    <div class="node-icon"></div>
+                    <div class="cp-info">
+                        <div>
+                            <div class="cp-text">HAIRPIN (Rent)</div>
+                            <div class="cp-dist">T+25</div>
+                        </div>
+                        <div class="cp-amt" style="color:red">-2,650</div>
+                    </div>
+                </div>
+                 <div class="check-point">
+                    <div class="node-icon"></div>
+                    <div class="cp-info">
+                        <div>
+                            <div class="cp-text">End of Stage</div>
+                            <div class="cp-dist">T+30</div>
+                        </div>
+                        <div class="cp-amt">---</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</body>
+</html>

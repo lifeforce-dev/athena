@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid Assets</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #101015;
+            --tank-glass: rgba(255, 255, 255, 0.05);
+            --liquid-color: #00d2ff;
+            --liquid-danger: #ea005e;
+            --text-primary: #e0e6ed;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: 'Chakra Petch', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+        }
+
+        /* TANK SECTION */
+        .tank-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            background: radial-gradient(circle at center, #1b1b22 0%, #000 70%);
+        }
+
+        .tank-container {
+            width: 200px;
+            height: 600px;
+            border: 4px solid #444;
+            border-radius: 20px;
+            position: relative;
+            background: var(--tank-glass);
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* Measurement markings */
+        .markings {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px 0;
+            border-left: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .mark {
+            height: 1px;
+            background: rgba(255,255,255,0.3);
+            width: 100%;
+            position: relative;
+        }
+
+        .mark span {
+            position: absolute;
+            right: 10px;
+            top: -10px;
+            font-size: 0.7rem;
+            color: #888;
+        }
+
+        .liquid {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, rgba(0,210,255,0.8), rgba(0,100,255,0.8));
+            transition: height 1s cubic-bezier(0.5, 0, 0.5, 1);
+            box-shadow: 0 0 40px var(--liquid-color);
+        }
+        
+        .liquid::after { /* Surface foam */
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: rgba(255,255,255,0.5);
+            filter: blur(2px);
+        }
+
+        .liquid.low {
+            background: linear-gradient(180deg, var(--liquid-danger), #600020);
+            box-shadow: 0 0 40px #ff0000;
+        }
+
+        .current-val {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: 700;
+            text-shadow: 0 5px 20px #000;
+            z-index: 10;
+        }
+        
+        .label { font-size: 1rem; color: #888; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin-bottom: 30px;}
+
+        /* FUTURE PREVIEW */
+        .future-section {
+            padding: 50px;
+            overflow-y: auto;
+        }
+        
+        .flow-header {
+            border-bottom: 2px solid #333;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+        }
+
+        .flow-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 25px;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        
+        .flow-row:hover { opacity: 1; }
+        
+        .flow-date { width: 100px; color: #888; font-size: 0.9rem; }
+        .flow-node { 
+            width: 15px; 
+            height: 15px; 
+            border-radius: 50%; 
+            background: #333; 
+            margin-right: 20px;
+            position: relative;
+        }
+        
+        /* Connector line */
+        .flow-node::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 7px;
+            width: 2px;
+            height: 35px; /* connects to next */
+            background: #222;
+        }
+        
+        .flow-row:last-child .flow-node::before { display: none; }
+
+        .flow-desc { flex: 1; }
+        .flow-amt { font-weight: 700; font-size: 1.1rem; }
+        
+        .in { color: var(--liquid-color); }
+        .out { color: #ff5588; }
+        
+        .drain-pipe {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1a1a20;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 5px;
+        }
+        
+        .mini-tank-preview {
+            margin-top: 20px;
+            background: #111;
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .mini-tank {
+            width: 40px;
+            height: 100px;
+            background: #222;
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .mini-liq {
+            position: absolute;
+            bottom: 0; width: 100%;
+            background: #555;
+        }
+
+    </style>
+</head>
+<body>
+    <section class="tank-section">
+        <div style="position: absolute; top: 100px; text-align: center;">
+            <div class="label">Primary Reserve</div>
+            <div class="tank-container">
+                <div class="markings">
+                    <div class="mark" style="top: 0%"><span>$6k</span></div>
+                    <div class="mark" style="top: 25%"><span>$4.5k</span></div>
+                    <div class="mark" style="top: 50%"><span>$3k</span></div>
+                    <div class="mark" style="top: 75%"><span>$1.5k</span></div>
+                    <div class="mark" style="top: 100%; background: red;"><span>CRIT</span></div>
+                </div>
+                <!-- Dynamic Height -->
+                <div class="liquid" style="height: 42%;" id="mainLiquid"></div>
+            </div>
+            <div class="current-val">$2,528.<small>36</small></div>
+            <div style="margin-top: 20px; color: #666; font-size: 0.8rem;">CAPACITY: $6,000</div>
+        </div>
+    </section>
+
+    <section class="future-section">
+        <div class="flow-header">
+            <h2>Outflow Pipeline</h2>
+        </div>
+        
+        <!-- List of upcoming drains -->
+        <div class="flow-list">
+            <div class="flow-row">
+                <div class="flow-date">Today</div>
+                <div class="flow-node"></div>
+                <div class="flow-desc">Starting Level</div>
+                <div class="flow-amt">$2,528</div>
+            </div>
+            
+            <div class="flow-row">
+                <div class="flow-date">Feb 08</div>
+                <div class="flow-node" style="background:var(--liquid-danger)"></div>
+                <div class="flow-desc">Weekly Food</div>
+                <div class="flow-amt out">- $120</div>
+            </div>
+            
+            <div class="flow-row">
+                <div class="flow-date">Feb 15</div>
+                <div class="flow-node" style="background:var(--liquid-danger)"></div>
+                <div class="flow-desc">Weekly Food</div>
+                <div class="flow-amt out">- $120</div>
+            </div>
+
+             <div class="flow-row">
+                <div class="flow-date">Feb 23</div>
+                <div class="flow-node" style="background:var(--liquid-color)"></div>
+                <div class="flow-desc">Blizzard Paycheck</div>
+                <div class="flow-amt in">+ $3,877</div>
+            </div>
+            
+            <div class="flow-row">
+                <div class="flow-date">Mar 05</div>
+                <div class="flow-node" style="background: #ff0000; box-shadow: 0 0 10px red;"></div>
+                <div class="flow-desc">RENT (Massive Drain)</div>
+                <div class="flow-amt out">- $2,650</div>
+            </div>
+        </div>
+
+        <div class="mini-tank-preview">
+            <div style="flex:1;">
+                <small>End of Feb</small><br>
+                <strong>Forecast</strong>
+            </div>
+            <div class="mini-tank" title="Post-Paycheck">
+                 <div class="mini-liq" style="height: 90%; background: var(--liquid-color);"></div>
+            </div>
+             <div class="mini-tank" title="Post-Rent">
+                 <div class="mini-liq" style="height: 30%; background: orange;"></div>
+            </div>
+        </div>
+
+    </section>
+
+    <script>
+        // Simple animation to show the "live" feel
+        const liq = document.getElementById('mainLiquid');
+        setInterval(() => {
+            const h = parseInt(liq.style.height);
+            liq.style.height = (h + (Math.random() - 0.5)) + '%';
+        }, 2000);
+        
+        // Logic: 2528 / 6000 cap = 42%
+    </script>
+</body>
+</html>
