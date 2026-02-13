@@ -1,0 +1,97 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "athena"
+version = "0.1.0"
+description = "Cash-flow projection engine and API"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "bandit>=1.7",
+    "pyright>=1.1",
+]
+
+[project.scripts]
+athena = "app.cli:_run_with_output"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+fix = true
+include = ["*.py"]
+extend-exclude = [
+    "__pycache__/",
+    ".venv",
+    "dist",
+    "build",
+    ".ruff_cache",
+]
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes
+    "E", "W", # pycodestyle
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "RUF",    # ruff-specific
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "C4",     # flake8-comprehensions
+    "S",      # flake8-bandit
+    "PTH",    # flake8-use-pathlib
+]
+ignore = [
+    "E501",   # let formatter handle line length
+    "S101",   # assert is fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+    "B018",   # useless expression
+    "S",      # security warnings in tests are noise
+]
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+# ---------------------------------------------------------------------------
+# bandit
+# ---------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = [
+    "tests",
+    ".venv",
+    "build",
+    "dist",
+]
+skips = [
+    "B101",   # assert usage
+]

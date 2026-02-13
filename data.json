@@ -1,0 +1,144 @@
+{
+  "initial_balance": 8600.36,
+  "templates": [
+    {
+      "name": "Paycheck (Blizzard biweekly Friday)",
+      "amount": 3877.0,
+      "direction": "inflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 2,
+        "weekday": 4,
+        "anchor_date": "2026-01-23"
+      },
+      "start_date": "2026-01-23"
+    },
+    {
+      "name": "BeyondFinanc_CFT",
+      "amount": 579.26,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 2,
+        "weekday": 4,
+        "anchor_date": "2026-01-23"
+      },
+      "start_date": "2026-01-23"
+    },
+    {
+      "name": "Rent (Calypso Apartmen)",
+      "amount": 2650.0,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 5
+      },
+      "start_date": "2026-01-05"
+    },
+    {
+      "name": "Dept Education – Student Loan",
+      "amount": 324.33,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 6
+      },
+      "start_date": "2026-01-06"
+    },
+    {
+      "name": "AGI Renters/Condo Insurance",
+      "amount": 19.67,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 5
+      },
+      "start_date": "2026-01-05"
+    },
+    {
+      "name": "USAA P&C Auto Insurance",
+      "amount": 184.48,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 30,
+        "anchor_date": "2026-01-21"
+      },
+      "start_date": "2026-01-21"
+    },
+    {
+      "name": "So Cal Edison (DirectPay)",
+      "amount": 300.0,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 30,
+        "anchor_date": "2026-01-02"
+      },
+      "start_date": "2026-01-02"
+    },
+    {
+      "name": "SoCalGas",
+      "amount": 19.04,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 30,
+        "anchor_date": "2026-01-23"
+      },
+      "start_date": "2026-01-23"
+    },
+    {
+      "name": "FOOD (weekly Sunday)",
+      "amount": 120.0,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 1,
+        "weekday": 6,
+        "anchor_date": "2026-02-08"
+      },
+      "start_date": "2026-02-08"
+    },
+    {
+      "name": "CAR GAS (biweekly payday)",
+      "amount": 80.0,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 2,
+        "weekday": 4,
+        "anchor_date": "2026-01-23"
+      },
+      "start_date": "2026-01-23"
+    },
+    {
+      "name": "Essentials (monthly)",
+      "amount": 200.0,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 1
+      },
+      "start_date": "2026-02-01"
+    },
+    {
+      "name": "Cat Food (every 4 weeks)",
+      "amount": 122.0,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 28,
+        "anchor_date": "2026-03-20"
+      },
+      "start_date": "2026-03-20"
+    },
+    { "name": "JetBrains", "amount": 17.9, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 7 }, "start_date": "2026-01-07" },
+    { "name": "Lisle Violin Shop", "amount": 47.0, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 12 }, "start_date": "2026-01-12" },
+    { "name": "GitHub", "amount": 39.0, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 7 }, "start_date": "2026-03-07" },
+    { "name": "Google (9.99)", "amount": 9.99, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 22 }, "start_date": "2026-01-22" },
+    { "name": "Plus Excalidraw", "amount": 7.0, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 27 }, "start_date": "2026-01-27" },
+    { "name": "OpenAI ChatGPT", "amount": 20.0, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 23 }, "start_date": "2026-01-23" },
+    { "name": "Spotify", "amount": 11.99, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 28 }, "start_date": "2026-01-28" }
+  ]
+}
