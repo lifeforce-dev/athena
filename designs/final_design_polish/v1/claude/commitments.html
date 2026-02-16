@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Athena — Commitments</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#06080C;--panel:rgba(14,17,24,.75);--raised:rgba(22,26,36,.8);
+      --border:rgba(255,255,255,.06);--text:#B8BEC9;--bright:#E8ECF2;
+      --dim:#5A6378;--muted:#2A3040;
+      --safe:#34D399;--safe-g:rgba(52,211,153,.07);
+      --tight:#FBBF24;--tight-g:rgba(251,191,36,.07);
+      --danger:#F87171;--danger-g:rgba(248,113,113,.07);
+      --income:#A78BFA;
+      --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+    a{color:inherit;text-decoration:none}
+
+    .nav{display:flex;align-items:center;backdrop-filter:blur(24px);background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+    .nav-brand{font-family:var(--mono);font-weight:700;font-size:11px;color:var(--bright);padding:0 20px;letter-spacing:.18em;text-transform:uppercase}
+    .nav-tabs{display:flex;margin-left:8px}
+    .nt{padding:14px 18px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);cursor:pointer;transition:color .2s;display:block}
+    .nt:hover{color:var(--text)}.nt.active{color:var(--bright)}
+    .nt.active::after{content:'';display:block;width:4px;height:4px;margin:4px auto 0;border-radius:50%;background:var(--income)}
+
+    .wrap{max-width:900px;margin:0 auto;padding:32px 24px 48px}
+    .page-title{font-size:20px;font-weight:800;color:var(--bright);margin-bottom:4px}
+    .page-sub{font-size:12px;color:var(--dim);margin-bottom:28px}
+
+    /* Summary cards */
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+    .sum-card{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+    .sum-val{font-family:var(--mono);font-size:20px;font-weight:700}
+    .sum-lbl{font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-top:4px;font-weight:700}
+
+    /* Category groups */
+    .cat-box{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;box-shadow:0 4px 24px rgba(0,0,0,.15)}
+    .cat-hdr{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:var(--raised);border-bottom:1px solid var(--border)}
+    .cat-name{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.12em}
+    .cat-total{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--danger)}
+    .cat-total.pos{color:var(--income)}
+    .col-hdr{display:grid;grid-template-columns:1fr 90px 90px 90px 40px;gap:10px;padding:8px 18px;border-bottom:1px solid var(--border);font-size:8px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+    .c-row{display:grid;grid-template-columns:1fr 90px 90px 90px 40px;gap:10px;align-items:center;padding:8px 18px;border-bottom:1px solid rgba(255,255,255,.02);transition:background .12s}
+    .c-row:last-child{border-bottom:none}
+    .c-row:hover{background:rgba(255,255,255,.02)}
+    .c-name{font-size:12px;color:var(--text);font-weight:500}
+    .c-amt{font-family:var(--mono);font-size:12px;font-weight:700;text-align:right}
+    .c-amt.neg{color:var(--danger)}.c-amt.pos{color:var(--income)}
+    .c-freq{font-size:10px;color:var(--dim);text-align:center}
+    .c-next{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
+    .c-del{width:28px;height:28px;border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:all .15s}
+    .c-del:hover{background:rgba(248,113,113,.1);color:var(--danger)}
+
+    /* One-time section */
+    .once-tag{display:inline-block;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 6px;border-radius:4px;background:rgba(167,139,250,.1);color:var(--income);margin-left:8px}
+
+    /* Add form */
+    .add-bar{display:flex;gap:10px;margin-bottom:28px;flex-wrap:wrap}
+    .add-btn{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 20px;color:var(--bright);font-family:var(--sans);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
+    .add-btn:hover{background:var(--raised);border-color:rgba(255,255,255,.1)}
+    .add-btn .plus{color:var(--income);font-size:16px;font-weight:400}
+
+    .modal-overlay{position:fixed;inset:0;background:rgba(6,8,12,.85);backdrop-filter:blur(8px);z-index:100;display:none;align-items:center;justify-content:center}
+    .modal-overlay.show{display:flex}
+    .modal{backdrop-filter:blur(24px);background:rgba(14,17,24,.95);border:1px solid var(--border);border-radius:16px;padding:28px;width:420px;max-width:90vw;box-shadow:0 16px 64px rgba(0,0,0,.5)}
+    .modal-title{font-size:16px;font-weight:800;color:var(--bright);margin-bottom:20px}
+    .field{margin-bottom:14px}
+    .field label{display:block;font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+    .field input,.field select{width:100%;background:var(--raised);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--bright);font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s}
+    .field input:focus,.field select:focus{border-color:rgba(167,139,250,.3)}
+    .field select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235A6378'%3E%3Cpath d='M2 4l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+    .btn{padding:10px 20px;border-radius:8px;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);transition:all .15s}
+    .btn-cancel{background:none;color:var(--dim)}.btn-cancel:hover{color:var(--text);background:var(--raised)}
+    .btn-save{background:rgba(167,139,250,.15);color:var(--income);border-color:rgba(167,139,250,.2)}.btn-save:hover{background:rgba(167,139,250,.25)}
+
+    @media(max-width:700px){
+      .summary{grid-template-columns:1fr 1fr}
+      .col-hdr,.c-row{grid-template-columns:1fr 70px 70px 30px}
+      .c-next,.col-hdr>span:nth-child(4){display:none}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">Athena</div>
+  <div class="nav-tabs">
+    <a href="dashboard.html" class="nt">Dashboard</a>
+    <a href="commitments.html" class="nt active">Commitments</a>
+    <a href="simulation.html" class="nt">Simulation</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="page-title">Commitments</div>
+  <div class="page-sub">Manage recurring expenses, income, and one-time payments that drive your trajectory.</div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="add-bar">
+    <button class="add-btn" onclick="openModal('recurring')"><span class="plus">+</span> Add Recurring</button>
+    <button class="add-btn" onclick="openModal('once')"><span class="plus">+</span> Add One-Time</button>
+  </div>
+
+  <div id="commitList"></div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">Add Commitment</div>
+    <div class="field">
+      <label>Name</label>
+      <input type="text" id="fName" placeholder="e.g. Netflix, Car Payment">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Amount ($)</label>
+        <input type="number" id="fAmount" step="0.01" placeholder="0.00">
+      </div>
+      <div class="field">
+        <label>Type</label>
+        <select id="fType">
+          <option value="expense">Expense (−)</option>
+          <option value="income">Income (+)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Frequency</label>
+        <select id="fFreq">
+          <option value="monthly">Monthly</option>
+          <option value="biweekly">Biweekly</option>
+          <option value="weekly">Weekly</option>
+          <option value="once">One-Time</option>
+        </select>
+      </div>
+      <div class="field" id="fDayWrap">
+        <label>Day of Month</label>
+        <input type="number" id="fDay" min="1" max="31" placeholder="1">
+      </div>
+      <div class="field" id="fDateWrap" style="display:none">
+        <label>Date</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="field" id="fAnchorWrap" style="display:none">
+        <label>Starting From</label>
+        <input type="date" id="fAnchor">
+      </div>
+    </div>
+    <div class="field">
+      <label>Category</label>
+      <select id="fCat">
+        <option value="income">Income</option>
+        <option value="housing">Housing</option>
+        <option value="bills">Bills</option>
+        <option value="subscriptions">Subscriptions</option>
+        <option value="debt">Debt Payments</option>
+        <option value="living">Living Expenses</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-save" onclick="saveCommitment()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const fm = n => '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+const fmI = n => '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0});
+
+const CAT_LABELS = {
+  income: 'Income', housing: 'Housing', bills: 'Bills',
+  subscriptions: 'Subscriptions', debt: 'Debt Payments',
+  living: 'Living Expenses', other: 'Other'
+};
+const CAT_ORDER = ['income','housing','debt','bills','living','subscriptions','other'];
+
+// ── Default commitment data ──
+const DEFAULT_COMMITMENTS = [
+  {id:1,name:'Paycheck',amount:3600.25,freq:'biweekly',anchor:'2026-02-20',cat:'income'},
+  {id:2,name:'Rent',amount:-2500,freq:'monthly',day:1,cat:'housing'},
+  {id:3,name:'ERenterPlan',amount:-22.75,freq:'monthly',day:21,cat:'housing'},
+  {id:4,name:'Cox Internet',amount:-69.99,freq:'monthly',day:1,cat:'bills'},
+  {id:5,name:'Utilities',amount:-113,freq:'monthly',day:23,cat:'bills'},
+  {id:6,name:'USAA Insurance',amount:-169,freq:'monthly',day:19,cat:'bills'},
+  {id:7,name:'Microsoft 365',amount:-9.99,freq:'monthly',day:15,cat:'subscriptions'},
+  {id:8,name:'OWL3D',amount:-9.99,freq:'monthly',day:15,cat:'subscriptions'},
+  {id:9,name:'GitHub',amount:-14,freq:'monthly',day:17,cat:'subscriptions'},
+  {id:10,name:'Discord Nitro',amount:-9.99,freq:'monthly',day:18,cat:'subscriptions'},
+  {id:11,name:'YouTube Premium',amount:-13.99,freq:'monthly',day:18,cat:'subscriptions'},
+  {id:12,name:'Raidbots Premium',amount:-24,freq:'monthly',day:18,cat:'subscriptions'},
+  {id:13,name:'ChatGPT',amount:-20,freq:'monthly',day:19,cat:'subscriptions'},
+  {id:14,name:'Rocket Money',amount:-6,freq:'monthly',day:25,cat:'subscriptions'},
+  {id:15,name:'Netflix',amount:-24.99,freq:'monthly',day:26,cat:'subscriptions'},
+  {id:16,name:'Hulu',amount:-9.99,freq:'monthly',day:26,cat:'subscriptions'},
+  {id:17,name:'Patreon',amount:-5.50,freq:'monthly',day:12,cat:'subscriptions'},
+  {id:18,name:'Lisle Violin Shop',amount:-47,freq:'monthly',day:12,cat:'subscriptions'},
+  {id:19,name:'Student Loan',amount:-324.33,freq:'monthly',day:6,cat:'debt'},
+  {id:20,name:'BeyondFinanc',amount:-579.26,freq:'biweekly',anchor:'2026-02-20',cat:'debt'},
+  {id:21,name:'Food',amount:-400,freq:'biweekly',anchor:'2026-02-20',cat:'living'},
+  {id:22,name:'Gas',amount:-30,freq:'biweekly',anchor:'2026-02-20',cat:'living'},
+  {id:23,name:'Savings',amount:-1,freq:'biweekly',anchor:'2026-02-20',cat:'living'},
+];
+
+// Load from localStorage or use defaults
+function loadCommitments() {
+  const saved = localStorage.getItem('athena_commitments');
+  if (saved) {
+    try { return JSON.parse(saved); } catch(e) {}
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_COMMITMENTS));
+}
+function saveCommitments(data) {
+  localStorage.setItem('athena_commitments', JSON.stringify(data));
+}
+
+let commitments = loadCommitments();
+let nextId = Math.max(...commitments.map(c => c.id), 0) + 1;
+
+function freqLabel(f) {
+  return {monthly:'Monthly',biweekly:'Biweekly',weekly:'Weekly',once:'One-Time'}[f] || f;
+}
+
+function nextOccurrence(c) {
+  const today = new Date('2026-02-15T12:00:00');
+  if (c.freq === 'once') {
+    return c.date || '—';
+  }
+  if (c.freq === 'monthly') {
+    let d = new Date(today.getFullYear(), today.getMonth(), c.day);
+    if (d <= today) d.setMonth(d.getMonth() + 1);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
+  if (c.freq === 'biweekly') {
+    const anchor = new Date(c.anchor + 'T12:00:00');
+    let d = new Date(anchor);
+    while (d <= today) d.setDate(d.getDate() + 14);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
+  if (c.freq === 'weekly') {
+    const anchor = new Date((c.anchor || '2026-02-15') + 'T12:00:00');
+    let d = new Date(anchor);
+    while (d <= today) d.setDate(d.getDate() + 7);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
+  return '—';
+}
+
+function monthlyEquiv(c) {
+  if (c.freq === 'monthly') return c.amount;
+  if (c.freq === 'biweekly') return c.amount * (26 / 12);
+  if (c.freq === 'weekly') return c.amount * (52 / 12);
+  return 0; // one-time doesn't recur
+}
+
+function render() {
+  // Summary
+  const recurring = commitments.filter(c => c.freq !== 'once');
+  const oneTime = commitments.filter(c => c.freq === 'once');
+  const totalIncome = recurring.filter(c => c.amount > 0).reduce((s, c) => s + monthlyEquiv(c), 0);
+  const totalExpenses = recurring.filter(c => c.amount < 0).reduce((s, c) => s + monthlyEquiv(c), 0);
+  const net = totalIncome + totalExpenses;
+
+  document.getElementById('summary').innerHTML =
+    '<div class="sum-card"><div class="sum-val" style="color:var(--income)">' + fmI(totalIncome) + '</div><div class="sum-lbl">Monthly Income</div></div>' +
+    '<div class="sum-card"><div class="sum-val" style="color:var(--danger)">' + fmI(totalExpenses) + '</div><div class="sum-lbl">Monthly Expenses</div></div>' +
+    '<div class="sum-card"><div class="sum-val" style="color:' + (net >= 0 ? 'var(--safe)' : 'var(--danger)') + '">' + (net >= 0 ? '+' : '-') + fmI(net) + '</div><div class="sum-lbl">Net / Month</div></div>' +
+    '<div class="sum-card"><div class="sum-val" style="color:var(--bright)">' + commitments.length + '</div><div class="sum-lbl">Total Items</div></div>';
+
+  // Group by category
+  const groups = {};
+  commitments.forEach(c => {
+    const g = c.cat || 'other';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(c);
+  });
+
+  let html = '';
+  CAT_ORDER.forEach(cat => {
+    if (!groups[cat]) return;
+    const items = groups[cat];
+    const total = items.reduce((s, c) => s + monthlyEquiv(c), 0);
+    const isPos = total > 0;
+
+    html += '<div class="cat-box"><div class="cat-hdr"><span class="cat-name">' + CAT_LABELS[cat] + ' (' + items.length + ')</span><span class="cat-total' + (isPos ? ' pos' : '') + '">' + (isPos ? '+' : '-') + fmI(total) + '/mo</span></div>';
+    html += '<div class="col-hdr"><span>Name</span><span style="text-align:right">Amount</span><span style="text-align:center">Frequency</span><span style="text-align:center">Next</span><span></span></div>';
+
+    items.sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
+    items.forEach(c => {
+      const isInc = c.amount > 0;
+      html += '<div class="c-row">';
+      html += '<span class="c-name">' + c.name + (c.freq === 'once' ? '<span class="once-tag">one-time</span>' : '') + '</span>';
+      html += '<span class="c-amt ' + (isInc ? 'pos' : 'neg') + '">' + (isInc ? '+' : '-') + fm(c.amount) + '</span>';
+      html += '<span class="c-freq">' + freqLabel(c.freq) + '</span>';
+      html += '<span class="c-next">' + nextOccurrence(c) + '</span>';
+      html += '<button class="c-del" onclick="deleteCommitment(' + c.id + ')" title="Remove">×</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  document.getElementById('commitList').innerHTML = html;
+}
+
+function deleteCommitment(id) {
+  commitments = commitments.filter(c => c.id !== id);
+  saveCommitments(commitments);
+  render();
+}
+
+function openModal(type) {
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('modalTitle').textContent = type === 'once' ? 'Add One-Time Payment' : 'Add Recurring Commitment';
+  document.getElementById('fName').value = '';
+  document.getElementById('fAmount').value = '';
+  document.getElementById('fType').value = 'expense';
+  document.getElementById('fCat').value = type === 'once' ? 'other' : 'bills';
+
+  if (type === 'once') {
+    document.getElementById('fFreq').value = 'once';
+    document.getElementById('fFreq').disabled = true;
+  } else {
+    document.getElementById('fFreq').value = 'monthly';
+    document.getElementById('fFreq').disabled = false;
+  }
+  updateFreqFields();
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+document.getElementById('fFreq').addEventListener('change', updateFreqFields);
+function updateFreqFields() {
+  const freq = document.getElementById('fFreq').value;
+  document.getElementById('fDayWrap').style.display = freq === 'monthly' ? '' : 'none';
+  document.getElementById('fDateWrap').style.display = freq === 'once' ? '' : 'none';
+  document.getElementById('fAnchorWrap').style.display = (freq === 'biweekly' || freq === 'weekly') ? '' : 'none';
+}
+
+function saveCommitment() {
+  const name = document.getElementById('fName').value.trim();
+  const rawAmt = parseFloat(document.getElementById('fAmount').value);
+  const type = document.getElementById('fType').value;
+  const freq = document.getElementById('fFreq').value;
+  const cat = document.getElementById('fCat').value;
+
+  if (!name || isNaN(rawAmt) || rawAmt <= 0) {
+    alert('Please fill in name and a positive amount.');
+    return;
+  }
+
+  const amount = type === 'expense' ? -rawAmt : rawAmt;
+  const entry = {id: nextId++, name, amount, freq, cat};
+
+  if (freq === 'monthly') {
+    entry.day = parseInt(document.getElementById('fDay').value) || 1;
+  } else if (freq === 'once') {
+    entry.date = document.getElementById('fDate').value || '2026-03-01';
+  } else {
+    entry.anchor = document.getElementById('fAnchor').value || '2026-02-15';
+  }
+
+  commitments.push(entry);
+  saveCommitments(commitments);
+  closeModal();
+  render();
+}
+
+// Close modal on overlay click
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+render();
+</script>
+</body>
+</html>

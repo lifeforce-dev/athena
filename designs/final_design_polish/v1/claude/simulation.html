@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Athena — Simulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#06080C;--panel:rgba(14,17,24,.75);--raised:rgba(22,26,36,.8);
+      --border:rgba(255,255,255,.06);--text:#B8BEC9;--bright:#E8ECF2;
+      --dim:#5A6378;--muted:#2A3040;
+      --safe:#34D399;--safe-g:rgba(52,211,153,.07);
+      --tight:#FBBF24;--tight-g:rgba(251,191,36,.07);
+      --danger:#F87171;--danger-g:rgba(248,113,113,.07);
+      --income:#A78BFA;
+      --mono:'IBM Plex Mono',monospace;--sans:'Sora',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+    a{color:inherit;text-decoration:none}
+
+    .nav{display:flex;align-items:center;backdrop-filter:blur(24px);background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+    .nav-brand{font-family:var(--mono);font-weight:700;font-size:11px;color:var(--bright);padding:0 20px;letter-spacing:.18em;text-transform:uppercase}
+    .nav-tabs{display:flex;margin-left:8px}
+    .nt{padding:14px 18px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);cursor:pointer;transition:color .2s;display:block}
+    .nt:hover{color:var(--text)}.nt.active{color:var(--bright)}
+    .nt.active::after{content:'';display:block;width:4px;height:4px;margin:4px auto 0;border-radius:50%;background:var(--income)}
+
+    .wrap{max-width:1060px;margin:0 auto;padding:32px 24px 48px}
+
+    /* Date picker row */
+    .sim-controls{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-bottom:28px}
+    .ctrl-field{display:flex;flex-direction:column;gap:4px}
+    .ctrl-label{font-size:8px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
+    .ctrl-input{background:var(--raised);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--bright);font-family:var(--sans);font-size:13px;outline:none;transition:border-color .15s;min-width:160px}
+    .ctrl-input:focus{border-color:rgba(167,139,250,.3)}
+    .sim-btn{padding:10px 24px;border-radius:8px;font-family:var(--sans);font-size:12px;font-weight:700;cursor:pointer;border:1px solid rgba(167,139,250,.2);background:rgba(167,139,250,.1);color:var(--income);transition:all .15s;height:41px}
+    .sim-btn:hover{background:rgba(167,139,250,.2)}
+    .sim-info{font-size:11px;color:var(--dim);margin-left:auto;align-self:center;font-family:var(--mono)}
+
+    /* Hero strip */
+    .hero-strip{display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap}
+    .hs-card{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;text-align:center;flex:1;min-width:140px;box-shadow:0 4px 16px rgba(0,0,0,.2)}
+    .hs-val{font-family:var(--mono);font-size:20px;font-weight:700}
+    .hs-sub{font-size:8px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+    .hs-lbl{font-size:8px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-top:4px;font-weight:700}
+
+    /* Chart */
+    .sh{display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 10px}
+    .sh-t{font-size:10px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.1em}
+    .sh-m{font-family:var(--mono);font-size:10px;color:var(--muted)}
+    .chart-box{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:14px;height:320px;position:relative;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.2)}
+    #tC{width:100%;height:100%;display:block}
+    .tt{position:absolute;pointer-events:none;opacity:0;backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 14px;font-size:11px;min-width:170px;transition:opacity .1s;z-index:5;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+    .tt.show{opacity:1}
+
+    /* Monthly breakdown */
+    .month-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:12px}
+    .mo-card{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+    .mo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .mo-name{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+    .mo-net{font-family:var(--mono);font-size:14px;font-weight:700}
+    .mo-net.pos{color:var(--safe)}.mo-net.neg{color:var(--danger)}
+    .mo-bar{width:100%;height:4px;background:var(--muted);border-radius:2px;overflow:hidden;margin:8px 0}
+    .mo-bar-fill{height:100%;border-radius:2px;transition:width .3s}
+    .mo-stats{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);font-family:var(--mono)}
+    .mo-start,.mo-end{display:flex;flex-direction:column;gap:1px}
+    .mo-val{color:var(--text);font-weight:600;font-size:10px}
+
+    .empty-state{text-align:center;padding:60px 20px;color:var(--dim)}
+    .empty-state h3{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px}
+    .empty-state p{font-size:12px;max-width:400px;margin:0 auto}
+
+    @media(max-width:700px){
+      .hero-strip{gap:8px}
+      .hs-card{min-width:100px;padding:12px}
+      .chart-box{height:240px}
+      .sim-controls{flex-direction:column;align-items:stretch}
+      .sim-info{margin-left:0;margin-top:8px}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">Athena</div>
+  <div class="nav-tabs">
+    <a href="dashboard.html" class="nt">Dashboard</a>
+    <a href="commitments.html" class="nt">Commitments</a>
+    <a href="simulation.html" class="nt active">Simulation</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="sim-controls">
+    <div class="ctrl-field">
+      <span class="ctrl-label">Start Date</span>
+      <input type="date" class="ctrl-input" id="startDate" value="2026-02-15">
+    </div>
+    <div class="ctrl-field">
+      <span class="ctrl-label">End Date</span>
+      <input type="date" class="ctrl-input" id="endDate" value="2026-05-15">
+    </div>
+    <button class="sim-btn" onclick="runSim()">Run Simulation</button>
+    <span class="sim-info" id="simInfo">90 day window</span>
+  </div>
+
+  <div class="hero-strip" id="heroStrip">
+    <div class="hs-card"><div class="hs-val" style="color:var(--bright)" id="hsCur">—</div><div class="hs-lbl">Current</div></div>
+    <div class="hs-card"><div class="hs-val" id="hsAfter">—</div><div class="hs-lbl">After Window</div></div>
+    <div class="hs-card"><div class="hs-val" id="hsLow">—</div><div class="hs-sub" id="hsLowDate"></div><div class="hs-lbl">Lowest Point</div></div>
+    <div class="hs-card"><div class="hs-val" id="hsAvg">—</div><div class="hs-lbl">Avg Gained / Month</div></div>
+  </div>
+
+  <div class="sh">
+    <span class="sh-t">Simulation Trajectory</span>
+    <span class="sh-m" id="chartRange"></span>
+  </div>
+  <div class="chart-box" id="cWrap">
+    <canvas id="tC"></canvas>
+    <div class="tt" id="tip"></div>
+  </div>
+
+  <div class="sh">
+    <span class="sh-t">Monthly Breakdown</span>
+    <span class="sh-m" id="moCount"></span>
+  </div>
+  <div class="month-grid" id="monthGrid"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// TRAJECTORY DATA (full projection)
+// ═══════════════════════════════════════════════════════
+const T=[
+  {d:'2026-02-15',b:2847,ev:[{n:'Microsoft 365',a:-9.99},{n:'OWL3D',a:-9.99}]},
+  {d:'2026-02-16',b:2827,ev:[]},{d:'2026-02-17',b:2813,ev:[{n:'GitHub',a:-14}]},
+  {d:'2026-02-18',b:2765,ev:[{n:'Discord Nitro',a:-9.99},{n:'YouTube Premium',a:-13.99},{n:'Raidbots Premium',a:-24}]},
+  {d:'2026-02-19',b:2576,ev:[{n:'USAA Insurance',a:-169},{n:'ChatGPT',a:-20}]},
+  {d:'2026-02-20',b:5166,ev:[{n:'Paycheck',a:3600.25},{n:'BeyondFinanc',a:-579.26},{n:'Food',a:-400},{n:'Gas',a:-30},{n:'Savings',a:-1}]},
+  {d:'2026-02-21',b:5143,ev:[{n:'ERenterPlan',a:-22.75}]},{d:'2026-02-22',b:5143,ev:[]},
+  {d:'2026-02-23',b:5030,ev:[{n:'Utilities',a:-113}]},{d:'2026-02-24',b:5030,ev:[]},
+  {d:'2026-02-25',b:5024,ev:[{n:'Rocket Money',a:-6}]},
+  {d:'2026-02-26',b:4989,ev:[{n:'Netflix',a:-24.99},{n:'Hulu',a:-9.99}]},
+  {d:'2026-02-27',b:4989,ev:[]},{d:'2026-02-28',b:4989,ev:[]},
+  {d:'2026-03-01',b:2419,ev:[{n:'Rent',a:-2500},{n:'Cox Internet',a:-69.99}]},
+  {d:'2026-03-02',b:2419,ev:[]},{d:'2026-03-03',b:2419,ev:[]},{d:'2026-03-04',b:2419,ev:[]},{d:'2026-03-05',b:2419,ev:[]},
+  {d:'2026-03-06',b:4685,ev:[{n:'Paycheck',a:3600.25},{n:'Student Loan',a:-324.33},{n:'BeyondFinanc',a:-579.26},{n:'Food',a:-400},{n:'Gas',a:-30},{n:'Savings',a:-1}]},
+  {d:'2026-03-07',b:4685,ev:[]},{d:'2026-03-08',b:4685,ev:[]},{d:'2026-03-09',b:4685,ev:[]},
+  {d:'2026-03-10',b:4685,ev:[]},{d:'2026-03-11',b:4685,ev:[]},
+  {d:'2026-03-12',b:4633,ev:[{n:'Lisle Violin Shop',a:-47},{n:'Patreon',a:-5.50}]},
+  {d:'2026-03-13',b:4633,ev:[]},{d:'2026-03-14',b:4633,ev:[]},
+  {d:'2026-03-15',b:4613,ev:[{n:'Microsoft 365',a:-9.99},{n:'OWL3D',a:-9.99}]},
+  {d:'2026-03-16',b:4613,ev:[]},{d:'2026-03-17',b:4613,ev:[]},
+  {d:'2026-03-18',b:4565,ev:[{n:'Discord Nitro',a:-9.99},{n:'YouTube Premium',a:-13.99},{n:'Raidbots Premium',a:-24}]},
+  {d:'2026-03-19',b:4376,ev:[{n:'USAA Insurance',a:-169},{n:'ChatGPT',a:-20}]},
+  {d:'2026-03-20',b:6966,ev:[{n:'Paycheck',a:3600.25},{n:'BeyondFinanc',a:-579.26},{n:'Food',a:-400},{n:'Gas',a:-30},{n:'Savings',a:-1}]},
+  {d:'2026-03-21',b:6943,ev:[{n:'ERenterPlan',a:-22.75}]},
+  {d:'2026-03-22',b:6943,ev:[]},{d:'2026-03-23',b:6830,ev:[{n:'Utilities',a:-113}]},
+  {d:'2026-03-24',b:6830,ev:[]},{d:'2026-03-25',b:6824,ev:[{n:'Rocket Money',a:-6}]},
+  {d:'2026-03-26',b:6789,ev:[{n:'Netflix',a:-24.99},{n:'Hulu',a:-9.99}]},
+  {d:'2026-03-27',b:6789,ev:[]},{d:'2026-03-28',b:6789,ev:[]},{d:'2026-03-29',b:6789,ev:[]},
+  {d:'2026-03-30',b:6789,ev:[]},{d:'2026-03-31',b:6789,ev:[]},
+  {d:'2026-04-01',b:4219,ev:[{n:'Rent',a:-2500},{n:'Cox Internet',a:-69.99}]},
+  {d:'2026-04-02',b:4219,ev:[]},{d:'2026-04-03',b:4519,ev:[{n:'Paycheck',a:3600.25},{n:'Student Loan',a:-324.33},{n:'BeyondFinanc',a:-579.26},{n:'Food',a:-400},{n:'Gas',a:-30},{n:'Savings',a:-1}]},
+  {d:'2026-04-04',b:4519,ev:[]},{d:'2026-04-05',b:4519,ev:[]},{d:'2026-04-06',b:4519,ev:[]},
+  {d:'2026-04-07',b:4519,ev:[]},{d:'2026-04-08',b:4519,ev:[]},{d:'2026-04-09',b:4519,ev:[]},
+  {d:'2026-04-10',b:4519,ev:[]},{d:'2026-04-11',b:4519,ev:[]},
+  {d:'2026-04-12',b:4467,ev:[{n:'Lisle Violin Shop',a:-47},{n:'Patreon',a:-5.50}]},
+  {d:'2026-04-13',b:4467,ev:[]},{d:'2026-04-14',b:4467,ev:[]},
+  {d:'2026-04-15',b:4447,ev:[{n:'Microsoft 365',a:-9.99},{n:'OWL3D',a:-9.99}]},
+  {d:'2026-04-16',b:4447,ev:[]},{d:'2026-04-17',b:4399,ev:[{n:'Paycheck',a:3600.25},{n:'BeyondFinanc',a:-579.26},{n:'Food',a:-400},{n:'Gas',a:-30},{n:'Savings',a:-1},{n:'Discord Nitro',a:-9.99},{n:'YouTube Premium',a:-13.99},{n:'Raidbots Premium',a:-24}]},
+  {d:'2026-04-18',b:4210,ev:[{n:'USAA Insurance',a:-169},{n:'ChatGPT',a:-20}]},
+  {d:'2026-04-19',b:4210,ev:[]},{d:'2026-04-20',b:4210,ev:[]},
+  {d:'2026-04-21',b:4187,ev:[{n:'ERenterPlan',a:-22.75}]},
+  {d:'2026-04-22',b:4187,ev:[]},{d:'2026-04-23',b:4074,ev:[{n:'Utilities',a:-113}]},
+  {d:'2026-04-24',b:4074,ev:[]},{d:'2026-04-25',b:4068,ev:[{n:'Rocket Money',a:-6}]},
+  {d:'2026-04-26',b:4033,ev:[{n:'Netflix',a:-24.99},{n:'Hulu',a:-9.99}]},
+  {d:'2026-04-27',b:4033,ev:[]},{d:'2026-04-28',b:4033,ev:[]},
+  {d:'2026-04-29',b:4033,ev:[]},{d:'2026-04-30',b:4033,ev:[]},
+  {d:'2026-05-01',b:1463,ev:[{n:'Rent',a:-2500},{n:'Cox Internet',a:-69.99}]},
+  {d:'2026-05-02',b:1463,ev:[]},{d:'2026-05-03',b:1463,ev:[]},
+  {d:'2026-05-04',b:1463,ev:[]},{d:'2026-05-05',b:1463,ev:[]},
+  {d:'2026-05-06',b:1463,ev:[]},{d:'2026-05-07',b:1463,ev:[]},
+  {d:'2026-05-08',b:1463,ev:[]},{d:'2026-05-09',b:1463,ev:[]},
+  {d:'2026-05-10',b:1463,ev:[]},{d:'2026-05-11',b:1463,ev:[]},
+  {d:'2026-05-12',b:1411,ev:[{n:'Lisle Violin Shop',a:-47},{n:'Patreon',a:-5.50}]},
+  {d:'2026-05-13',b:1411,ev:[]},{d:'2026-05-14',b:1411,ev:[]},
+  {d:'2026-05-15',b:1391,ev:[{n:'Microsoft 365',a:-9.99},{n:'OWL3D',a:-9.99}]},
+];
+
+const fm = n => '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:0});
+const fm2 = n => '$' + Math.abs(n).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+const sd = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'});
+const mn = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {month:'long', year:'numeric'});
+const mnShort = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {month:'short', year:'2-digit'});
+const daysBetween = (a, b) => Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00')) / 864e5);
+
+let simSlice = [];
+let monthBreaks = []; // [{idx, label, startBal, endBal, net}]
+
+function runSim() {
+  const startStr = document.getElementById('startDate').value;
+  const endStr = document.getElementById('endDate').value;
+  if (!startStr || !endStr) return;
+
+  const startIdx = T.findIndex(t => t.d >= startStr);
+  const endIdx = T.findIndex(t => t.d > endStr);
+  if (startIdx < 0) { alert('Start date out of data range'); return; }
+
+  simSlice = T.slice(startIdx, endIdx < 0 ? T.length : endIdx);
+  if (simSlice.length < 2) { alert('Window too small — need at least 2 days of data'); return; }
+
+  const days = daysBetween(simSlice[0].d, simSlice[simSlice.length - 1].d);
+  document.getElementById('simInfo').textContent = days + ' day window';
+
+  // ── Hero metrics ──
+  const curBal = simSlice[0].b;
+  const afterBal = simSlice[simSlice.length - 1].b;
+  const lowest = simSlice.reduce((m, t) => t.b < m.b ? t : m, simSlice[0]);
+  const net = afterBal - curBal;
+  const months = Math.max(days / 30.44, 1);
+  const avgPerMonth = net / months;
+
+  document.getElementById('hsCur').textContent = fm(curBal);
+
+  const ac = afterBal >= curBal ? 'var(--safe)' : 'var(--danger)';
+  document.getElementById('hsAfter').innerHTML = '<span style="color:' + ac + '">' + fm(afterBal) + '</span>';
+
+  document.getElementById('hsLow').innerHTML = '<span style="color:var(--danger)">' + fm(lowest.b) + '</span>';
+  document.getElementById('hsLowDate').textContent = sd(lowest.d);
+
+  const avgC = avgPerMonth >= 0 ? 'var(--safe)' : 'var(--danger)';
+  document.getElementById('hsAvg').innerHTML = '<span style="color:' + avgC + '">' + (avgPerMonth >= 0 ? '+' : '-') + fm(avgPerMonth) + '</span>';
+
+  // ── Monthly breakdown ──
+  computeMonthBreaks();
+  renderMonthCards();
+
+  document.getElementById('chartRange').textContent = sd(simSlice[0].d) + ' → ' + sd(simSlice[simSlice.length - 1].d);
+  drawChart();
+}
+
+function computeMonthBreaks() {
+  monthBreaks = [];
+  if (!simSlice.length) return;
+
+  let curMonth = simSlice[0].d.slice(0, 7); // "2026-02"
+  let monthStart = 0;
+
+  for (let i = 1; i < simSlice.length; i++) {
+    const m = simSlice[i].d.slice(0, 7);
+    if (m !== curMonth) {
+      // Month boundary: previous day ends old month
+      monthBreaks.push({
+        idx: i,
+        label: mnShort(simSlice[monthStart].d),
+        startBal: simSlice[monthStart].b,
+        endBal: simSlice[i - 1].b,
+        net: simSlice[i - 1].b - simSlice[monthStart].b,
+        startDate: simSlice[monthStart].d,
+        endDate: simSlice[i - 1].d
+      });
+      monthStart = i;
+      curMonth = m;
+    }
+  }
+  // Last partial month
+  monthBreaks.push({
+    idx: simSlice.length,
+    label: mnShort(simSlice[monthStart].d),
+    startBal: simSlice[monthStart].b,
+    endBal: simSlice[simSlice.length - 1].b,
+    net: simSlice[simSlice.length - 1].b - simSlice[monthStart].b,
+    startDate: simSlice[monthStart].d,
+    endDate: simSlice[simSlice.length - 1].d
+  });
+}
+
+function renderMonthCards() {
+  document.getElementById('moCount').textContent = monthBreaks.length + ' months';
+  const maxAbs = Math.max(...monthBreaks.map(m => Math.abs(m.net)), 1);
+
+  let html = '';
+  monthBreaks.forEach(m => {
+    const pos = m.net >= 0;
+    const pct = Math.min(Math.abs(m.net) / maxAbs * 100, 100);
+    const barColor = pos ? 'var(--safe)' : 'var(--danger)';
+    html += '<div class="mo-card">';
+    html += '<div class="mo-header"><span class="mo-name">' + m.label + '</span>';
+    html += '<span class="mo-net ' + (pos ? 'pos' : 'neg') + '">' + (pos ? '+' : '-') + fm(m.net) + '</span></div>';
+    html += '<div class="mo-bar"><div class="mo-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
+    html += '<div class="mo-stats">';
+    html += '<div class="mo-start"><span style="font-size:7px;text-transform:uppercase;letter-spacing:.06em">' + sd(m.startDate) + '</span><span class="mo-val">' + fm(m.startBal) + '</span></div>';
+    html += '<div class="mo-end" style="text-align:right"><span style="font-size:7px;text-transform:uppercase;letter-spacing:.06em">' + sd(m.endDate) + '</span><span class="mo-val">' + fm(m.endBal) + '</span></div>';
+    html += '</div></div>';
+  });
+  document.getElementById('monthGrid').innerHTML = html;
+}
+
+function drawChart() {
+  if (!simSlice.length) return;
+  const canvas = document.getElementById('tC'), ctx = canvas.getContext('2d');
+  const wrap = document.getElementById('cWrap'), tip = document.getElementById('tip');
+  const P = {top:32, right:20, bottom:38, left:60};
+  const rect = wrap.getBoundingClientRect(), dpr = devicePixelRatio || 1;
+  canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+  canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = rect.width, H = rect.height;
+  const slice = simSlice;
+  const mn2 = 0;
+  const mx = Math.max(...slice.map(t => t.b)) * 1.1;
+  const cW = W - P.left - P.right, cH = H - P.top - P.bottom;
+  const xP = i => P.left + (i / (slice.length - 1)) * cW;
+  const yP = v => P.top + (1 - (v - mn2) / (mx - mn2)) * cH;
+  const chartBottom = P.top + cH;
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Subtle gradient fill under trajectory ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(xP(0), chartBottom);
+  slice.forEach((t, i) => ctx.lineTo(xP(i), yP(t.b)));
+  ctx.lineTo(xP(slice.length - 1), chartBottom);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, P.top, 0, chartBottom);
+  grad.addColorStop(0, 'rgba(167,139,250,.06)');
+  grad.addColorStop(1, 'rgba(167,139,250,.01)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Monthly boundary lines ──
+  monthBreaks.forEach((mb, mi) => {
+    if (mi === 0) return; // Don't draw at the start
+    const bIdx = mb.idx;
+    if (bIdx >= slice.length) return;
+    const x = xP(bIdx);
+
+    // Vertical boundary line
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = 'rgba(167,139,250,.12)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, P.top); ctx.lineTo(x, chartBottom); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Month gain/loss label at top
+    const prev = monthBreaks[mi - 1];
+    const net = prev.net;
+    const pos = net >= 0;
+    const midX = (xP(mi > 1 ? monthBreaks[mi - 1].idx : 0) + x) / 2;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = pos ? 'rgba(52,211,153,.5)' : 'rgba(248,113,113,.5)';
+    ctx.font = '700 10px IBM Plex Mono';
+    ctx.fillText((pos ? '+' : '-') + fm(net), midX, P.top - 6);
+    ctx.fillStyle = 'rgba(90,99,120,.4)';
+    ctx.font = '600 8px Sora';
+    ctx.fillText(prev.label, midX, P.top - 17);
+    ctx.textAlign = 'left';
+  });
+
+  // Last month label
+  if (monthBreaks.length > 0) {
+    const last = monthBreaks[monthBreaks.length - 1];
+    const prevIdx = monthBreaks.length > 1 ? monthBreaks[monthBreaks.length - 2].idx : 0;
+    const midX = (xP(prevIdx) + xP(slice.length - 1)) / 2;
+    const pos = last.net >= 0;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = pos ? 'rgba(52,211,153,.5)' : 'rgba(248,113,113,.5)';
+    ctx.font = '700 10px IBM Plex Mono';
+    ctx.fillText((pos ? '+' : '-') + fm(last.net), midX, P.top - 6);
+    ctx.fillStyle = 'rgba(90,99,120,.4)';
+    ctx.font = '600 8px Sora';
+    ctx.fillText(last.label, midX, P.top - 17);
+    ctx.textAlign = 'left';
+  }
+
+  // ── Grid lines ──
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const v = mn2 + (mx - mn2) * (i / 5), y = yP(v);
+    ctx.strokeStyle = 'rgba(255,255,255,.015)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(P.left, y); ctx.lineTo(P.left + cW, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(90,99,120,.5)';
+    ctx.font = '10px IBM Plex Mono';
+    ctx.fillText('$' + Math.round(v).toLocaleString(), P.left - 7, y + 3);
+  }
+  ctx.textAlign = 'left';
+
+  // ── Trajectory line ──
+  ctx.beginPath();
+  slice.forEach((t, i) => { if (!i) ctx.moveTo(xP(i), yP(t.b)); else ctx.lineTo(xP(i), yP(t.b)); });
+  ctx.strokeStyle = '#B8BEC9';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  // Glow
+  ctx.strokeStyle = 'rgba(184,190,201,.08)';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  slice.forEach((t, i) => { if (!i) ctx.moveTo(xP(i), yP(t.b)); else ctx.lineTo(xP(i), yP(t.b)); });
+  ctx.stroke();
+
+  // ── Event dots ──
+  const lowI = slice.reduce((m, t, i) => t.b < slice[m].b ? i : m, 0);
+  slice.forEach((t, i) => {
+    if (!t.ev.length) return;
+    const x = xP(i), y = yP(t.b);
+    const inc = t.ev.some(e => e.a > 0), rent = t.ev.some(e => e.n === 'Rent');
+    let c = 'rgba(184,190,201,.4)', r = 3;
+    if (inc) { c = '#A78BFA'; r = 5; }
+    if (rent) { c = '#FBBF24'; r = 5; }
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = c; ctx.fill();
+  });
+
+  // ── Lowest point marker ──
+  const lx = xP(lowI), ly = yP(slice[lowI].b);
+  ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(248,113,113,.25)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+  ctx.fillStyle = '#F87171'; ctx.fill();
+  const gl = ctx.createRadialGradient(lx, ly, 0, lx, ly, 18);
+  gl.addColorStop(0, 'rgba(248,113,113,.15)'); gl.addColorStop(1, 'rgba(248,113,113,0)');
+  ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(lx, ly, 18, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#F87171'; ctx.textAlign = 'center';
+  ctx.font = '700 9px Sora'; ctx.fillText('LOWEST', lx, ly - 16);
+  ctx.font = '700 11px IBM Plex Mono'; ctx.fillText(fm(slice[lowI].b), lx, ly - 6);
+  ctx.textAlign = 'left';
+
+  // ── Start/End markers ──
+  // Start
+  const sx = xP(0), sy = yP(slice[0].b);
+  ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+  ctx.fillStyle = 'var(--bright)'; ctx.fill();
+  ctx.fillStyle = 'rgba(232,236,242,.6)'; ctx.textAlign = 'left';
+  ctx.font = '600 8px Sora'; ctx.fillText('START', sx + 8, sy - 4);
+  ctx.font = '700 10px IBM Plex Mono'; ctx.fillText(fm(slice[0].b), sx + 8, sy + 8);
+
+  // End
+  const ex = xP(slice.length - 1), ey = yP(slice[slice.length - 1].b);
+  ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2);
+  const endColor = slice[slice.length - 1].b >= slice[0].b ? '#34D399' : '#F87171';
+  ctx.fillStyle = endColor; ctx.fill();
+  ctx.fillStyle = endColor; ctx.textAlign = 'right';
+  ctx.font = '600 8px Sora'; ctx.fillText('END', ex - 8, ey - 4);
+  ctx.font = '700 10px IBM Plex Mono'; ctx.fillText(fm(slice[slice.length - 1].b), ex - 8, ey + 8);
+  ctx.textAlign = 'left';
+
+  // ── X-axis labels ──
+  ctx.textAlign = 'center';
+  const step = slice.length > 60 ? 7 : slice.length > 30 ? 4 : slice.length > 15 ? 2 : 1;
+  slice.forEach((t, i) => {
+    if (i % step && i !== slice.length - 1 && i !== 0) return;
+    const x = xP(i), yb = chartBottom;
+    ctx.fillStyle = 'rgba(90,99,120,.4)'; ctx.font = '9px Sora';
+    ctx.fillText(sd(t.d), x, yb + 14);
+  });
+  ctx.textAlign = 'left';
+
+  // Store for tooltip
+  canvas._cd = {xP, yP, slice};
+}
+
+// ── Tooltip ──
+(function(){
+  const canvas = document.getElementById('tC'), wrap = document.getElementById('cWrap'), tip = document.getElementById('tip');
+  canvas.addEventListener('mousemove', function(e) {
+    if (!canvas._cd) return;
+    const rect = canvas.getBoundingClientRect(), mx2 = e.clientX - rect.left;
+    const {xP, yP, slice} = canvas._cd;
+    let ci = 0, cd = 1e9;
+    slice.forEach((_, i) => { const d = Math.abs(xP(i) - mx2); if (d < cd) { cd = d; ci = i; } });
+    if (cd > 25) { tip.classList.remove('show'); return; }
+    const t = slice[ci], x = xP(ci), y = yP(t.b);
+    const dt = new Date(t.d + 'T12:00:00');
+    let h = '<div style="font-weight:700;color:var(--bright);margin-bottom:3px">' + dt.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'}) + '</div>';
+    h += '<div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--bright);margin-bottom:5px">' + fm(t.b) + '</div>';
+    t.ev.forEach(ev => {
+      const c = ev.a > 0 ? 'var(--income)' : 'var(--danger)';
+      h += '<div style="font-size:10px;color:var(--dim);display:flex;justify-content:space-between;gap:8px"><span>' + ev.n + '</span><span style="font-family:var(--mono);font-weight:700;color:' + c + '">' + (ev.a > 0 ? '+' : '-') + fm(ev.a) + '</span></div>';
+    });
+    tip.innerHTML = h; tip.classList.add('show');
+    let tx = x + 12; if (tx + 180 > wrap.clientWidth - 10) tx = x - 190;
+    tip.style.left = tx + 'px'; tip.style.top = Math.max(6, y - 30) + 'px';
+  });
+  canvas.addEventListener('mouseleave', () => tip.classList.remove('show'));
+})();
+
+// Auto-update date range info
+document.getElementById('startDate').addEventListener('change', updateInfo);
+document.getElementById('endDate').addEventListener('change', updateInfo);
+function updateInfo() {
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+  if (s && e) {
+    const d = daysBetween(s, e);
+    document.getElementById('simInfo').textContent = d + ' day window';
+  }
+}
+
+window.addEventListener('resize', () => { if (simSlice.length) drawChart(); });
+
+// Run default simulation on load
+runSim();
+</script>
+</body>
+</html>
