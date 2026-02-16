@@ -20,6 +20,11 @@
     }
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+    *{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
     a{color:inherit;text-decoration:none}
 
     .nav{display:flex;align-items:center;backdrop-filter:blur(24px);background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
@@ -141,6 +146,10 @@
           <option value="monthly">Monthly</option>
           <option value="biweekly">Biweekly</option>
           <option value="weekly">Weekly</option>
+          <option value="daily">Daily</option>
+          <option value="quarterly">Quarterly</option>
+          <option value="semiannually">Semi-Annually</option>
+          <option value="annually">Annually</option>
           <option value="once">One-Time</option>
         </select>
       </div>
@@ -230,7 +239,7 @@ let commitments = loadCommitments();
 let nextId = Math.max(...commitments.map(c => c.id), 0) + 1;
 
 function freqLabel(f) {
-  return {monthly:'Monthly',biweekly:'Biweekly',weekly:'Weekly',once:'One-Time'}[f] || f;
+  return {monthly:'Monthly',biweekly:'Biweekly',weekly:'Weekly',daily:'Daily',quarterly:'Quarterly',semiannually:'Semi-Annually',annually:'Annually',once:'One-Time'}[f] || f;
 }
 
 function nextOccurrence(c) {
@@ -255,6 +264,25 @@ function nextOccurrence(c) {
     while (d <= today) d.setDate(d.getDate() + 7);
     return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
   }
+  if (c.freq === 'daily') {
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
+  if (c.freq === 'quarterly') {
+    let d = new Date(today.getFullYear(), today.getMonth(), c.day || 1);
+    if (d <= today) d.setMonth(d.getMonth() + 3 - (d.getMonth() % 3));
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
+  if (c.freq === 'semiannually') {
+    let d = new Date(today.getFullYear(), today.getMonth(), c.day || 1);
+    if (d <= today) d.setMonth(d.getMonth() + 6);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
+  if (c.freq === 'annually') {
+    let d = new Date(today.getFullYear(), today.getMonth(), c.day || 1);
+    if (d <= today) d.setFullYear(d.getFullYear() + 1);
+    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+  }
   return '—';
 }
 
@@ -262,6 +290,10 @@ function monthlyEquiv(c) {
   if (c.freq === 'monthly') return c.amount;
   if (c.freq === 'biweekly') return c.amount * (26 / 12);
   if (c.freq === 'weekly') return c.amount * (52 / 12);
+  if (c.freq === 'daily') return c.amount * (365.25 / 12);
+  if (c.freq === 'quarterly') return c.amount / 3;
+  if (c.freq === 'semiannually') return c.amount / 6;
+  if (c.freq === 'annually') return c.amount / 12;
   return 0; // one-time doesn't recur
 }
 
@@ -345,9 +377,11 @@ function closeModal() {
 document.getElementById('fFreq').addEventListener('change', updateFreqFields);
 function updateFreqFields() {
   const freq = document.getElementById('fFreq').value;
-  document.getElementById('fDayWrap').style.display = freq === 'monthly' ? '' : 'none';
+  const needsDay = ['monthly','quarterly','semiannually','annually'].includes(freq);
+  const needsAnchor = ['biweekly','weekly'].includes(freq);
+  document.getElementById('fDayWrap').style.display = needsDay ? '' : 'none';
   document.getElementById('fDateWrap').style.display = freq === 'once' ? '' : 'none';
-  document.getElementById('fAnchorWrap').style.display = (freq === 'biweekly' || freq === 'weekly') ? '' : 'none';
+  document.getElementById('fAnchorWrap').style.display = needsAnchor ? '' : 'none';
 }
 
 function saveCommitment() {
@@ -365,11 +399,11 @@ function saveCommitment() {
   const amount = type === 'expense' ? -rawAmt : rawAmt;
   const entry = {id: nextId++, name, amount, freq, cat};
 
-  if (freq === 'monthly') {
+  if (['monthly','quarterly','semiannually','annually'].includes(freq)) {
     entry.day = parseInt(document.getElementById('fDay').value) || 1;
   } else if (freq === 'once') {
     entry.date = document.getElementById('fDate').value || '2026-03-01';
-  } else {
+  } else if (['biweekly','weekly'].includes(freq)) {
     entry.anchor = document.getElementById('fAnchor').value || '2026-02-15';
   }
 

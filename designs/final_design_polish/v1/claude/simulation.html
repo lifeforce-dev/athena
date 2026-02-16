@@ -20,6 +20,11 @@
     }
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh}
+    ::-webkit-scrollbar{width:8px;height:8px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+    ::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+    *{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
     a{color:inherit;text-decoration:none}
 
     .nav{display:flex;align-items:center;backdrop-filter:blur(24px);background:var(--panel);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
@@ -199,6 +204,20 @@ const mn = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {month:'long
 const mnShort = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {month:'short', year:'2-digit'});
 const daysBetween = (a, b) => Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00')) / 864e5);
 
+// ── Threshold computation (same as dashboard) ──
+const SAFETY_BUFFER = 1000;
+const rentEntry = T.find(t => t.ev.some(e => e.n === 'Rent'));
+const rentIdx = T.indexOf(rentEntry);
+const RENT = Math.abs(rentEntry.ev.find(e => e.n === 'Rent').a);
+const nextPayAfterRent = T.slice(rentIdx + 1).find(t => t.ev.some(e => e.a > 1000));
+const payIdx = nextPayAfterRent ? T.indexOf(nextPayAfterRent) : T.length;
+let windowBills = 0;
+for (let i = rentIdx; i < payIdx; i++) {
+  T[i].ev.forEach(e => { if (e.a < 0 && e.n !== 'Rent') windowBills += Math.abs(e.a); });
+}
+const RED_THRESHOLD = RENT + windowBills;
+const YELLOW_THRESHOLD = RED_THRESHOLD + SAFETY_BUFFER;
+
 let simSlice = [];
 let monthBreaks = []; // [{idx, label, startBal, endBal, net}]
 
@@ -320,19 +339,60 @@ function drawChart() {
   const chartBottom = P.top + cH;
   ctx.clearRect(0, 0, W, H);
 
-  // ── Subtle gradient fill under trajectory ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(xP(0), chartBottom);
-  slice.forEach((t, i) => ctx.lineTo(xP(i), yP(t.b)));
-  ctx.lineTo(xP(slice.length - 1), chartBottom);
-  ctx.closePath();
-  const grad = ctx.createLinearGradient(0, P.top, 0, chartBottom);
-  grad.addColorStop(0, 'rgba(167,139,250,.06)');
-  grad.addColorStop(1, 'rgba(167,139,250,.01)');
-  ctx.fillStyle = grad;
-  ctx.fill();
-  ctx.restore();
+  // ── Threshold zone bands (matching dashboard) ──
+  const yRed = yP(RED_THRESHOLD);
+  const yYellow = yP(YELLOW_THRESHOLD);
+
+  // Green zone (above yellow)
+  if (YELLOW_THRESHOLD < mx) {
+    ctx.fillStyle = 'rgba(52,211,153,.02)';
+    ctx.fillRect(P.left, P.top, cW, yYellow - P.top);
+  }
+  // Yellow zone (between red and yellow)
+  ctx.fillStyle = 'rgba(251,191,36,.02)';
+  ctx.fillRect(P.left, yYellow, cW, yRed - yYellow);
+  // Red zone (below red, down to $0)
+  ctx.fillStyle = 'rgba(248,113,113,.03)';
+  ctx.fillRect(P.left, yRed, cW, chartBottom - yRed);
+
+  // ── Trajectory fill per zone ──
+  function zoneFill(yTop, yBot, color) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(P.left, yTop, cW, yBot - yTop);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.moveTo(xP(0), chartBottom);
+    slice.forEach((_, i) => ctx.lineTo(xP(i), yP(slice[i].b)));
+    ctx.lineTo(xP(slice.length - 1), chartBottom);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.restore();
+  }
+  zoneFill(P.top, yYellow, 'rgba(52,211,153,.06)');
+  zoneFill(yYellow, yRed, 'rgba(251,191,36,.06)');
+  zoneFill(yRed, chartBottom, 'rgba(248,113,113,.07)');
+
+  // ── Threshold lines ──
+  ctx.setLineDash([4, 6]);
+  if (RED_THRESHOLD > mn2 && RED_THRESHOLD < mx) {
+    ctx.strokeStyle = 'rgba(248,113,113,.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(P.left, yRed); ctx.lineTo(P.left + cW, yRed); ctx.stroke();
+    ctx.fillStyle = 'rgba(248,113,113,.25)';
+    ctx.font = '600 8px Sora';
+    ctx.fillText('DANGER ' + fm(RED_THRESHOLD), P.left + 4, yRed - 3);
+  }
+  if (YELLOW_THRESHOLD > mn2 && YELLOW_THRESHOLD < mx) {
+    ctx.strokeStyle = 'rgba(251,191,36,.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(P.left, yYellow); ctx.lineTo(P.left + cW, yYellow); ctx.stroke();
+    ctx.fillStyle = 'rgba(251,191,36,.2)';
+    ctx.font = '600 8px Sora';
+    ctx.fillText('CAUTION ' + fm(YELLOW_THRESHOLD), P.left + 4, yYellow - 3);
+  }
+  ctx.setLineDash([]);
 
   // ── Monthly boundary lines ──
   monthBreaks.forEach((mb, mi) => {
@@ -431,25 +491,6 @@ function drawChart() {
   ctx.fillStyle = '#F87171'; ctx.textAlign = 'center';
   ctx.font = '700 9px Sora'; ctx.fillText('LOWEST', lx, ly - 16);
   ctx.font = '700 11px IBM Plex Mono'; ctx.fillText(fm(slice[lowI].b), lx, ly - 6);
-  ctx.textAlign = 'left';
-
-  // ── Start/End markers ──
-  // Start
-  const sx = xP(0), sy = yP(slice[0].b);
-  ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI * 2);
-  ctx.fillStyle = 'var(--bright)'; ctx.fill();
-  ctx.fillStyle = 'rgba(232,236,242,.6)'; ctx.textAlign = 'left';
-  ctx.font = '600 8px Sora'; ctx.fillText('START', sx + 8, sy - 4);
-  ctx.font = '700 10px IBM Plex Mono'; ctx.fillText(fm(slice[0].b), sx + 8, sy + 8);
-
-  // End
-  const ex = xP(slice.length - 1), ey = yP(slice[slice.length - 1].b);
-  ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2);
-  const endColor = slice[slice.length - 1].b >= slice[0].b ? '#34D399' : '#F87171';
-  ctx.fillStyle = endColor; ctx.fill();
-  ctx.fillStyle = endColor; ctx.textAlign = 'right';
-  ctx.font = '600 8px Sora'; ctx.fillText('END', ex - 8, ey - 4);
-  ctx.font = '700 10px IBM Plex Mono'; ctx.fillText(fm(slice[slice.length - 1].b), ex - 8, ey + 8);
   ctx.textAlign = 'left';
 
   // ── X-axis labels ──

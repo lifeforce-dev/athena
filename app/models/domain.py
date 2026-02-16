@@ -140,7 +140,7 @@ class CashFlowTemplate(BaseModel):
 
 class CashFlowConfig(BaseModel):
     initial_balance: float = 0.0
-    templates: list[CashFlowTemplate] = []
+    templates: list[CashFlowTemplate] = Field(default_factory=list)
 
     @classmethod
     def from_json(cls, payload: str) -> CashFlowConfig:

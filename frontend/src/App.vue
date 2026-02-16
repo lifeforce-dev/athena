@@ -90,8 +90,12 @@ const nextCheckAmount = computed(() => {
   return nextInflow?.delta ?? 0
 })
 
+const todayAnchor = computed(() => toLocalDateString(new Date()))
+
 const rentRisk = computed(() => {
-  const rentEntry = ledger.value.find((entry) => entry.name.toLowerCase().includes('rent'))
+  const rentEntry = ledger.value.find(
+    (entry) => entry.name.toLowerCase().includes('rent') && entry.date >= todayAnchor.value
+  )
   if (!rentEntry) {
     return { label: 'Unknown', detail: 'Rent not found', level: 'ok' as const }
   }
@@ -108,7 +112,9 @@ const rentRisk = computed(() => {
   return { label: level === 'ok' ? 'Safe' : 'Tight', detail, level }
 })
 
-const upcomingOutflows = computed(() => ledger.value.filter((item) => item.delta < 0).slice(0, 8))
+const upcomingOutflows = computed(() =>
+  ledger.value.filter((item) => item.delta < 0 && item.date >= todayAnchor.value).slice(0, 8)
+)
 
 const shortDate = (value: string) =>
   parseLocalDate(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

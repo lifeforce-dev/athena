@@ -376,3 +376,83 @@ class TestProjectionEndpoint:
     def test_missing_as_of_returns_422(self, client):
         resp = client.get("/api/projection")
         assert resp.status_code == 422
+
+    def test_missing_config_file_returns_404(self, tmp_path: Path):
+        from fastapi.testclient import TestClient
+
+        from app.config import Settings, get_settings
+        from app.main import app
+
+        missing_config_path = tmp_path / "missing_config.json"
+
+        def _override_settings() -> Settings:
+            return Settings(config_path=missing_config_path)
+
+        app.dependency_overrides[get_settings] = _override_settings
+        try:
+            with TestClient(app) as test_client:
+                resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
+
+            assert resp.status_code == 404
+            assert resp.json() == {"detail": "Projection config file not found"}
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_invalid_json_config_returns_422(self, tmp_path: Path):
+        from fastapi.testclient import TestClient
+
+        from app.config import Settings, get_settings
+        from app.main import app
+
+        invalid_json_path = tmp_path / "invalid_json_config.json"
+        invalid_json_path.write_text('{"initial_balance": 1000, "templates": [}', encoding="utf-8")
+
+        def _override_settings() -> Settings:
+            return Settings(config_path=invalid_json_path)
+
+        app.dependency_overrides[get_settings] = _override_settings
+        try:
+            with TestClient(app) as test_client:
+                resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
+
+            assert resp.status_code == 422
+            assert resp.json() == {"detail": "Projection config is not valid JSON"}
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_schema_invalid_config_returns_422(self, tmp_path: Path):
+        from fastapi.testclient import TestClient
+
+        from app.config import Settings, get_settings
+        from app.main import app
+
+        invalid_schema_path = tmp_path / "invalid_schema_config.json"
+        invalid_schema_path.write_text(
+            json.dumps(
+                {
+                    "initial_balance": 1000.0,
+                    "templates": [
+                        {
+                            "name": "Income",
+                            "direction": "inflow",
+                            "recurrence": {"type": "month_day", "day_of_month": 15},
+                            "start_date": "2026-01-01",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        def _override_settings() -> Settings:
+            return Settings(config_path=invalid_schema_path)
+
+        app.dependency_overrides[get_settings] = _override_settings
+        try:
+            with TestClient(app) as test_client:
+                resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
+
+            assert resp.status_code == 422
+            assert resp.json() == {"detail": "Projection config does not match schema"}
+        finally:
+            app.dependency_overrides.clear()

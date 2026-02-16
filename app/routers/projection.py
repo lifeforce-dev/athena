@@ -4,11 +4,11 @@ import logging
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import Settings, get_settings
 from app.models.schemas import ProjectionResponse
-from app.services.projection_service import build_projection
+from app.services.projection_service import ProjectionConfigError, build_projection
 
 logger = logging.getLogger(__name__)
 
@@ -23,4 +23,7 @@ def get_projection(
 ) -> ProjectionResponse:
     """Return a cash-flow projection for the requested date window."""
     logger.info(f'Projection requested. as_of={as_of} from_date={from_date}')
-    return build_projection(settings.config_path, as_of, from_date)
+    try:
+        return build_projection(settings.config_path, as_of, from_date)
+    except ProjectionConfigError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

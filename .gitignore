@@ -36,6 +36,11 @@ coverage.xml
 # CLI output
 output/
 
+# Design previewer generated artifacts
+designs/design_previewer/
+designs/design_previewer/manifest.json
+designs/design_previewer/.previewer_runtime/
+
 # Node (frontend/)
 node_modules/
 frontend/dist/

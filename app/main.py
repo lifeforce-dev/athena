@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.common.logging import setup_logging
 from app.config import get_settings
+from app.routers.designs import router as designs_router
 from app.routers.projection import router as projection_router
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(projection_router, prefix='/api')
+    application.include_router(designs_router)
 
     @application.get('/health')
     async def health_check() -> dict[str, str]:

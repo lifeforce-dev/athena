@@ -21,6 +21,14 @@ uvicorn app.main:app --reload
 
 The API is at `http://localhost:8000` and docs at `http://localhost:8000/docs`.
 
+### Design Review (v1)
+
+Use this single hub endpoint to review all current design concepts by section:
+
+- `http://localhost:8000/designs/v1`
+
+The hub includes Claude, GPT, and Gemini sections with links to each v1 HTML design.
+
 ### Frontend
 
 ```bash
