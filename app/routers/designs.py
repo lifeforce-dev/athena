@@ -29,7 +29,7 @@ def list_designs_v1() -> HTMLResponse:
     section_markup: list[str] = []
 
     for provider_slug, directory_name, display_name in _V1_SECTIONS:
-        files = _html_files(_DESIGNS_ROOT / directory_name)
+        files = _html_files(_DESIGNS_ROOT / "v1" / directory_name)
         if files:
             links = "\n".join(
                 f'<li><a href="/designs/v1/{provider_slug}/{escape(file_path.name)}" target="_blank">{escape(file_path.name)}</a></li>'
@@ -119,8 +119,8 @@ def get_design_file_v1(provider: str, filename: str) -> FileResponse:
     if not filename.lower().endswith(".html"):
         raise HTTPException(status_code=404, detail="Design file not found")
 
-    file_path = (_DESIGNS_ROOT / provider_dir / filename).resolve()
-    allowed_dir = (_DESIGNS_ROOT / provider_dir).resolve()
+    file_path = (_DESIGNS_ROOT / "v1" / provider_dir / filename).resolve()
+    allowed_dir = (_DESIGNS_ROOT / "v1" / provider_dir).resolve()
 
     if allowed_dir not in file_path.parents:
         raise HTTPException(status_code=404, detail="Design file not found")

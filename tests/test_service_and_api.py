@@ -332,8 +332,12 @@ class TestBuildProjection:
 class TestProjectionEndpoint:
     @pytest.fixture()
     def client(self, tmp_path: Path):
-        """Create a TestClient with a temp config file."""
+        """Create a TestClient with a temp config file and bypassed auth."""
         from fastapi.testclient import TestClient
+
+        from app.config import Settings, get_settings
+        from app.dependencies import get_current_user
+        from app.main import app
 
         config = {
             "initial_balance": 1000.0,
@@ -349,14 +353,14 @@ class TestProjectionEndpoint:
         }
         config_path = _write_config(tmp_path, config)
 
-        # Override settings to use test config
-        from app.config import Settings, get_settings
-        from app.main import app
-
         def _override_settings() -> Settings:
             return Settings(config_path=config_path)
 
+        def _fake_user() -> dict:
+            return {"sub": "1", "discord_id": "000", "username": "test-user"}
+
         app.dependency_overrides[get_settings] = _override_settings
+        app.dependency_overrides[get_current_user] = _fake_user
         yield TestClient(app)
         app.dependency_overrides.clear()
 
@@ -385,6 +389,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.dependencies import get_current_user
         from app.main import app
 
         missing_config_path = tmp_path / "missing_config.json"
@@ -392,7 +397,11 @@ class TestProjectionEndpoint:
         def _override_settings() -> Settings:
             return Settings(config_path=missing_config_path)
 
+        def _fake_user() -> dict:
+            return {"sub": "1", "discord_id": "000", "username": "test-user"}
+
         app.dependency_overrides[get_settings] = _override_settings
+        app.dependency_overrides[get_current_user] = _fake_user
         try:
             with TestClient(app) as test_client:
                 resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
@@ -406,6 +415,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.dependencies import get_current_user
         from app.main import app
 
         invalid_json_path = tmp_path / "invalid_json_config.json"
@@ -414,7 +424,11 @@ class TestProjectionEndpoint:
         def _override_settings() -> Settings:
             return Settings(config_path=invalid_json_path)
 
+        def _fake_user() -> dict:
+            return {"sub": "1", "discord_id": "000", "username": "test-user"}
+
         app.dependency_overrides[get_settings] = _override_settings
+        app.dependency_overrides[get_current_user] = _fake_user
         try:
             with TestClient(app) as test_client:
                 resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
@@ -428,6 +442,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.dependencies import get_current_user
         from app.main import app
 
         invalid_schema_path = tmp_path / "invalid_schema_config.json"
@@ -451,7 +466,11 @@ class TestProjectionEndpoint:
         def _override_settings() -> Settings:
             return Settings(config_path=invalid_schema_path)
 
+        def _fake_user() -> dict:
+            return {"sub": "1", "discord_id": "000", "username": "test-user"}
+
         app.dependency_overrides[get_settings] = _override_settings
+        app.dependency_overrides[get_current_user] = _fake_user
         try:
             with TestClient(app) as test_client:
                 resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
