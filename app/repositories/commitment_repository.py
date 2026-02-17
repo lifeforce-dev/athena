@@ -106,6 +106,10 @@ def _build_recurrence(row: Commitment) -> Recurrence:
         anchor = row.anchor_date or row.start_date
         return DayInterval(interval_days=1, anchor_date=anchor)
 
+    if freq == "day_interval":
+        anchor = row.anchor_date or row.start_date
+        return DayInterval(interval_days=row.interval_days or 1, anchor_date=anchor)
+
     if freq == "weekly":
         anchor = row.anchor_date or row.start_date
         return WeekdayCadence(interval_weeks=1, weekday=anchor.weekday(), anchor_date=anchor)

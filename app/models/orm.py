@@ -58,9 +58,10 @@ class Commitment(Base):
     # Signed amount: negative = expense, positive = income.
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 
-    # Recurrence type: 'weekly', 'biweekly', 'monthly', 'once'.
+    # Recurrence type: 'weekly', 'biweekly', 'monthly', 'day_interval', 'once'.
     frequency: Mapped[str] = mapped_column(String(32), nullable=False)
     day_of_month: Mapped[int | None] = mapped_column()
+    interval_days: Mapped[int | None] = mapped_column()
     anchor_date: Mapped[date | None] = mapped_column(Date)
     one_time_date: Mapped[date | None] = mapped_column(Date)
 

@@ -45,6 +45,7 @@ export interface components {
       amount: string
       frequency: string
       day_of_month: number | null
+      interval_days: number | null
       anchor_date: string | null
       one_time_date: string | null
       start_date: string
@@ -57,8 +58,9 @@ export interface components {
     CommitmentCreate: {
       name: string
       amount: string
-      frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'once'
+      frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'day_interval' | 'once'
       day_of_month?: number | null
+      interval_days?: number | null
       anchor_date?: string | null
       one_time_date?: string | null
       start_date: string
@@ -68,8 +70,9 @@ export interface components {
     CommitmentUpdate: {
       name?: string | null
       amount?: string | null
-      frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'once' | null
+      frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'day_interval' | 'once' | null
       day_of_month?: number | null
+      interval_days?: number | null
       anchor_date?: string | null
       one_time_date?: string | null
       start_date?: string | null

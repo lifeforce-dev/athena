@@ -13,6 +13,7 @@ FrequencyLiteral = Literal[
     "weekly",
     "biweekly",
     "monthly",
+    "day_interval",
     "once",
 ]
 
@@ -24,6 +25,7 @@ class CommitmentCreate(BaseModel):
     amount: Decimal = Field(description="Signed: negative = expense, positive = income.")
     frequency: FrequencyLiteral
     day_of_month: int | None = Field(default=None, ge=1, le=31)
+    interval_days: int | None = Field(default=None, ge=1)
     anchor_date: date | None = None
     one_time_date: date | None = None
     start_date: date
@@ -39,6 +41,12 @@ class CommitmentCreate(BaseModel):
         if self.frequency in ("weekly", "biweekly", "daily") and self.anchor_date is None:
             raise ValueError("anchor_date is required for weekly/biweekly/daily frequency")
 
+        if self.frequency == "day_interval":
+            if self.interval_days is None:
+                raise ValueError("interval_days is required for day_interval frequency")
+            if self.anchor_date is None:
+                raise ValueError("anchor_date is required for day_interval frequency")
+
         if self.frequency == "once" and self.one_time_date is None:
             raise ValueError("one_time_date is required for once frequency")
 
@@ -52,6 +60,7 @@ class CommitmentUpdate(BaseModel):
     amount: Decimal | None = Field(default=None)
     frequency: FrequencyLiteral | None = None
     day_of_month: int | None = Field(default=None, ge=1, le=31)
+    interval_days: int | None = Field(default=None, ge=1)
     anchor_date: date | None = None
     one_time_date: date | None = None
     start_date: date | None = None
@@ -67,6 +76,7 @@ class CommitmentResponse(BaseModel):
     amount: Decimal
     frequency: str
     day_of_month: int | None
+    interval_days: int | None
     anchor_date: date | None
     one_time_date: date | None
     start_date: date

@@ -14,12 +14,13 @@ _FREQUENCY_REQUIRED_FIELDS: dict[str, list[str]] = {
     "weekly": ["anchor_date"],
     "biweekly": ["anchor_date"],
     "monthly": ["day_of_month"],
+    "day_interval": ["anchor_date", "interval_days"],
     "once": ["one_time_date"],
 }
 
 # All frequency-specific date columns. When switching frequencies, columns
 # not required by the new frequency are nulled out to prevent stale data.
-_ALL_FREQUENCY_DATE_FIELDS = {"day_of_month", "anchor_date", "one_time_date"}
+_ALL_FREQUENCY_DATE_FIELDS = {"day_of_month", "interval_days", "anchor_date", "one_time_date"}
 
 
 def _validate_merged_state(frequency: str, merged: dict[str, object]) -> None:
@@ -82,6 +83,7 @@ async def update_commitment(
     merged: dict[str, object] = {
         "frequency": existing.frequency,
         "day_of_month": existing.day_of_month,
+        "interval_days": existing.interval_days,
         "anchor_date": existing.anchor_date,
         "one_time_date": existing.one_time_date,
     }
