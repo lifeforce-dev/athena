@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -111,7 +112,7 @@ Recurrence = Annotated[
 
 class CashFlowTemplate(BaseModel):
     name: str
-    amount: float = Field(gt=0)
+    amount: Decimal = Field(gt=0)
     direction: Direction
     recurrence: Recurrence
     start_date: date
@@ -129,7 +130,7 @@ class CashFlowTemplate(BaseModel):
         return ensure_optional_date(v)
 
     @property
-    def signed_amount(self) -> float:
+    def signed_amount(self) -> Decimal:
         return self.amount if self.direction == Direction.INFLOW else -self.amount
 
 
@@ -139,7 +140,7 @@ class CashFlowTemplate(BaseModel):
 
 
 class CashFlowConfig(BaseModel):
-    initial_balance: float = 0.0
+    initial_balance: Decimal = Decimal(0)
     templates: list[CashFlowTemplate] = Field(default_factory=list)
 
     @classmethod

@@ -9,6 +9,7 @@ from __future__ import annotations
 import calendar
 from dataclasses import dataclass, field
 from datetime import date
+from decimal import Decimal
 
 from app.models.schemas import LedgerEntry, MonthSummary, PayPeriodSummary
 
@@ -20,12 +21,12 @@ class ProcessedProjection:
     ledger: list[LedgerEntry]
     months: list[MonthSummary]
     pay_periods: list[PayPeriodSummary]
-    ending_balance: float
+    ending_balance: Decimal
 
 
 def process_ledger(
-    raw_ledger: list[tuple[date, str, float]],
-    initial_balance: float,
+    raw_ledger: list[tuple[date, str, Decimal]],
+    initial_balance: Decimal,
     window_start: date,
     window_end: date,
     paycheck_names: set[str] | None = None,
@@ -66,7 +67,7 @@ def process_ledger(
 # ---------------------------------------------------------------------------
 
 
-def _is_paycheck_entry(entry_name: str, entry_delta: float, paycheck_names: set[str]) -> bool:
+def _is_paycheck_entry(entry_name: str, entry_delta: Decimal, paycheck_names: set[str]) -> bool:
     """Check whether this ledger entry belongs to a paycheck template."""
     return entry_delta > 0 and entry_name in paycheck_names
 
@@ -79,21 +80,21 @@ def _last_day_of_month(year: int, month: int) -> int:
 class _AccumulationTracker:
     """Walks the sorted ledger once, accumulating month and pay-period summaries."""
 
-    _initial_balance: float
+    _initial_balance: Decimal
     _window_start: date
     _window_end: date
     _paycheck_names: set[str]
 
-    _running_balance: float = field(init=False)
-    _month_net: float = 0.0
+    _running_balance: Decimal = field(init=False)
+    _month_net: Decimal = Decimal(0)
     _current_month_key: tuple[int, int] | None = None
 
     # Pay-period tracking
     _last_paycheck_date: date | None = None
-    _period_start_balance: float | None = None
-    _period_outflows: float = 0.0
-    _period_net: float = 0.0
-    _period_min_balance: float | None = None
+    _period_start_balance: Decimal | None = None
+    _period_outflows: Decimal = Decimal(0)
+    _period_net: Decimal = Decimal(0)
+    _period_min_balance: Decimal | None = None
 
     # Accumulated results
     _ledger_entries: list[LedgerEntry] = field(default_factory=list)
@@ -103,7 +104,7 @@ class _AccumulationTracker:
     def __post_init__(self) -> None:
         self._running_balance = self._initial_balance
 
-    def process_entry(self, occ_date: date, name: str, delta: float) -> None:
+    def process_entry(self, occ_date: date, name: str, delta: Decimal) -> None:
         """Process a single sorted ledger entry."""
         is_paycheck = _is_paycheck_entry(name, delta, self._paycheck_names)
 
@@ -112,8 +113,8 @@ class _AccumulationTracker:
 
         if is_paycheck:
             self._last_paycheck_date = occ_date
-            self._period_outflows = 0.0
-            self._period_net = 0.0
+            self._period_outflows = Decimal(0)
+            self._period_net = Decimal(0)
             self._period_start_balance = None
             self._period_min_balance = None
 
@@ -187,7 +188,7 @@ class _AccumulationTracker:
                 covered_end=covered_end,
             )
         )
-        self._month_net = 0.0
+        self._month_net = Decimal(0)
 
     def _close_period(self, end_date: date, is_partial: bool) -> None:
         if (

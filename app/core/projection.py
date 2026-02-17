@@ -4,6 +4,7 @@ import calendar
 import math
 from collections.abc import Iterable, Iterator
 from datetime import date, timedelta
+from decimal import Decimal
 
 from app.models.domain import (
     CashFlowTemplate,
@@ -18,11 +19,11 @@ from app.models.domain import (
 # ---------------------------
 
 def project_cash_on(
-    initial_balance: float,
+    initial_balance: Decimal,
     templates: Iterable[CashFlowTemplate],
     as_of: date,
     from_date: date | None = None,
-) -> tuple[float, list[tuple[date, str, float]]]:
+) -> tuple[Decimal, list[tuple[date, str, Decimal]]]:
     """Run a cash-flow projection and return (ending_balance, ledger)."""
     if from_date is None:
         from_date = date.today()
@@ -30,7 +31,7 @@ def project_cash_on(
     start = min(from_date, as_of)
     end = max(from_date, as_of)
 
-    ledger: list[tuple[date, str, float]] = []
+    ledger: list[tuple[date, str, Decimal]] = []
     for template in templates:
         for occ in iter_occurrences(template, end):
             if occ < start:

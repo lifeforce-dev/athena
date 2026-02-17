@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
@@ -8,15 +9,15 @@ from pydantic import BaseModel, Field
 class LedgerEntry(BaseModel):
     date: date
     name: str
-    delta: float
-    balance: float
+    delta: Decimal
+    balance: Decimal
 
 
 class MonthSummary(BaseModel):
     month: int = Field(ge=1, le=12)
     year: int
-    net: float
-    balance: float
+    net: Decimal
+    balance: Decimal
     is_partial: bool
     covered_start: date
     covered_end: date
@@ -26,17 +27,17 @@ class PayPeriodSummary(BaseModel):
     start_date: date
     end_date: date
     is_partial: bool
-    spent: float
-    net: float
-    start_balance: float
-    end_balance: float
-    min_balance: float
+    spent: Decimal
+    net: Decimal
+    start_balance: Decimal
+    end_balance: Decimal
+    min_balance: Decimal
 
 
 class ProjectionResponse(BaseModel):
     as_of: date
     from_date: date
-    current_balance: float
+    current_balance: Decimal
     ledger: list[LedgerEntry]
     months: list[MonthSummary]
     pay_periods: list[PayPeriodSummary]

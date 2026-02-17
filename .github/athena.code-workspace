@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../zc_web_poc"
+		},
+		{
+			"path": "../../zc_web_editor"
+		}
+	],
+	"settings": {}
+}
