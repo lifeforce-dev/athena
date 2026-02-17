@@ -1,0 +1,13 @@
+import { api } from './client'
+import type { User } from '@/types/auth'
+
+/** Fetch the currently authenticated user. Throws ApiError(401) if not logged in. */
+export const fetchCurrentUser = () => api.get<User>('/auth/me')
+
+/** Redirect to Discord OAuth2 login. */
+export const loginRedirect = () => {
+  window.location.href = '/api/auth/login'
+}
+
+/** Clear the session cookie. */
+export const logout = () => api.post<void>('/auth/logout')

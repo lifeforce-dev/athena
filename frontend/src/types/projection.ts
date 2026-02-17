@@ -13,6 +13,17 @@ export interface ParsedLedgerEntry {
   balance: number
 }
 
+/** Month summary with money fields parsed to numbers for display. */
+export interface ParsedMonthSummary {
+  month: number
+  year: number
+  net: number
+  balance: number
+  is_partial: boolean
+  covered_start: string
+  covered_end: string
+}
+
 /** Pay period summary with money fields parsed to numbers for display. */
 export interface ParsedPayPeriod {
   start_date: string

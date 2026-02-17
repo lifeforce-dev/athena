@@ -1,0 +1,36 @@
+/* ============================================================
+   Athena — Shared Utility Styles
+   ============================================================
+   Reusable surface / text classes used across components.
+   Keep this small — component-scoped styles belong in .vue files.
+   ============================================================ */
+
+/* Glass panel surface */
+.surface {
+  backdrop-filter: blur(16px);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Slightly raised surface (headers, secondary areas) */
+.surface-raised {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* Section header label */
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Mono value text */
+.mono {
+  font-family: var(--font-mono);
+}

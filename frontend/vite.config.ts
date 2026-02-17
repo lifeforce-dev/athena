@@ -12,7 +12,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api': {
+        target: 'https://athena-api-hgu4.onrender.com',
+        changeOrigin: true,
+        secure: true,
+      },
     },
   },
 })
