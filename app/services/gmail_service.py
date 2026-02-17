@@ -38,6 +38,15 @@ def _build_service(settings: Settings):
     return build("gmail", "v1", credentials=creds)
 
 
+def build_service_sync(settings: Settings):
+    """Build a Gmail API service client for reuse across multiple calls.
+
+    Callers should build once and pass the service to subsequent functions
+    to avoid rebuilding credentials on every API call.
+    """
+    return _build_service(settings)
+
+
 async def get_user_email(settings: Settings) -> str:
     """Fetch the Gmail address associated with the stored credentials."""
     def _get():
@@ -65,7 +74,7 @@ async def register_watch(settings: Settings) -> dict:
 
 
 async def fetch_history_message_ids(
-    settings: Settings, start_history_id: str
+    settings: Settings, start_history_id: str, *, service=None
 ) -> list[str]:
     """Fetch message IDs added since the given history ID.
 
@@ -73,13 +82,13 @@ async def fetch_history_message_ids(
     message IDs in discovery order.
     """
     def _fetch():
-        service = _build_service(settings)
+        svc = service or _build_service(settings)
         message_ids: list[str] = []
         seen: set[str] = set()
         page_token = None
 
         while True:
-            response = service.users().history().list(
+            response = svc.users().history().list(
                 userId="me",
                 startHistoryId=start_history_id,
                 historyTypes=["messageAdded"],
@@ -102,11 +111,11 @@ async def fetch_history_message_ids(
     return await asyncio.to_thread(_fetch)
 
 
-async def get_message(settings: Settings, message_id: str) -> dict:
+async def get_message(settings: Settings, message_id: str, *, service=None) -> dict:
     """Fetch a full Gmail message by ID."""
     def _get():
-        service = _build_service(settings)
-        return service.users().messages().get(
+        svc = service or _build_service(settings)
+        return svc.users().messages().get(
             userId="me",
             id=message_id,
             format="full",

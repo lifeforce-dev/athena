@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user_id
 from app.repositories import gmail_repository
 from app.services.gmail_service import (
     get_user_email,
@@ -42,7 +42,7 @@ class WatchRegisteredResponse(BaseModel):
 
 @router.post("/watch", response_model=WatchRegisteredResponse)
 async def register_gmail_watch(
-    user: Annotated[dict, Depends(get_current_user)],
+    user_id: Annotated[int, Depends(get_current_user_id)],
     settings: Annotated[Settings, Depends(get_settings)],
     db: AsyncSession = Depends(get_db),
 ) -> WatchRegisteredResponse:
@@ -51,8 +51,6 @@ async def register_gmail_watch(
     Calls the Gmail API users.watch() and stores the resulting historyId
     and expiration in the gmail_subscriptions table.
     """
-    user_id = int(user["sub"])
-
     gmail_address = await get_user_email(settings)
     response = await register_watch(settings)
 
@@ -62,6 +60,7 @@ async def register_gmail_watch(
     await gmail_repository.upsert(
         db, user_id, gmail_address, history_id, watch_expiry,
     )
+    await db.commit()
 
     logger.info(f"Gmail watch registered, expires {watch_expiry.isoformat()}")
 
@@ -74,11 +73,10 @@ async def register_gmail_watch(
 
 @router.get("/status", response_model=WatchStatusResponse)
 async def get_gmail_status(
-    user: Annotated[dict, Depends(get_current_user)],
+    user_id: Annotated[int, Depends(get_current_user_id)],
     db: AsyncSession = Depends(get_db),
 ) -> WatchStatusResponse:
     """Check the current Gmail watch status for the authenticated user."""
-    user_id = int(user["sub"])
     sub = await gmail_repository.get_by_user(db, user_id)
 
     if not sub:

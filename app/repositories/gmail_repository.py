@@ -59,7 +59,7 @@ async def upsert(
         )
         db.add(sub)
 
-    await db.commit()
+    await db.flush()
     await db.refresh(sub)
     return sub
 
@@ -74,4 +74,3 @@ async def update_history_id(
     sub = result.scalar_one_or_none()
     if sub:
         sub.history_id = history_id
-        await db.commit()

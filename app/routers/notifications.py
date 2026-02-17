@@ -13,6 +13,7 @@ import asyncio
 import base64
 import json
 import logging
+from email.utils import parsedate_to_datetime
 
 from fastapi import APIRouter, Depends, Request, Response
 from pydantic import BaseModel
@@ -27,6 +28,7 @@ from app.services.email_parser import (
     try_parse_email,
 )
 from app.services.gmail_service import (
+    build_service_sync,
     extract_body_html,
     extract_header,
     fetch_history_message_ids,
@@ -62,12 +64,16 @@ class PubSubPush(BaseModel):
 async def _verify_oidc_token(request: Request, settings: Settings) -> bool:
     """Verify the OIDC bearer token from Google Pub/Sub.
 
-    Returns True if the token is valid. Skips verification if no audience
-    is configured (allows local dev without GCP).
+    Returns True if the token is valid. Skips verification in debug mode
+    to allow local development without GCP.
     """
-    if not settings.google_push_audience:
-        logger.warning("OIDC verification skipped -- no google_push_audience configured")
+    if settings.debug:
+        logger.warning("OIDC verification skipped -- debug mode")
         return True
+
+    if not settings.google_push_audience:
+        logger.error("OIDC verification failed -- no google_push_audience configured")
+        return False
 
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -100,12 +106,14 @@ async def _process_message(
     user_id: int,
     settings: Settings,
     gmail_message_id: str,
+    *,
+    service=None,
 ) -> bool:
     """Fetch, parse, and store a single Gmail message.
 
     Returns True if a balance or transaction record was stored.
     """
-    message = await get_message(settings, gmail_message_id)
+    message = await get_message(settings, gmail_message_id, service=service)
 
     sender = extract_header(message, "From") or ""
     if BOA_SENDER not in sender.lower():
@@ -117,7 +125,16 @@ async def _process_message(
         logger.warning(f"No HTML body in message {gmail_message_id}")
         return False
 
-    notification = try_parse_email(subject, html)
+    # Use the email Date header as a fallback timestamp for parsers.
+    received_at = None
+    date_header = extract_header(message, "Date")
+    if date_header:
+        try:
+            received_at = parsedate_to_datetime(date_header)
+        except Exception:
+            pass
+
+    notification = try_parse_email(subject, html, received_at)
     if notification is None:
         logger.info(f"Unrecognized BofA email subject: {subject[:80]}")
         return False
@@ -172,7 +189,7 @@ async def handle_gmail_push(
         email_address = decoded.get("emailAddress", "")
         push_history_id = str(decoded.get("historyId", ""))
     except Exception:
-        logger.exception("Failed to decode Pub/Sub message data")
+        logger.exception(f"Failed to decode Pub/Sub message data, messageId={push.message.messageId}")
         return Response(status_code=200)
 
     # Resolve the user by their registered Gmail address.
@@ -183,25 +200,29 @@ async def handle_gmail_push(
 
     start_id = sub.history_id or push_history_id
 
+    # Build the Gmail API service once and reuse for all calls in this push.
+    service = await asyncio.to_thread(build_service_sync, settings)
+
     try:
-        message_ids = await fetch_history_message_ids(settings, start_id)
+        message_ids = await fetch_history_message_ids(settings, start_id, service=service)
         logger.info(f"Processing {len(message_ids)} new Gmail message(s)")
 
         for msg_id in message_ids:
             try:
-                await _process_message(db, sub.user_id, settings, msg_id)
+                await _process_message(db, sub.user_id, settings, msg_id, service=service)
             except Exception:
                 logger.exception(f"Failed to process message {msg_id}")
 
+        # Advance history ID in the same transaction as the data.
+        await gmail_repository.update_history_id(db, sub.id, push_history_id)
         await db.commit()
     except Exception:
         logger.exception("Gmail history fetch/processing failed")
-
-    # Always advance history ID to prevent reprocessing loops.
-    # If processing failed, the next push catches up via historyId.
-    try:
-        await gmail_repository.update_history_id(db, sub.id, push_history_id)
-    except Exception:
-        logger.exception("Failed to update Gmail history ID")
+        # Still advance history ID to prevent reprocessing loops.
+        try:
+            await gmail_repository.update_history_id(db, sub.id, push_history_id)
+            await db.commit()
+        except Exception:
+            logger.exception("Failed to update Gmail history ID")
 
     return Response(status_code=200)

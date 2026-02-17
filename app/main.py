@@ -35,7 +35,12 @@ logger = logging.getLogger(__name__)
 async def _maybe_renew_gmail_watch(
     factory: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    """Renew any Gmail watches expiring within 24 hours."""
+    """Renew any Gmail watches expiring within 24 hours.
+
+    Single-user system: iterates all rows (typically one). If multi-user
+    support is added, filter by the configured Gmail address or add
+    per-user credential storage.
+    """
     async with factory() as db:
         subs = await gmail_repository.get_all(db)
         for sub in subs:
@@ -120,6 +125,11 @@ def create_app() -> FastAPI:
     if "*" in settings.cors_origins:
         raise RuntimeError(
             "CORS origins must not contain '*' when allow_credentials is enabled."
+        )
+
+    if settings.google_refresh_token and not settings.google_push_audience:
+        raise RuntimeError(
+            "ATHENA_GOOGLE_PUSH_AUDIENCE must be set when Gmail integration is enabled."
         )
 
     application = FastAPI(title='Athena - Cash Projection API', version='0.1.0', lifespan=lifespan)

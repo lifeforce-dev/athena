@@ -79,6 +79,6 @@ async def create_manual(
         account_label=account_label,
     )
     db.add(snapshot)
-    await db.commit()
+    await db.flush()
     await db.refresh(snapshot)
     return snapshot

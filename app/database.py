@@ -50,4 +50,8 @@ async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
         )
 
     async with factory() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise

@@ -33,7 +33,9 @@ async def _load_from_db(
     """Try to load projection inputs from the database.
 
     Returns (initial_balance, templates) if the user has commitments,
-    or None to signal a fallback to the JSON file.
+    or None to signal a fallback to the JSON file. This is intentional
+    for the current single-user system: new users without DB commitments
+    can still see a demo projection from the JSON config.
     """
     templates = await commitment_repository.list_as_templates(db, user_id)
     if not templates:

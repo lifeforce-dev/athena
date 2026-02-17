@@ -109,10 +109,12 @@ def _parse_date(text: str) -> datetime | None:
 # -- Public API ------------------------------------------------------------
 
 
-def parse_balance_email(html: str) -> BalanceNotification | None:
+def parse_balance_email(html: str, received_at: datetime | None = None) -> BalanceNotification | None:
     """Parse a BofA 'Available Balance' email and extract balance data.
 
     Returns None if the required balance amount cannot be extracted.
+    Falls back to *received_at* (email Date header) or utcnow() for the
+    observation timestamp when the email body contains no parseable date.
     """
     text = _strip_html(html)
 
@@ -127,7 +129,7 @@ def parse_balance_email(html: str) -> BalanceNotification | None:
     account_match = _ACCOUNT_RE.search(text)
     account_label = f"Account - {account_match.group(1)}" if account_match else None
 
-    observed_at = _parse_date(text) or datetime.now(timezone.utc)
+    observed_at = _parse_date(text) or received_at or datetime.now(timezone.utc)
 
     return BalanceNotification(
         balance=balance,
@@ -136,10 +138,12 @@ def parse_balance_email(html: str) -> BalanceNotification | None:
     )
 
 
-def parse_debit_email(html: str) -> DebitNotification | None:
+def parse_debit_email(html: str, received_at: datetime | None = None) -> DebitNotification | None:
     """Parse a BofA 'Debit Card Used' email and extract transaction data.
 
     Returns None if the required amount cannot be extracted.
+    Falls back to *received_at* (email Date header) or utcnow() when
+    the email body contains no parseable date.
     """
     text = _strip_html(html)
 
@@ -157,7 +161,7 @@ def parse_debit_email(html: str) -> DebitNotification | None:
     card_match = _CARD_RE.search(text)
     card_last_four = card_match.group(1) if card_match else None
 
-    purchase_date = _parse_date(text) or datetime.now(timezone.utc)
+    purchase_date = _parse_date(text) or received_at or datetime.now(timezone.utc)
 
     return DebitNotification(
         amount=amount,
@@ -168,7 +172,7 @@ def parse_debit_email(html: str) -> DebitNotification | None:
 
 
 def try_parse_email(
-    subject: str, html: str
+    subject: str, html: str, received_at: datetime | None = None
 ) -> BalanceNotification | DebitNotification | None:
     """Route to the correct parser based on the email subject.
 
@@ -178,9 +182,9 @@ def try_parse_email(
     lower_subject = subject.lower()
 
     if BALANCE_SUBJECT in lower_subject:
-        return parse_balance_email(html)
+        return parse_balance_email(html, received_at)
 
     if DEBIT_SUBJECT in lower_subject:
-        return parse_debit_email(html)
+        return parse_debit_email(html, received_at)
 
     return None

@@ -37,3 +37,14 @@ def get_current_user(
         )
 
     return payload
+
+
+def get_current_user_id(
+    user: Annotated[dict, Depends(get_current_user)],
+) -> int:
+    """Extract the numeric user ID from the authenticated session.
+
+    Convenience wrapper over get_current_user for routes that only need
+    the user ID.
+    """
+    return int(user["sub"])
