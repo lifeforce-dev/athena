@@ -229,7 +229,8 @@ class TestBalanceTracking:
 
 
 class TestBuildProjection:
-    def test_returns_correct_shape(self, tmp_path: Path):
+    @pytest.mark.asyncio
+    async def test_returns_correct_shape(self, tmp_path: Path):
         config = {
             "initial_balance": 5000.0,
             "templates": [
@@ -252,7 +253,7 @@ class TestBuildProjection:
         }
         config_path = _write_config(tmp_path, config)
 
-        result = build_projection(config_path, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
+        result = await build_projection(config_path, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
 
         assert result.as_of == date(2026, 3, 31)
         assert result.from_date == date(2026, 1, 1)
@@ -260,7 +261,8 @@ class TestBuildProjection:
         assert len(result.months) == 3
         assert result.current_balance == Decimal("7400")
 
-    def test_month_summaries_reflect_net(self, tmp_path: Path):
+    @pytest.mark.asyncio
+    async def test_month_summaries_reflect_net(self, tmp_path: Path):
         config = {
             "initial_balance": 0.0,
             "templates": [
@@ -282,12 +284,13 @@ class TestBuildProjection:
         }
         config_path = _write_config(tmp_path, config)
 
-        result = build_projection(config_path, as_of=date(2026, 2, 28), from_date=date(2026, 1, 1))
+        result = await build_projection(config_path, as_of=date(2026, 2, 28), from_date=date(2026, 1, 1))
 
         assert len(result.months) == 2
         assert all(m.net == Decimal("1000") for m in result.months)
 
-    def test_pay_periods_populated_with_paycheck_entries(self, tmp_path: Path):
+    @pytest.mark.asyncio
+    async def test_pay_periods_populated_with_paycheck_entries(self, tmp_path: Path):
         config = {
             "initial_balance": 1000.0,
             "templates": [
@@ -315,7 +318,7 @@ class TestBuildProjection:
         }
         config_path = _write_config(tmp_path, config)
 
-        result = build_projection(config_path, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
+        result = await build_projection(config_path, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
 
         assert len(result.pay_periods) > 0
         assert all(pp.start_date is not None for pp in result.pay_periods)
