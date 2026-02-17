@@ -29,23 +29,26 @@ class ProjectionConfigError(Exception):
 async def _load_from_db(
     db: AsyncSession,
     user_id: int,
-) -> tuple[Decimal, list[CashFlowTemplate]] | None:
+) -> tuple[Decimal, list[CashFlowTemplate], bool] | None:
     """Try to load projection inputs from the database.
 
-    Returns (initial_balance, templates) if the user has commitments,
-    or None to signal a fallback to the JSON file. This is intentional
-    for the current single-user system: new users without DB commitments
-    can still see a demo projection from the JSON config.
+    Returns (initial_balance, templates) if the user has ever created
+    commitments (even if all are now inactive). Returns None only when
+    the user has zero commitment rows, signaling JSON fallback for
+    users who have not yet set up their data.
     """
-    templates = await commitment_repository.list_as_templates(db, user_id)
-    if not templates:
+    # Distinguish 'never set up' from 'cleared all commitments'.
+    if not await commitment_repository.has_any(db, user_id):
         return None
+
+    templates = await commitment_repository.list_as_templates(db, user_id)
 
     # Use the latest balance snapshot as the starting balance, or 0.
     latest_snapshot = await balance_repository.get_latest(db, user_id)
     initial_balance = latest_snapshot.balance if latest_snapshot else Decimal(0)
+    has_initial_balance = latest_snapshot is not None
 
-    return initial_balance, templates
+    return initial_balance, templates, has_initial_balance
 
 
 async def _load_from_json(config_path: Path) -> tuple[Decimal, list[CashFlowTemplate]]:
@@ -83,10 +86,12 @@ async def build_projection(
         db_result = await _load_from_db(db, user_id)
 
     if db_result is not None:
-        initial_balance, templates = db_result
+        initial_balance, templates, has_initial_balance = db_result
         logger.info(f'Projection using DB data. user_id={user_id} templates={len(templates)}')
     else:
         initial_balance, templates = await _load_from_json(config_path)
+        # JSON config always provides an explicit initial_balance.
+        has_initial_balance = True
         logger.info(f'Projection using JSON fallback. config_path={config_path}')
 
     if from_date is None:
@@ -114,6 +119,7 @@ async def build_projection(
         as_of=as_of,
         from_date=from_date,
         current_balance=ending,
+        has_initial_balance=has_initial_balance,
         ledger=processed.ledger,
         months=processed.months,
         pay_periods=processed.pay_periods,

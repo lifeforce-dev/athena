@@ -47,25 +47,25 @@ def build_service_sync(settings: Settings):
     return _build_service(settings)
 
 
-async def get_user_email(settings: Settings) -> str:
+async def get_user_email(settings: Settings, *, service=None) -> str:
     """Fetch the Gmail address associated with the stored credentials."""
     def _get():
-        service = _build_service(settings)
-        profile = service.users().getProfile(userId="me").execute()
+        svc = service or _build_service(settings)
+        profile = svc.users().getProfile(userId="me").execute()
         return profile["emailAddress"]
 
     return await asyncio.to_thread(_get)
 
 
-async def register_watch(settings: Settings) -> dict:
+async def register_watch(settings: Settings, *, service=None) -> dict:
     """Register a Gmail push notification watch via Pub/Sub.
 
     Returns the watch response containing historyId and expiration (ms epoch).
     """
     def _watch():
-        service = _build_service(settings)
+        svc = service or _build_service(settings)
         topic = f"projects/{settings.google_project_id}/topics/athena-gmail"
-        return service.users().watch(
+        return svc.users().watch(
             userId="me",
             body={"topicName": topic, "labelIds": ["INBOX"]},
         ).execute()

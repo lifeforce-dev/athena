@@ -35,6 +35,9 @@ from app.services.gmail_service import (
     get_message,
 )
 
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["notifications"])
@@ -82,11 +85,8 @@ async def _verify_oidc_token(request: Request, settings: Settings) -> bool:
     token = auth_header[7:]
 
     try:
-        from google.auth.transport import requests as google_requests
-        from google.oauth2 import id_token
-
         claims = await asyncio.to_thread(
-            id_token.verify_oauth2_token,
+            google_id_token.verify_oauth2_token,
             token,
             google_requests.Request(),
             settings.google_push_audience,
@@ -208,6 +208,9 @@ async def handle_gmail_push(
         logger.info(f"Processing {len(message_ids)} new Gmail message(s)")
 
         for msg_id in message_ids:
+            # Per-message failures are caught individually. Each email is
+            # independent and inserts use ON CONFLICT DO NOTHING, so partial
+            # processing is safe and idempotent on retry.
             try:
                 await _process_message(db, sub.user_id, settings, msg_id, service=service)
             except Exception:
@@ -217,12 +220,9 @@ async def handle_gmail_push(
         await gmail_repository.update_history_id(db, sub.id, push_history_id)
         await db.commit()
     except Exception:
+        # Do NOT advance history_id on failure. The next push will carry a
+        # newer historyId, but our stored (older) startHistoryId will cause
+        # history.list to return the missed messages for reprocessing.
         logger.exception("Gmail history fetch/processing failed")
-        # Still advance history ID to prevent reprocessing loops.
-        try:
-            await gmail_repository.update_history_id(db, sub.id, push_history_id)
-            await db.commit()
-        except Exception:
-            logger.exception("Failed to update Gmail history ID")
 
     return Response(status_code=200)

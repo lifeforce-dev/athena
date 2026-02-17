@@ -36,6 +36,7 @@ async def create_commitment(
 ) -> CommitmentResponse:
     """Create a new commitment."""
     row = await service.create_commitment(db, user_id, data)
+    await db.commit()
     return CommitmentResponse.model_validate(row)
 
 
@@ -56,6 +57,7 @@ async def update_commitment(
 
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commitment not found")
+    await db.commit()
     return CommitmentResponse.model_validate(row)
 
 
@@ -69,3 +71,4 @@ async def delete_commitment(
     found = await service.delete_commitment(db, commitment_id, user_id)
     if not found:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commitment not found")
+    await db.commit()

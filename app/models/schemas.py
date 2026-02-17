@@ -38,6 +38,7 @@ class ProjectionResponse(BaseModel):
     as_of: date
     from_date: date
     current_balance: Decimal
+    has_initial_balance: bool
     ledger: list[LedgerEntry]
     months: list[MonthSummary]
     pay_periods: list[PayPeriodSummary]

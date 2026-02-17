@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import func
 
 from app.models.domain import (
     CashFlowTemplate,
@@ -20,6 +21,18 @@ from app.models.domain import (
 from app.models.orm import Commitment
 
 logger = logging.getLogger(__name__)
+
+
+async def has_any(db: AsyncSession, user_id: int) -> bool:
+    """Check if a user has ever created any commitments (active or not).
+
+    Used to distinguish 'never set up' (JSON fallback) from 'cleared all
+    commitments' (empty projection).
+    """
+    result = await db.execute(
+        select(func.count()).select_from(Commitment).where(Commitment.user_id == user_id)
+    )
+    return (result.scalar() or 0) > 0
 
 
 async def list_active(db: AsyncSession, user_id: int) -> list[Commitment]:
@@ -44,7 +57,7 @@ async def create(db: AsyncSession, user_id: int, **fields: object) -> Commitment
     """Insert a new commitment and return it."""
     commitment = Commitment(user_id=user_id, **fields)
     db.add(commitment)
-    await db.commit()
+    await db.flush()
     await db.refresh(commitment)
     return commitment
 
@@ -61,7 +74,7 @@ async def apply_update(
     for key, value in fields.items():
         setattr(commitment, key, value)
 
-    await db.commit()
+    await db.flush()
     await db.refresh(commitment)
     return commitment
 
@@ -76,7 +89,6 @@ async def soft_delete(db: AsyncSession, commitment_id: int, user_id: int) -> boo
         .where(Commitment.id == commitment_id, Commitment.user_id == user_id)
         .values(is_active=False, updated_at=datetime.now(timezone.utc))
     )
-    await db.commit()
 
     # CursorResult has rowcount at runtime; type stubs are incomplete.
     return (result.rowcount or 0) > 0  # type: ignore[union-attr]
