@@ -20,6 +20,7 @@
         :class="{ inc: ev.amount > 0 }"
         @mouseenter="emit('hoverDate', ev.date)"
         @mouseleave="emit('hoverDate', null)"
+        @click="emit('clickDate', ev.date)"
       >
         <span class="ev-d">{{ shortDay(ev.date) }}</span>
         <span class="ev-n" :class="{ inc: ev.amount > 0 }">{{ ev.name }}</span>
@@ -43,6 +44,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   hoverDate: [date: string | null]
+  clickDate: [date: string]
 }>()
 
 interface EventRow {

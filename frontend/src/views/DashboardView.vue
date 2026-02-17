@@ -15,8 +15,8 @@
       <div v-else-if="error" class="error-msg">{{ error }}</div>
 
       <template v-else-if="trajectory.length">
-        <TrajectoryChart :data="trajectory" :highlight-date="highlightDate" />
-        <EventList :ledger="ledger" @hover-date="highlightDate = $event" />
+        <TrajectoryChart ref="chartRef" :data="trajectory" :highlight-date="highlightDate" />
+        <EventList :ledger="ledger" @hover-date="highlightDate = $event" @click-date="onClickDate" />
       </template>
 
       <div v-else class="empty">
@@ -35,6 +35,11 @@ import EventList from '@/components/EventList.vue'
 import { useDashboard } from '@/composables/useDashboard'
 
 const highlightDate = ref<string | null>(null)
+const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
+
+function onClickDate(date: string) {
+  chartRef.value?.zoomToDate(date)
+}
 
 const {
   loading,

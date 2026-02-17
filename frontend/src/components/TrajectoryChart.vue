@@ -65,6 +65,7 @@ let chartState: {
   xPos: (i: number) => number
   yPos: (v: number) => number
   slice: TrajectoryPoint[]
+  thresholds: { red: number; yellow: number }[]
 } | null = null
 
 function clampView() {
@@ -73,48 +74,42 @@ function clampView() {
   if (viewStart < 0) viewStart = 0
 }
 
-/** Compute danger/caution thresholds from the full dataset.
- *  Red = rent amount + all expenses between rent and next paycheck.
- *  Yellow = red + 1000. */
-function computeThresholds(allData: TrajectoryPoint[]) {
-  // Find the first rent-like event (name contains "rent", case-insensitive).
-  const rentIdx = allData.findIndex(pt =>
-    pt.events.some(e => e.amount < 0 && e.name.toLowerCase().includes('rent') && Math.abs(e.amount) > 500)
+/** Compute per-point danger/caution thresholds.
+ *  At each point, red = sum of remaining expenses before the next paycheck.
+ *  Yellow = red + 1000. Thresholds step down as expenses are paid. */
+function computeDynamicThresholds(allData: TrajectoryPoint[]): { red: number; yellow: number }[] {
+  // Identify paycheck days (large income events).
+  const paycheckIndices: number[] = []
+  for (let i = 0; i < allData.length; i++) {
+    if (allData[i].events.some(e => e.amount > 500)) {
+      paycheckIndices.push(i)
+    }
+  }
+
+  // Per-day expense totals and prefix sums for O(1) range queries.
+  const dayExpense = allData.map(pt =>
+    pt.events.reduce((sum, e) => sum + (e.amount < 0 ? Math.abs(e.amount) : 0), 0)
   )
+  const prefix: number[] = [0]
+  for (let i = 0; i < dayExpense.length; i++) {
+    prefix.push(prefix[i] + dayExpense[i])
+  }
+  const rangeExpense = (a: number, b: number) => (a > b ? 0 : prefix[b + 1] - prefix[a])
 
-  if (rentIdx < 0) {
-    // No rent found -- sum all expenses in the first 30 days as a rough baseline.
-    let total = 0
-    const window = allData.slice(0, Math.min(30, allData.length))
-    for (const pt of window) {
-      for (const ev of pt.events) {
-        if (ev.amount < 0) total += Math.abs(ev.amount)
-      }
-    }
-    const red = Math.round(total * 0.5)
-    return { red, yellow: red + 1000 }
+  const result: { red: number; yellow: number }[] = []
+  let payPtr = 0
+
+  for (let i = 0; i < allData.length; i++) {
+    // Advance to first paycheck strictly after this point.
+    while (payPtr < paycheckIndices.length && paycheckIndices[payPtr] <= i) payPtr++
+    const nextPayIdx = payPtr < paycheckIndices.length ? paycheckIndices[payPtr] : allData.length
+
+    // Sum expenses from the day after this point through the day before payday.
+    const red = Math.round(rangeExpense(i + 1, nextPayIdx - 1))
+    result.push({ red, yellow: red + 1000 })
   }
 
-  const rentPt = allData[rentIdx]
-  const rentEv = rentPt.events.find(e => e.amount < 0 && e.name.toLowerCase().includes('rent'))!
-  const rentAmount = Math.abs(rentEv.amount)
-
-  // Find next large income (paycheck) after rent.
-  const payIdx = allData.findIndex((pt, i) => i > rentIdx && pt.events.some(e => e.amount > 500))
-  const end = payIdx >= 0 ? payIdx : Math.min(rentIdx + 14, allData.length)
-
-  // Sum all non-rent expenses from rent day to next paycheck.
-  let windowBills = 0
-  for (let i = rentIdx; i < end; i++) {
-    for (const ev of allData[i].events) {
-      if (ev.amount < 0 && ev !== rentEv) {
-        windowBills += Math.abs(ev.amount)
-      }
-    }
-  }
-
-  const red = Math.round(rentAmount + windowBills)
-  return { red, yellow: red + 1000 }
+  return result
 }
 
 function draw() {
@@ -140,70 +135,117 @@ function draw() {
   const H = rect.height
   const cW = W - P.left - P.right
   const cH = H - P.top - P.bottom
+  // Per-point thresholds computed before Y scaling.
+  const allThresholds = computeDynamicThresholds(props.data)
+  const sliceThresholds = allThresholds.slice(viewStart, viewStart + viewCount)
   const mn = 0
-  const mx = Math.max(...slice.map(t => t.balance)) * 1.1
+  const maxBal = Math.max(...slice.map(t => t.balance))
+  const maxYellow = Math.max(...sliceThresholds.map(t => t.yellow))
+  const mx = Math.max(maxBal, maxYellow) * 1.1
   const xPos = (i: number) => P.left + (i / Math.max(slice.length - 1, 1)) * cW
   const yPos = (v: number) => P.top + (1 - (v - mn) / (mx - mn)) * cH
   const chartBottom = P.top + cH
 
-  chartState = { xPos, yPos, slice }
-  rangeLabel.value = `${shortDate(slice[0].date)} \u2192 ${shortDate(slice[slice.length - 1].date)} \u00B7 ${slice.length} days`
+  chartState = { xPos, yPos, slice, thresholds: sliceThresholds }
+  const calDays = daysBetween(slice[0].date, slice[slice.length - 1].date)
+  rangeLabel.value = `${shortDate(slice[0].date)} \u2192 ${shortDate(slice[slice.length - 1].date)} \u00B7 ${calDays} days`
 
   ctx.clearRect(0, 0, W, H)
 
-  // Compute thresholds from full data, not just visible window.
-  const { red: redT, yellow: yellowT } = computeThresholds(props.data)
-  const yRed = yPos(redT)
-  const yYellow = yPos(yellowT)
-
-  // Zone background bands.
-  if (yellowT < mx) {
-    ctx.fillStyle = 'rgba(52,211,153,.02)'
-    ctx.fillRect(P.left, P.top, cW, yYellow - P.top)
+  // Generate step coordinates for dynamic threshold lines.
+  const redVals = sliceThresholds.map(t => t.red)
+  const yellowVals = sliceThresholds.map(t => t.yellow)
+  const traceStep = (vals: number[]): [number, number][] => {
+    const pts: [number, number][] = []
+    for (let i = 0; i < vals.length; i++) {
+      if (i > 0) pts.push([xPos(i), yPos(vals[i - 1])])
+      pts.push([xPos(i), yPos(vals[i])])
+    }
+    return pts
   }
-  ctx.fillStyle = 'rgba(251,191,36,.02)'
-  ctx.fillRect(P.left, yYellow, cW, yRed - yYellow)
-  ctx.fillStyle = 'rgba(248,113,113,.03)'
-  ctx.fillRect(P.left, yRed, cW, chartBottom - yRed)
+  const redStep = traceStep(redVals)
+  const yellowStep = traceStep(yellowVals)
 
-  // Zone fills under trajectory.
-  const zoneFill = (yTop: number, yBot: number, color: string) => {
-    ctx.save()
+  // Red zone fill: below red step to chart bottom.
+  ctx.beginPath()
+  ctx.moveTo(xPos(0), chartBottom)
+  for (const [x, y] of redStep) ctx.lineTo(x, y)
+  ctx.lineTo(xPos(slice.length - 1), chartBottom)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(248,113,113,.03)'
+  ctx.fill()
+
+  // Yellow zone fill: between yellow and red steps.
+  if (yellowStep.length && redStep.length) {
     ctx.beginPath()
-    ctx.rect(P.left, yTop, cW, yBot - yTop)
-    ctx.clip()
+    ctx.moveTo(yellowStep[0][0], yellowStep[0][1])
+    for (let i = 1; i < yellowStep.length; i++) ctx.lineTo(yellowStep[i][0], yellowStep[i][1])
+    for (let i = redStep.length - 1; i >= 0; i--) ctx.lineTo(redStep[i][0], redStep[i][1])
+    ctx.closePath()
+    ctx.fillStyle = 'rgba(251,191,36,.02)'
+    ctx.fill()
+  }
+
+  // Green zone fill: above yellow step to chart top.
+  ctx.beginPath()
+  ctx.moveTo(xPos(0), P.top)
+  for (const [x, y] of yellowStep) ctx.lineTo(x, y)
+  ctx.lineTo(xPos(slice.length - 1), P.top)
+  ctx.closePath()
+  ctx.fillStyle = 'rgba(52,211,153,.02)'
+  ctx.fill()
+
+  // Per-segment trajectory fill colored by zone.
+  for (let i = 0; i < slice.length - 1; i++) {
+    const bal = Math.min(slice[i].balance, slice[i + 1].balance)
+    const th = sliceThresholds[i]
+    const color = bal < th.red
+      ? 'rgba(248,113,113,.07)'
+      : bal < th.yellow
+        ? 'rgba(251,191,36,.06)'
+        : 'rgba(52,211,153,.06)'
     ctx.beginPath()
-    ctx.moveTo(xPos(0), chartBottom)
-    slice.forEach((_, i) => ctx.lineTo(xPos(i), yPos(slice[i].balance)))
-    ctx.lineTo(xPos(slice.length - 1), chartBottom)
+    ctx.moveTo(xPos(i), chartBottom)
+    ctx.lineTo(xPos(i), yPos(slice[i].balance))
+    ctx.lineTo(xPos(i + 1), yPos(slice[i + 1].balance))
+    ctx.lineTo(xPos(i + 1), chartBottom)
     ctx.closePath()
     ctx.fillStyle = color
     ctx.fill()
-    ctx.restore()
   }
-  zoneFill(P.top, yYellow, 'rgba(52,211,153,.06)')
-  zoneFill(yYellow, yRed, 'rgba(251,191,36,.06)')
-  zoneFill(yRed, chartBottom, 'rgba(248,113,113,.07)')
 
-  // Threshold lines.
+  // Stepped threshold dashed lines.
   ctx.setLineDash([4, 6])
-  if (redT > mn && redT < mx) {
-    ctx.strokeStyle = 'rgba(248,113,113,.2)'
-    ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(P.left, yRed); ctx.lineTo(P.left + cW, yRed); ctx.stroke()
+  ctx.strokeStyle = 'rgba(248,113,113,.2)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let i = 0; i < redStep.length; i++) {
+    if (i === 0) ctx.moveTo(redStep[i][0], redStep[i][1])
+    else ctx.lineTo(redStep[i][0], redStep[i][1])
+  }
+  ctx.stroke()
+
+  ctx.strokeStyle = 'rgba(251,191,36,.15)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (let i = 0; i < yellowStep.length; i++) {
+    if (i === 0) ctx.moveTo(yellowStep[i][0], yellowStep[i][1])
+    else ctx.lineTo(yellowStep[i][0], yellowStep[i][1])
+  }
+  ctx.stroke()
+  ctx.setLineDash([])
+
+  // Threshold labels at left edge.
+  if (redVals[0] > mn) {
     ctx.fillStyle = 'rgba(248,113,113,.25)'
     ctx.font = '600 8px Sora'
-    ctx.fillText(`DANGER ${fmtShort(redT)}`, P.left + 4, yRed - 3)
+    ctx.fillText(`DANGER ${fmtShort(redVals[0])}`, P.left + 4, yPos(redVals[0]) - 3)
   }
-  if (yellowT > mn && yellowT < mx) {
-    ctx.strokeStyle = 'rgba(251,191,36,.15)'
-    ctx.lineWidth = 1
-    ctx.beginPath(); ctx.moveTo(P.left, yYellow); ctx.lineTo(P.left + cW, yYellow); ctx.stroke()
+  if (yellowVals[0] > mn) {
     ctx.fillStyle = 'rgba(251,191,36,.2)'
     ctx.font = '600 8px Sora'
-    ctx.fillText(`CAUTION ${fmtShort(yellowT)}`, P.left + 4, yYellow - 3)
+    ctx.fillText(`CAUTION ${fmtShort(yellowVals[0])}`, P.left + 4, yPos(yellowVals[0]) - 3)
   }
-  ctx.setLineDash([])
 
   // Grid lines.
   ctx.textAlign = 'right'
@@ -325,9 +367,10 @@ function showTooltip(clientX: number) {
   const days = daysBetween(props.data[0].date, t.date)
   const dayLabel = days === 0 ? 'Today' : `+${days}d`
 
-  const bc = t.balance < (computeThresholds(props.data).red)
+  const th = chartState.thresholds[ci] ?? { red: 0, yellow: 1000 }
+  const bc = t.balance < th.red
     ? 'var(--danger)'
-    : t.balance < (computeThresholds(props.data).yellow)
+    : t.balance < th.yellow
       ? 'var(--tight)'
       : 'var(--safe)'
 
@@ -464,6 +507,34 @@ watch(() => props.data, () => {
 
 // Redraw when highlight changes (event list hover).
 watch(() => props.highlightDate, () => { draw() })
+
+/** Zoom the chart so it spans from index 0 through the target date + 10 calendar days. */
+function zoomToDate(targetDate: string) {
+  if (!props.data.length) return
+
+  const targetCal = parseLocalDate(targetDate).getTime()
+  const bufferMs = 10 * 864e5
+  const endCal = targetCal + bufferMs
+
+  // Find last data index whose date <= targetDate + 10 days.
+  let endIdx = props.data.length - 1
+  for (let i = props.data.length - 1; i >= 0; i--) {
+    if (parseLocalDate(props.data[i].date).getTime() <= endCal) {
+      endIdx = i
+      break
+    }
+  }
+
+  viewStart = 0
+  viewCount = Math.max(10, endIdx + 1)
+  clampView()
+  draw()
+
+  // Scroll the chart into view.
+  wrapRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+defineExpose({ zoomToDate })
 </script>
 
 <style scoped>
