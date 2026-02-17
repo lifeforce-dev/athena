@@ -15,7 +15,7 @@
       <div v-else-if="error" class="error-msg">{{ error }}</div>
 
       <template v-else-if="trajectory.length">
-        <TrajectoryChart ref="chartRef" :data="trajectory" :highlight-date="highlightDate" />
+        <TrajectoryChart ref="chartRef" :data="trajectory" :highlight-date="highlightDate" :pulse-date="pulseDate" />
         <EventList :ledger="ledger" @hover-date="highlightDate = $event" @click-date="onClickDate" />
       </template>
 
@@ -28,17 +28,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import DashboardHero from '@/components/DashboardHero.vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import EventList from '@/components/EventList.vue'
 import { useDashboard } from '@/composables/useDashboard'
 
 const highlightDate = ref<string | null>(null)
+const pulseDate = ref<string | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
 
 function onClickDate(date: string) {
+  pulseDate.value = null
   chartRef.value?.zoomToDate(date)
+  // Set on next tick so the watch fires even if the same date is clicked again.
+  nextTick(() => { pulseDate.value = date })
 }
 
 const {

@@ -37,6 +37,7 @@ import { parseLocalDate } from '@/utils/format'
 const props = defineProps<{
   data: TrajectoryPoint[]
   highlightDate?: string | null
+  pulseDate?: string | null
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -59,6 +60,26 @@ const shortDate = (d: string) =>
 
 const daysBetween = (a: string, b: string) =>
   Math.round((parseLocalDate(b).getTime() - parseLocalDate(a).getTime()) / 864e5)
+
+// Pulse animation state.
+let pulseStartTime = 0
+let pulseAnimId = 0
+const PULSE_DURATION = 2500
+
+function startPulse() {
+  cancelAnimationFrame(pulseAnimId)
+  pulseStartTime = performance.now()
+  const tick = () => {
+    const elapsed = performance.now() - pulseStartTime
+    if (elapsed > PULSE_DURATION) {
+      draw()
+      return
+    }
+    draw(elapsed)
+    pulseAnimId = requestAnimationFrame(tick)
+  }
+  pulseAnimId = requestAnimationFrame(tick)
+}
 
 // Store chart mapping for tooltip hit-testing.
 let chartState: {
@@ -89,7 +110,7 @@ function computeWindowThreshold(slice: TrajectoryPoint[]): { red: number; yellow
   return { red, yellow: red + 1000 }
 }
 
-function draw() {
+function draw(pulseElapsed?: number) {
   const canvas = canvasRef.value
   const wrap = wrapRef.value
   if (!canvas || !wrap || !props.data.length) return
@@ -231,6 +252,27 @@ function draw() {
       c = '#E8ECF2'; r = 8
       ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2)
       ctx.fillStyle = 'rgba(232,236,242,.07)'; ctx.fill()
+    }
+
+    // Pulse animation from event click.
+    if (props.pulseDate && t.date === props.pulseDate && pulseElapsed !== undefined) {
+      const progress = pulseElapsed / PULSE_DURATION
+      const wave1 = (pulseElapsed % 800) / 800
+      const wave2 = ((pulseElapsed + 400) % 800) / 800
+      const fadeOut = 1 - progress
+
+      for (const w of [wave1, wave2]) {
+        const ringR = 8 + w * 20
+        const alpha = (1 - w) * 0.35 * fadeOut
+        ctx.beginPath(); ctx.arc(x, y, ringR, 0, Math.PI * 2)
+        ctx.strokeStyle = `rgba(167,139,250,${alpha})`
+        ctx.lineWidth = 2
+        ctx.stroke()
+      }
+
+      c = '#A78BFA'; r = 6
+      ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(167,139,250,${0.12 * (1 - progress)})`; ctx.fill()
     }
 
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2)
@@ -437,6 +479,12 @@ watch(() => props.data, () => {
 
 // Redraw when highlight changes (event list hover).
 watch(() => props.highlightDate, () => { draw() })
+
+// Start pulse animation when pulseDate changes.
+watch(() => props.pulseDate, (val) => {
+  if (val) startPulse()
+  else draw()
+})
 
 /** Zoom the chart so it spans from index 0 through the target date + 10 calendar days. */
 function zoomToDate(targetDate: string) {
