@@ -75,10 +75,11 @@ function clampView() {
 }
 
 /** Compute per-point danger/caution thresholds.
- *  At each point, red = sum of remaining expenses before the next paycheck.
- *  Yellow = red + 1000. Thresholds step down as expenses are paid. */
+ *  Red = high water mark for each pay window: total expenses from payday
+ *  through the day before next payday, held flat the entire window.
+ *  Yellow = red + 1000. Resets on each payday. */
 function computeDynamicThresholds(allData: TrajectoryPoint[]): { red: number; yellow: number }[] {
-  // Identify paycheck days (large income events).
+  // Identify paycheck indices (any income event > $500).
   const paycheckIndices: number[] = []
   for (let i = 0; i < allData.length; i++) {
     if (allData[i].events.some(e => e.amount > 500)) {
@@ -86,26 +87,30 @@ function computeDynamicThresholds(allData: TrajectoryPoint[]): { red: number; ye
     }
   }
 
-  // Per-day expense totals and prefix sums for O(1) range queries.
+  // Per-day expense totals.
   const dayExpense = allData.map(pt =>
     pt.events.reduce((sum, e) => sum + (e.amount < 0 ? Math.abs(e.amount) : 0), 0)
   )
-  const prefix: number[] = [0]
-  for (let i = 0; i < dayExpense.length; i++) {
-    prefix.push(prefix[i] + dayExpense[i])
+
+  // Build pay windows: [windowStart, dayBeforeNextPay].
+  // Before first paycheck: window starts at index 0.
+  // Each paycheck starts a new window through the day before the next paycheck.
+  const windows: { start: number; end: number; total: number }[] = []
+  const starts = [0, ...paycheckIndices]
+  for (let w = 0; w < starts.length; w++) {
+    const wStart = starts[w]
+    const wEnd = w + 1 < starts.length ? starts[w + 1] - 1 : allData.length - 1
+    let total = 0
+    for (let i = wStart; i <= wEnd; i++) total += dayExpense[i]
+    windows.push({ start: wStart, end: wEnd, total: Math.round(total) })
   }
-  const rangeExpense = (a: number, b: number) => (a > b ? 0 : prefix[b + 1] - prefix[a])
 
+  // Assign each point the flat high water mark of its window.
   const result: { red: number; yellow: number }[] = []
-  let payPtr = 0
-
+  let wIdx = 0
   for (let i = 0; i < allData.length; i++) {
-    // Advance to first paycheck strictly after this point.
-    while (payPtr < paycheckIndices.length && paycheckIndices[payPtr] <= i) payPtr++
-    const nextPayIdx = payPtr < paycheckIndices.length ? paycheckIndices[payPtr] : allData.length
-
-    // Sum expenses from the day after this point through the day before payday.
-    const red = Math.round(rangeExpense(i + 1, nextPayIdx - 1))
+    while (wIdx < windows.length - 1 && i > windows[wIdx].end) wIdx++
+    const red = windows[wIdx].total
     result.push({ red, yellow: red + 1000 })
   }
 
