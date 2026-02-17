@@ -1,10 +1,21 @@
 <template>
   <div>
     <div class="sh">
-      <span class="sh-t">Trajectory</span>
+      <span class="sh-t">Balance Trajectory</span>
       <span class="sh-m">{{ rangeLabel }}</span>
     </div>
-    <div class="chart-box" ref="wrapRef" :class="{ grabbing: isDragging }">
+    <div
+      class="chart-box"
+      ref="wrapRef"
+      :class="{ grabbing: isDragging }"
+      @mousedown="onMouseDown"
+      @mousemove="onMouseMove"
+      @mouseleave="onMouseLeave"
+      @wheel.prevent="onWheel"
+      @touchstart="onTouchStart"
+      @touchmove.prevent="onTouchMove"
+      @touchend="onTouchEnd"
+    >
       <canvas ref="canvasRef" />
       <div class="tt" ref="tipRef" :class="{ show: tipVisible }">
         <div v-html="tipHtml" />
@@ -25,6 +36,7 @@ import { parseLocalDate } from '@/utils/format'
 
 const props = defineProps<{
   data: TrajectoryPoint[]
+  highlightDate?: string | null
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -33,8 +45,11 @@ const tipRef = ref<HTMLDivElement | null>(null)
 const tipVisible = ref(false)
 const tipHtml = ref('')
 const isDragging = ref(false)
-
 const rangeLabel = ref('')
+
+// Windowed view state.
+let viewStart = 0
+let viewCount = 30
 
 const fmtShort = (n: number) =>
   '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -42,32 +57,63 @@ const fmtShort = (n: number) =>
 const shortDate = (d: string) =>
   parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
+const daysBetween = (a: string, b: string) =>
+  Math.round((parseLocalDate(b).getTime() - parseLocalDate(a).getTime()) / 864e5)
+
 // Store chart mapping for tooltip hit-testing.
-let chartData: {
+let chartState: {
   xPos: (i: number) => number
   yPos: (v: number) => number
   slice: TrajectoryPoint[]
 } | null = null
 
-function computeThresholds(slice: TrajectoryPoint[]) {
-  // Find first rent event and first large income after it to define survival window.
-  const rentIdx = slice.findIndex(pt => pt.events.some(e => e.name === 'Rent'))
-  if (rentIdx < 0) return { red: 3000, yellow: 4000 }
+function clampView() {
+  if (viewStart < 0) viewStart = 0
+  if (viewStart > props.data.length - viewCount) viewStart = props.data.length - viewCount
+  if (viewStart < 0) viewStart = 0
+}
 
-  const rentAmount = Math.abs(slice[rentIdx].events.find(e => e.name === 'Rent')!.amount)
-  const payIdx = slice.findIndex((pt, i) => i > rentIdx && pt.events.some(e => e.amount > 1000))
-  const end = payIdx >= 0 ? payIdx : slice.length
+/** Compute danger/caution thresholds from the full dataset.
+ *  Red = rent amount + all expenses between rent and next paycheck.
+ *  Yellow = red + 1000. */
+function computeThresholds(allData: TrajectoryPoint[]) {
+  // Find the first rent-like event (name contains "rent", case-insensitive).
+  const rentIdx = allData.findIndex(pt =>
+    pt.events.some(e => e.amount < 0 && e.name.toLowerCase().includes('rent') && Math.abs(e.amount) > 500)
+  )
 
+  if (rentIdx < 0) {
+    // No rent found -- sum all expenses in the first 30 days as a rough baseline.
+    let total = 0
+    const window = allData.slice(0, Math.min(30, allData.length))
+    for (const pt of window) {
+      for (const ev of pt.events) {
+        if (ev.amount < 0) total += Math.abs(ev.amount)
+      }
+    }
+    const red = Math.round(total * 0.5)
+    return { red, yellow: red + 1000 }
+  }
+
+  const rentPt = allData[rentIdx]
+  const rentEv = rentPt.events.find(e => e.amount < 0 && e.name.toLowerCase().includes('rent'))!
+  const rentAmount = Math.abs(rentEv.amount)
+
+  // Find next large income (paycheck) after rent.
+  const payIdx = allData.findIndex((pt, i) => i > rentIdx && pt.events.some(e => e.amount > 500))
+  const end = payIdx >= 0 ? payIdx : Math.min(rentIdx + 14, allData.length)
+
+  // Sum all non-rent expenses from rent day to next paycheck.
   let windowBills = 0
   for (let i = rentIdx; i < end; i++) {
-    for (const ev of slice[i].events) {
-      if (ev.amount < 0 && ev.name !== 'Rent') {
+    for (const ev of allData[i].events) {
+      if (ev.amount < 0 && ev !== rentEv) {
         windowBills += Math.abs(ev.amount)
       }
     }
   }
 
-  const red = rentAmount + windowBills
+  const red = Math.round(rentAmount + windowBills)
   return { red, yellow: red + 1000 }
 }
 
@@ -77,7 +123,10 @@ function draw() {
   if (!canvas || !wrap || !props.data.length) return
 
   const ctx = canvas.getContext('2d')!
-  const slice = props.data
+  clampView()
+  const slice = props.data.slice(viewStart, viewStart + viewCount)
+  if (!slice.length) return
+
   const rect = wrap.getBoundingClientRect()
   const dpr = devicePixelRatio || 1
   canvas.width = rect.width * dpr
@@ -93,22 +142,21 @@ function draw() {
   const cH = H - P.top - P.bottom
   const mn = 0
   const mx = Math.max(...slice.map(t => t.balance)) * 1.1
-  const xPos = (i: number) => P.left + (i / (slice.length - 1)) * cW
+  const xPos = (i: number) => P.left + (i / Math.max(slice.length - 1, 1)) * cW
   const yPos = (v: number) => P.top + (1 - (v - mn) / (mx - mn)) * cH
   const chartBottom = P.top + cH
 
-  chartData = { xPos, yPos, slice }
-
-  // Update range label.
-  rangeLabel.value = `${shortDate(slice[0].date)} - ${shortDate(slice[slice.length - 1].date)}`
+  chartState = { xPos, yPos, slice }
+  rangeLabel.value = `${shortDate(slice[0].date)} \u2192 ${shortDate(slice[slice.length - 1].date)} \u00B7 ${slice.length} days`
 
   ctx.clearRect(0, 0, W, H)
 
-  const { red: redT, yellow: yellowT } = computeThresholds(slice)
+  // Compute thresholds from full data, not just visible window.
+  const { red: redT, yellow: yellowT } = computeThresholds(props.data)
   const yRed = yPos(redT)
   const yYellow = yPos(yellowT)
 
-  // Zone bands.
+  // Zone background bands.
   if (yellowT < mx) {
     ctx.fillStyle = 'rgba(52,211,153,.02)'
     ctx.fillRect(P.left, P.top, cW, yYellow - P.top)
@@ -157,7 +205,7 @@ function draw() {
   }
   ctx.setLineDash([])
 
-  // Grid.
+  // Grid lines.
   ctx.textAlign = 'right'
   for (let i = 0; i <= 5; i++) {
     const v = mn + (mx - mn) * (i / 5)
@@ -199,11 +247,19 @@ function draw() {
     const x = xPos(i)
     const y = yPos(t.balance)
     const inc = t.events.some(e => e.amount > 0)
-    const isRent = t.events.some(e => e.name === 'Rent')
+    const isRent = t.events.some(e => e.name.toLowerCase().includes('rent') && e.amount < -500)
     let c = 'rgba(184,190,201,.4)'
     let r = 3
     if (inc) { c = '#A78BFA'; r = 5 }
     if (isRent) { c = '#FBBF24'; r = 5 }
+
+    // Highlight from event list hover.
+    if (props.highlightDate && t.date === props.highlightDate) {
+      c = '#E8ECF2'; r = 8
+      ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(232,236,242,.07)'; ctx.fill()
+    }
+
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2)
     ctx.fillStyle = c; ctx.fill()
   })
@@ -233,18 +289,24 @@ function draw() {
   const step = slice.length > 60 ? 7 : slice.length > 30 ? 4 : slice.length > 15 ? 2 : 1
   slice.forEach((t, i) => {
     if (i % step && i !== slice.length - 1 && i !== 0) return
+    const x = xPos(i)
     ctx.fillStyle = 'rgba(90,99,120,.4)'
     ctx.font = '9px Sora'
-    ctx.fillText(shortDate(t.date), xPos(i), chartBottom + 14)
+    ctx.fillText(shortDate(t.date), x, chartBottom + 14)
+    const days = daysBetween(props.data[0].date, t.date)
+    ctx.fillStyle = 'rgba(90,99,120,.22)'
+    ctx.font = '8px IBM Plex Mono'
+    ctx.fillText(days === 0 ? 'today' : `+${days}d`, x, chartBottom + 25)
   })
   ctx.textAlign = 'left'
 }
 
-function handleMouseMove(e: MouseEvent) {
-  if (!chartData || !wrapRef.value || !tipRef.value) return
+// ── Tooltip on hover ──
+function showTooltip(clientX: number) {
+  if (!chartState || !wrapRef.value || !tipRef.value) return
   const rect = wrapRef.value.getBoundingClientRect()
-  const mx = e.clientX - rect.left
-  const { xPos, yPos, slice } = chartData
+  const mx = clientX - rect.left
+  const { xPos, yPos, slice } = chartState
 
   let ci = 0
   let cd = Infinity
@@ -253,19 +315,24 @@ function handleMouseMove(e: MouseEvent) {
     if (d < cd) { cd = d; ci = i }
   })
 
-  if (cd > 25) {
-    tipVisible.value = false
-    return
-  }
+  if (cd > 25) { tipVisible.value = false; return }
 
   const t = slice[ci]
   const x = xPos(ci)
   const y = yPos(t.balance)
   const dt = parseLocalDate(t.date)
   const dateStr = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const days = daysBetween(props.data[0].date, t.date)
+  const dayLabel = days === 0 ? 'Today' : `+${days}d`
 
-  let h = `<div style="font-weight:700;color:var(--bright);margin-bottom:3px">${dateStr}</div>`
-  h += `<div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--bright);margin-bottom:5px">${fmtShort(t.balance)}</div>`
+  const bc = t.balance < (computeThresholds(props.data).red)
+    ? 'var(--danger)'
+    : t.balance < (computeThresholds(props.data).yellow)
+      ? 'var(--tight)'
+      : 'var(--safe)'
+
+  let h = `<div style="font-weight:700;color:var(--bright);margin-bottom:3px">${dateStr} \u00B7 ${dayLabel}</div>`
+  h += `<div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:${bc};margin-bottom:5px">${fmtShort(t.balance)}</div>`
   for (const ev of t.events) {
     const c = ev.amount > 0 ? 'var(--income)' : 'var(--danger)'
     const sign = ev.amount > 0 ? '+' : '-'
@@ -274,34 +341,129 @@ function handleMouseMove(e: MouseEvent) {
 
   tipHtml.value = h
   tipVisible.value = true
-
-  if (tipRef.value) {
-    let tx = x + 12
-    if (tx + 180 > rect.width - 10) tx = x - 190
-    tipRef.value.style.left = `${tx}px`
-    tipRef.value.style.top = `${Math.max(6, y - 30)}px`
-  }
+  let tx = x + 12
+  if (tx + 180 > rect.width - 10) tx = x - 190
+  tipRef.value.style.left = `${tx}px`
+  tipRef.value.style.top = `${Math.max(6, y - 30)}px`
 }
 
-function handleMouseLeave() {
+// ── Mouse interactions ──
+let dragStartX = 0
+let dragStartView = 0
+
+function onMouseDown(e: MouseEvent) {
+  isDragging.value = true
+  dragStartX = e.clientX
+  dragStartView = viewStart
   tipVisible.value = false
+  window.addEventListener('mousemove', onWindowMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
 }
 
-function handleResize() {
+function onWindowMouseMove(e: MouseEvent) {
+  if (!isDragging.value || !wrapRef.value) return
+  const dx = e.clientX - dragStartX
+  const pxPerDay = wrapRef.value.clientWidth / viewCount
+  viewStart = Math.round(dragStartView - dx / pxPerDay)
+  clampView()
   draw()
 }
 
-onMounted(() => {
-  window.addEventListener('resize', handleResize)
-})
+function onMouseUp() {
+  isDragging.value = false
+  window.removeEventListener('mousemove', onWindowMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
+}
 
+function onMouseMove(e: MouseEvent) {
+  if (isDragging.value) return
+  showTooltip(e.clientX)
+}
+
+function onMouseLeave() {
+  tipVisible.value = false
+}
+
+function onWheel(e: WheelEvent) {
+  if (!wrapRef.value) return
+  const rect = wrapRef.value.getBoundingClientRect()
+  const pct = (e.clientX - rect.left) / rect.width
+  const delta = e.deltaY > 0 ? 5 : -5
+  const oldCount = viewCount
+  viewCount = Math.max(10, Math.min(props.data.length, viewCount + delta))
+  // Keep the point under cursor stable.
+  const shift = Math.round((viewCount - oldCount) * pct)
+  viewStart -= shift
+  clampView()
+  draw()
+}
+
+// ── Touch interactions ──
+let lastPinchDist = 0
+let touchStartView = 0
+let touchStartCount = 0
+let touchDragging = false
+let touchStartX = 0
+let touchDragStartView = 0
+
+function onTouchStart(e: TouchEvent) {
+  if (e.touches.length === 2) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX
+    const dy = e.touches[0].clientY - e.touches[1].clientY
+    lastPinchDist = Math.sqrt(dx * dx + dy * dy)
+    touchStartView = viewStart
+    touchStartCount = viewCount
+  } else if (e.touches.length === 1) {
+    touchDragging = true
+    touchStartX = e.touches[0].clientX
+    touchDragStartView = viewStart
+  }
+}
+
+function onTouchMove(e: TouchEvent) {
+  if (e.touches.length === 2 && lastPinchDist > 0) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX
+    const dy = e.touches[0].clientY - e.touches[1].clientY
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const scale = dist / lastPinchDist
+    viewCount = Math.max(10, Math.min(props.data.length, Math.round(touchStartCount / scale)))
+    const mid = (e.touches[0].clientX + e.touches[1].clientX) / 2
+    const rect = wrapRef.value!.getBoundingClientRect()
+    const pct = (mid - rect.left) / rect.width
+    viewStart = Math.round(touchStartView + (touchStartCount - viewCount) * pct)
+    clampView()
+    draw()
+  } else if (e.touches.length === 1 && touchDragging && wrapRef.value) {
+    const dx = e.touches[0].clientX - touchStartX
+    const pxPerDay = wrapRef.value.clientWidth / viewCount
+    viewStart = Math.round(touchDragStartView - dx / pxPerDay)
+    clampView()
+    draw()
+  }
+}
+
+function onTouchEnd() {
+  touchDragging = false
+  lastPinchDist = 0
+}
+
+function handleResize() { draw() }
+
+onMounted(() => { window.addEventListener('resize', handleResize) })
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  window.removeEventListener('mousemove', onWindowMouseMove)
+  window.removeEventListener('mouseup', onMouseUp)
 })
 
 watch(() => props.data, () => {
+  viewStart = 0
+  viewCount = Math.min(30, props.data.length)
   nextTick(draw)
 }, { immediate: true })
+
+// Redraw when highlight changes (event list hover).
+watch(() => props.highlightDate, () => { draw() })
 </script>
 
 <style scoped>
@@ -334,8 +496,13 @@ watch(() => props.data, () => {
   height: 280px;
   position: relative;
   overflow: hidden;
-  cursor: crosshair;
+  cursor: grab;
   box-shadow: var(--shadow-card);
+  touch-action: none;
+}
+
+.chart-box.grabbing {
+  cursor: grabbing;
 }
 
 .chart-box canvas {

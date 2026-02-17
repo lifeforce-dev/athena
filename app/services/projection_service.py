@@ -118,7 +118,7 @@ async def build_projection(
     return ProjectionResponse(
         as_of=as_of,
         from_date=from_date,
-        current_balance=ending,
+        current_balance=initial_balance,
         has_initial_balance=has_initial_balance,
         ledger=processed.ledger,
         months=processed.months,

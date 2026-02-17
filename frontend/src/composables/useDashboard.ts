@@ -11,10 +11,10 @@ export interface TrajectoryPoint {
 
 export function useDashboard() {
   const today = new Date()
-  const threeMonthsOut = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate())
+  const ninetyDaysOut = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
 
   const fromDate = ref(toLocalDateString(today))
-  const asOf = ref(toLocalDateString(threeMonthsOut))
+  const asOf = ref(toLocalDateString(ninetyDaysOut))
 
   const projection = useProjection()
 

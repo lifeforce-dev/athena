@@ -18,6 +18,8 @@
         :key="`${ev.date}-${ev.name}-${idx}`"
         class="ev-r"
         :class="{ inc: ev.amount > 0 }"
+        @mouseenter="emit('hoverDate', ev.date)"
+        @mouseleave="emit('hoverDate', null)"
       >
         <span class="ev-d">{{ shortDay(ev.date) }}</span>
         <span class="ev-n" :class="{ inc: ev.amount > 0 }">{{ ev.name }}</span>
@@ -37,6 +39,10 @@ import { parseLocalDate } from '@/utils/format'
 
 const props = defineProps<{
   ledger: ParsedLedgerEntry[]
+}>()
+
+const emit = defineEmits<{
+  hoverDate: [date: string | null]
 }>()
 
 interface EventRow {
