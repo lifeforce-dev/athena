@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -94,35 +95,35 @@ class TestTemplateTagValidation:
 class TestMonthSummaries:
     def test_single_month_produces_one_summary(self):
         raw_ledger = [
-            (date(2026, 1, 5), "Rent", -1500.0),
-            (date(2026, 1, 15), "Paycheck", 3000.0),
+            (date(2026, 1, 5), "Rent", Decimal("-1500")),
+            (date(2026, 1, 15), "Paycheck", Decimal("3000")),
         ]
 
-        result = process_ledger(raw_ledger, 5000.0, date(2026, 1, 1), date(2026, 1, 31))
+        result = process_ledger(raw_ledger, Decimal("5000"), date(2026, 1, 1), date(2026, 1, 31))
 
         assert len(result.months) == 1
         assert result.months[0].month == 1
         assert result.months[0].year == 2026
-        assert result.months[0].net == pytest.approx(1500.0)
+        assert result.months[0].net == Decimal("1500")
         assert result.months[0].is_partial is False
 
     def test_multiple_months_each_get_summary(self):
         raw_ledger = [
-            (date(2026, 1, 15), "Income", 2000.0),
-            (date(2026, 2, 15), "Income", 2000.0),
-            (date(2026, 3, 15), "Income", 2000.0),
+            (date(2026, 1, 15), "Income", Decimal("2000")),
+            (date(2026, 2, 15), "Income", Decimal("2000")),
+            (date(2026, 3, 15), "Income", Decimal("2000")),
         ]
 
-        result = process_ledger(raw_ledger, 0.0, date(2026, 1, 1), date(2026, 3, 31))
+        result = process_ledger(raw_ledger, Decimal("0"), date(2026, 1, 1), date(2026, 3, 31))
 
         assert len(result.months) == 3
         assert [m.month for m in result.months] == [1, 2, 3]
-        assert all(m.net == pytest.approx(2000.0) for m in result.months)
+        assert all(m.net == Decimal("2000") for m in result.months)
 
     def test_partial_month_flagged(self):
-        raw_ledger = [(date(2026, 2, 15), "Income", 1000.0)]
+        raw_ledger = [(date(2026, 2, 15), "Income", Decimal("1000"))]
 
-        result = process_ledger(raw_ledger, 0.0, date(2026, 2, 10), date(2026, 2, 28))
+        result = process_ledger(raw_ledger, Decimal("0"), date(2026, 2, 10), date(2026, 2, 28))
 
         assert result.months[0].is_partial is True
         assert result.months[0].covered_start == date(2026, 2, 10)
@@ -136,34 +137,34 @@ class TestMonthSummaries:
 class TestPayPeriodGrouping:
     def test_paycheck_entries_create_pay_periods(self):
         raw_ledger = [
-            (date(2026, 1, 9), "Paycheck", 3000.0),
-            (date(2026, 1, 12), "Rent", -1500.0),
-            (date(2026, 1, 23), "Paycheck", 3000.0),
-            (date(2026, 1, 25), "Bills", -500.0),
+            (date(2026, 1, 9), "Paycheck", Decimal("3000")),
+            (date(2026, 1, 12), "Rent", Decimal("-1500")),
+            (date(2026, 1, 23), "Paycheck", Decimal("3000")),
+            (date(2026, 1, 25), "Bills", Decimal("-500")),
         ]
 
-        result = process_ledger(raw_ledger, 1000.0, date(2026, 1, 1), date(2026, 1, 31), paycheck_names={"Paycheck"})
+        result = process_ledger(raw_ledger, Decimal("1000"), date(2026, 1, 1), date(2026, 1, 31), paycheck_names={"Paycheck"})
 
         # Two periods: first closed at second paycheck, second is partial (open at window end)
         assert len(result.pay_periods) == 2
         assert result.pay_periods[0].start_date == date(2026, 1, 9)
         assert result.pay_periods[0].end_date == date(2026, 1, 23)
         assert result.pay_periods[0].is_partial is False
-        assert result.pay_periods[0].spent == pytest.approx(1500.0)
+        assert result.pay_periods[0].spent == Decimal("1500")
 
         assert result.pay_periods[1].start_date == date(2026, 1, 23)
         assert result.pay_periods[1].is_partial is True
-        assert result.pay_periods[1].spent == pytest.approx(500.0)
+        assert result.pay_periods[1].spent == Decimal("500")
 
     def test_tag_based_detection_ignores_name(self):
         """Pay-period detection uses tags, not the entry name."""
         raw_ledger = [
-            (date(2026, 1, 9), "Salary Deposit", 3000.0),
-            (date(2026, 1, 12), "Rent", -1500.0),
+            (date(2026, 1, 9), "Salary Deposit", Decimal("3000")),
+            (date(2026, 1, 12), "Rent", Decimal("-1500")),
         ]
 
         result = process_ledger(
-            raw_ledger, 1000.0, date(2026, 1, 1), date(2026, 1, 31),
+            raw_ledger, Decimal("1000"), date(2026, 1, 1), date(2026, 1, 31),
             paycheck_names={"Salary Deposit"},
         )
 
@@ -172,22 +173,22 @@ class TestPayPeriodGrouping:
 
     def test_no_paycheck_means_no_pay_periods(self):
         raw_ledger = [
-            (date(2026, 1, 5), "Rent", -1500.0),
-            (date(2026, 1, 10), "Utilities", -200.0),
+            (date(2026, 1, 5), "Rent", Decimal("-1500")),
+            (date(2026, 1, 10), "Utilities", Decimal("-200")),
         ]
 
-        result = process_ledger(raw_ledger, 5000.0, date(2026, 1, 1), date(2026, 1, 31))
+        result = process_ledger(raw_ledger, Decimal("5000"), date(2026, 1, 1), date(2026, 1, 31))
 
         assert result.pay_periods == []
 
     def test_inflows_before_same_day_outflows(self):
         """Paycheck entries should sort before same-day outflows."""
         raw_ledger = [
-            (date(2026, 1, 15), "Bills", -500.0),
-            (date(2026, 1, 15), "Paycheck", 3000.0),
+            (date(2026, 1, 15), "Bills", Decimal("-500")),
+            (date(2026, 1, 15), "Paycheck", Decimal("3000")),
         ]
 
-        result = process_ledger(raw_ledger, 1000.0, date(2026, 1, 1), date(2026, 1, 31), paycheck_names={"Paycheck"})
+        result = process_ledger(raw_ledger, Decimal("1000"), date(2026, 1, 1), date(2026, 1, 31), paycheck_names={"Paycheck"})
 
         assert result.ledger[0].name == "Paycheck"
         assert result.ledger[1].name == "Bills"
@@ -201,22 +202,22 @@ class TestPayPeriodGrouping:
 class TestBalanceTracking:
     def test_running_balance_accumulates(self):
         raw_ledger = [
-            (date(2026, 1, 1), "Income", 1000.0),
-            (date(2026, 1, 5), "Expense", -300.0),
-            (date(2026, 1, 10), "Income", 500.0),
+            (date(2026, 1, 1), "Income", Decimal("1000")),
+            (date(2026, 1, 5), "Expense", Decimal("-300")),
+            (date(2026, 1, 10), "Income", Decimal("500")),
         ]
 
-        result = process_ledger(raw_ledger, 2000.0, date(2026, 1, 1), date(2026, 1, 31))
+        result = process_ledger(raw_ledger, Decimal("2000"), date(2026, 1, 1), date(2026, 1, 31))
 
-        assert result.ledger[0].balance == pytest.approx(3000.0)
-        assert result.ledger[1].balance == pytest.approx(2700.0)
-        assert result.ledger[2].balance == pytest.approx(3200.0)
-        assert result.ending_balance == pytest.approx(3200.0)
+        assert result.ledger[0].balance == Decimal("3000")
+        assert result.ledger[1].balance == Decimal("2700")
+        assert result.ledger[2].balance == Decimal("3200")
+        assert result.ending_balance == Decimal("3200")
 
     def test_empty_ledger_returns_initial_balance(self):
-        result = process_ledger([], 5000.0, date(2026, 1, 1), date(2026, 1, 31))
+        result = process_ledger([], Decimal("5000"), date(2026, 1, 1), date(2026, 1, 31))
 
-        assert result.ending_balance == pytest.approx(5000.0)
+        assert result.ending_balance == Decimal("5000")
         assert result.ledger == []
         assert result.months == []
         assert result.pay_periods == []
@@ -257,7 +258,7 @@ class TestBuildProjection:
         assert result.from_date == date(2026, 1, 1)
         assert len(result.ledger) == 6  # 3 paychecks + 3 rents
         assert len(result.months) == 3
-        assert result.current_balance == pytest.approx(5000.0 + 3 * 2000.0 - 3 * 1200.0)
+        assert result.current_balance == Decimal("7400")
 
     def test_month_summaries_reflect_net(self, tmp_path: Path):
         config = {
@@ -284,7 +285,7 @@ class TestBuildProjection:
         result = build_projection(config_path, as_of=date(2026, 2, 28), from_date=date(2026, 1, 1))
 
         assert len(result.months) == 2
-        assert all(m.net == pytest.approx(1000.0) for m in result.months)
+        assert all(m.net == Decimal("1000") for m in result.months)
 
     def test_pay_periods_populated_with_paycheck_entries(self, tmp_path: Path):
         config = {
@@ -364,14 +365,14 @@ class TestProjectionEndpoint:
         assert body["as_of"] == "2026-03-31"
         assert body["from_date"] == "2026-01-01"
         assert len(body["ledger"]) == 3  # Jan, Feb, Mar on the 15th
-        assert body["current_balance"] == pytest.approx(2500.0)
+        assert body["current_balance"] == "2500.0"
 
     def test_get_projection_returns_months(self, client):
         resp = client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
 
         body = resp.json()
         assert len(body["months"]) == 3
-        assert all(m["net"] == pytest.approx(500.0) for m in body["months"])
+        assert all(m["net"] == "500.0" for m in body["months"])
 
     def test_missing_as_of_returns_422(self, client):
         resp = client.get("/api/projection")

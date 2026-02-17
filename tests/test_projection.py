@@ -7,8 +7,7 @@ from __future__ import annotations
 
 import itertools
 from datetime import date
-
-import pytest
+from decimal import Decimal
 
 from app.core.projection import iter_occurrences, project_cash_on
 from app.models.domain import (
@@ -172,13 +171,13 @@ class TestProjectCashOn:
         templates = [_inflow("Paycheck", 1000.0, rec, start=date(2026, 1, 1))]
 
         balance, ledger = project_cash_on(
-            initial_balance=500.0,
+            initial_balance=Decimal("500"),
             templates=templates,
             as_of=date(2026, 3, 31),
             from_date=date(2026, 1, 1),
         )
 
-        assert balance == 500.0 + 3 * 1000.0  # Jan, Feb, Mar
+        assert balance == Decimal("3500")  # Jan, Feb, Mar
         assert len(ledger) == 3
 
     def test_inflow_and_outflow_net_correctly(self):
@@ -186,24 +185,24 @@ class TestProjectCashOn:
         rent = _outflow("Rent", 1500.0, MonthDay(day_of_month=5), start=date(2026, 1, 1))
 
         balance, _ledger = project_cash_on(
-            initial_balance=1000.0,
+            initial_balance=Decimal("1000"),
             templates=[pay, rent],
             as_of=date(2026, 2, 28),
             from_date=date(2026, 1, 1),
         )
 
         # 2 paychecks (+4000), 2 rents (-3000), net +1000 from initial 1000
-        assert balance == pytest.approx(2000.0)
+        assert balance == Decimal("2000")
 
     def test_empty_templates_returns_initial_balance(self):
         balance, ledger = project_cash_on(
-            initial_balance=5000.0,
+            initial_balance=Decimal("5000"),
             templates=[],
             as_of=date(2026, 6, 30),
             from_date=date(2026, 1, 1),
         )
 
-        assert balance == 5000.0
+        assert balance == Decimal("5000")
         assert ledger == []
 
     def test_from_date_filters_out_earlier_occurrences(self):
@@ -211,21 +210,21 @@ class TestProjectCashOn:
         templates = [_inflow("Income", 1000.0, rec, start=date(2026, 1, 1))]
 
         balance, ledger = project_cash_on(
-            initial_balance=0.0,
+            initial_balance=Decimal("0"),
             templates=templates,
             as_of=date(2026, 4, 30),
             from_date=date(2026, 3, 1),  # skip Jan + Feb
         )
 
         assert len(ledger) == 2  # Mar 15, Apr 15 only
-        assert balance == 2000.0
+        assert balance == Decimal("2000")
 
     def test_ledger_is_sorted_by_date(self):
         t1 = _outflow("Rent", 2650.0, MonthDay(day_of_month=5), start=date(2026, 1, 1))
         t2 = _inflow("Paycheck", 3877.0, WeekdayCadence(interval_weeks=2, weekday=4, anchor_date=date(2026, 1, 23)), start=date(2026, 1, 23))
 
         _, ledger = project_cash_on(
-            initial_balance=8000.0,
+            initial_balance=Decimal("8000"),
             templates=[t1, t2],
             as_of=date(2026, 3, 31),
             from_date=date(2026, 1, 1),
@@ -255,7 +254,7 @@ class TestConfigParsing:
         }
         cfg = CashFlowConfig.model_validate(raw)
 
-        assert cfg.initial_balance == 1000.0
+        assert cfg.initial_balance == Decimal("1000")
         assert len(cfg.templates) == 1
         assert cfg.templates[0].name == "Test"
         assert cfg.templates[0].start_date == date(2026, 1, 1)
@@ -322,13 +321,13 @@ class TestOneTime:
         t = _outflow("Security deposit", 500.0, rec, start=date(2026, 1, 15))
 
         balance, ledger = project_cash_on(
-            initial_balance=1000.0,
+            initial_balance=Decimal("1000"),
             templates=[t],
             as_of=date(2026, 6, 30),
             from_date=date(2026, 2, 1),  # window starts after the one-time event
         )
 
-        assert balance == 1000.0
+        assert balance == Decimal("1000")
         assert ledger == []
 
     def test_one_time_included_in_window(self):
@@ -336,13 +335,13 @@ class TestOneTime:
         t = _outflow("Tax payment", 2000.0, rec, start=date(2026, 4, 15))
 
         balance, ledger = project_cash_on(
-            initial_balance=5000.0,
+            initial_balance=Decimal("5000"),
             templates=[t],
             as_of=date(2026, 6, 30),
             from_date=date(2026, 1, 1),
         )
 
-        assert balance == 3000.0
+        assert balance == Decimal("3000")
         assert len(ledger) == 1
         assert ledger[0][1] == "Tax payment"
 
@@ -387,4 +386,4 @@ class TestOneTime:
             from_date=date(2026, 1, 1),
         )
 
-        assert balance == 4000.0
+        assert balance == Decimal("4000")
