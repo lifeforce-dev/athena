@@ -16,7 +16,7 @@ router = APIRouter(prefix='/projection', tags=['projection'])
 
 
 @router.get('', response_model=ProjectionResponse)
-def get_projection(
+async def get_projection(
     settings: Annotated[Settings, Depends(get_settings)],
     as_of: date = Query(..., description='Target date (YYYY-MM-DD)'),
     from_date: date | None = Query(None, description='Start date (YYYY-MM-DD)'),
@@ -24,6 +24,6 @@ def get_projection(
     """Return a cash-flow projection for the requested date window."""
     logger.info(f'Projection requested. as_of={as_of} from_date={from_date}')
     try:
-        return build_projection(settings.config_path, as_of, from_date)
+        return await build_projection(settings.config_path, as_of, from_date)
     except ProjectionConfigError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc

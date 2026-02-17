@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from json import JSONDecodeError
 from datetime import date
@@ -22,10 +23,11 @@ class ProjectionConfigError(Exception):
         self.detail = detail
 
 
-def build_projection(config_path: Path, as_of: date, from_date: date | None) -> ProjectionResponse:
+async def build_projection(config_path: Path, as_of: date, from_date: date | None) -> ProjectionResponse:
     """Build a full projection with month and pay-period summaries."""
     try:
-        cfg = CashFlowConfig.from_json(config_path.read_text(encoding='utf-8'))
+        raw = await asyncio.to_thread(config_path.read_text, encoding='utf-8')
+        cfg = CashFlowConfig.from_json(raw)
     except FileNotFoundError as exc:
         logger.exception(
             f'Projection config file not found. config_path={config_path} as_of={as_of} from_date={from_date}'
