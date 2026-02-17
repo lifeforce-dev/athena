@@ -97,16 +97,36 @@ function clampView() {
 }
 
 /** Compute threshold for a visible slice.
- *  Red = total expenses in the window (the amount you cannot go below).
- *  Yellow = red + 1000. */
+ *  Splits the window into pay periods, sums expenses in each, and takes the
+ *  max as the "high water mark" -- the most you need to survive the tightest
+ *  pay period visible. Yellow = red + 1000. */
 function computeWindowThreshold(slice: TrajectoryPoint[]): { red: number; yellow: number } {
-  let total = 0
-  for (const pt of slice) {
-    for (const ev of pt.events) {
-      if (ev.amount < 0) total += Math.abs(ev.amount)
+  // Find paycheck indices within the slice.
+  const payIndices: number[] = []
+  for (let i = 0; i < slice.length; i++) {
+    if (slice[i].events.some(e => e.amount > 500)) {
+      payIndices.push(i)
     }
   }
-  const red = Math.round(total)
+
+  // Build pay windows. Each window runs from one payday to the day before next.
+  // Before first payday and after last payday are their own windows.
+  const windowStarts = [0, ...payIndices]
+  let maxExpenses = 0
+
+  for (let w = 0; w < windowStarts.length; w++) {
+    const wStart = windowStarts[w]
+    const wEnd = w + 1 < windowStarts.length ? windowStarts[w + 1] - 1 : slice.length - 1
+    let total = 0
+    for (let i = wStart; i <= wEnd; i++) {
+      for (const ev of slice[i].events) {
+        if (ev.amount < 0) total += Math.abs(ev.amount)
+      }
+    }
+    if (total > maxExpenses) maxExpenses = total
+  }
+
+  const red = Math.round(maxExpenses)
   return { red, yellow: red + 1000 }
 }
 
