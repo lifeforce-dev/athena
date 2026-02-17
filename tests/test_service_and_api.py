@@ -336,6 +336,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.database import get_db
         from app.dependencies import get_current_user
         from app.main import app
 
@@ -359,8 +360,12 @@ class TestProjectionEndpoint:
         def _fake_user() -> dict:
             return {"sub": "1", "discord_id": "000", "username": "test-user"}
 
+        async def _no_db():
+            yield None
+
         app.dependency_overrides[get_settings] = _override_settings
         app.dependency_overrides[get_current_user] = _fake_user
+        app.dependency_overrides[get_db] = _no_db
         yield TestClient(app)
         app.dependency_overrides.clear()
 
@@ -389,6 +394,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.database import get_db
         from app.dependencies import get_current_user
         from app.main import app
 
@@ -400,8 +406,12 @@ class TestProjectionEndpoint:
         def _fake_user() -> dict:
             return {"sub": "1", "discord_id": "000", "username": "test-user"}
 
+        async def _no_db():
+            yield None
+
         app.dependency_overrides[get_settings] = _override_settings
         app.dependency_overrides[get_current_user] = _fake_user
+        app.dependency_overrides[get_db] = _no_db
         try:
             with TestClient(app) as test_client:
                 resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
@@ -415,6 +425,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.database import get_db
         from app.dependencies import get_current_user
         from app.main import app
 
@@ -427,8 +438,12 @@ class TestProjectionEndpoint:
         def _fake_user() -> dict:
             return {"sub": "1", "discord_id": "000", "username": "test-user"}
 
+        async def _no_db():
+            yield None
+
         app.dependency_overrides[get_settings] = _override_settings
         app.dependency_overrides[get_current_user] = _fake_user
+        app.dependency_overrides[get_db] = _no_db
         try:
             with TestClient(app) as test_client:
                 resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
@@ -442,6 +457,7 @@ class TestProjectionEndpoint:
         from fastapi.testclient import TestClient
 
         from app.config import Settings, get_settings
+        from app.database import get_db
         from app.dependencies import get_current_user
         from app.main import app
 
@@ -469,8 +485,12 @@ class TestProjectionEndpoint:
         def _fake_user() -> dict:
             return {"sub": "1", "discord_id": "000", "username": "test-user"}
 
+        async def _no_db():
+            yield None
+
         app.dependency_overrides[get_settings] = _override_settings
         app.dependency_overrides[get_current_user] = _fake_user
+        app.dependency_overrides[get_db] = _no_db
         try:
             with TestClient(app) as test_client:
                 resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
