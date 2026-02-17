@@ -37,7 +37,17 @@ def build_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessio
 
 async def get_db(request: Request) -> AsyncIterator[AsyncSession]:
     """FastAPI dependency that yields an async DB session per request."""
-    factory: async_sessionmaker[AsyncSession] = request.app.state.db_session_factory
+    factory: async_sessionmaker[AsyncSession] | None = getattr(
+        request.app.state, "db_session_factory", None
+    )
+
+    if factory is None:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database is not configured",
+        )
 
     async with factory() as session:
         yield session

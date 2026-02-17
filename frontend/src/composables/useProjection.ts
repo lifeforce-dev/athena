@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import type { ProjectionResponse } from '@/types/projection'
 import { fetchProjection } from '@/api/projection'
+import { parseMoney } from '@/utils/format'
 
 export function useProjection() {
   const data = ref<ProjectionResponse | null>(null)
@@ -19,7 +20,7 @@ export function useProjection() {
     }
   }
 
-  const currentBalance = computed(() => data.value?.current_balance ?? 0)
+  const currentBalance = computed(() => parseMoney(data.value?.current_balance ?? '0'))
   const payPeriods = computed(() => data.value?.pay_periods ?? [])
   const ledger = computed(() => data.value?.ledger ?? [])
 

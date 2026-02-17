@@ -43,6 +43,16 @@ def create_app() -> FastAPI:
     """Build the FastAPI application with middleware and routes."""
     settings = get_settings()
 
+    if not settings.jwt_secret:
+        raise RuntimeError(
+            "ATHENA_JWT_SECRET is not set. Auth tokens cannot be signed securely."
+        )
+
+    if "*" in settings.cors_origins:
+        raise RuntimeError(
+            "CORS origins must not contain '*' when allow_credentials is enabled."
+        )
+
     application = FastAPI(title='Athena - Cash Projection API', version='0.1.0', lifespan=lifespan)
 
     application.add_middleware(

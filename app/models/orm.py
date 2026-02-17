@@ -50,7 +50,9 @@ class Commitment(Base):
     __tablename__ = "commitments"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Signed amount: negative = expense, positive = income.
@@ -86,7 +88,9 @@ class BalanceSnapshot(Base):
     __tablename__ = "balance_snapshots"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     account_label: Mapped[str | None] = mapped_column(String(64))
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -109,7 +113,9 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     merchant: Mapped[str | None] = mapped_column(Text)
     card_last_four: Mapped[str | None] = mapped_column(String(4))
@@ -132,7 +138,9 @@ class GmailSubscription(Base):
     __tablename__ = "gmail_subscriptions"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
     gmail_address: Mapped[str] = mapped_column(String(255), nullable=False)
     history_id: Mapped[str | None] = mapped_column(String(64))
     watch_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

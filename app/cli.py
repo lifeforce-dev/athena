@@ -7,6 +7,7 @@ import calendar
 import logging
 import sys
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import TextIO
 
@@ -83,7 +84,7 @@ def _write_projection(
     out: TextIO,
     processed: ProcessedProjection,
     target: date,
-    ending: float,
+    ending: Decimal,
     recurrence_lookup: dict[str, str],
     verbose: bool,
 ) -> None:

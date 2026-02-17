@@ -8,14 +8,14 @@ export interface components {
     LedgerEntry: {
       date: string
       name: string
-      delta: number
-      balance: number
+      delta: string
+      balance: string
     }
     MonthSummary: {
       month: number
       year: number
-      net: number
-      balance: number
+      net: string
+      balance: string
       is_partial: boolean
       covered_start: string
       covered_end: string
@@ -24,16 +24,16 @@ export interface components {
       start_date: string
       end_date: string
       is_partial: boolean
-      spent: number
-      net: number
-      start_balance: number
-      end_balance: number
-      min_balance: number
+      spent: string
+      net: string
+      start_balance: string
+      end_balance: string
+      min_balance: string
     }
     ProjectionResponse: {
       as_of: string
       from_date: string
-      current_balance: number
+      current_balance: string
       ledger: components['schemas']['LedgerEntry'][]
       months: components['schemas']['MonthSummary'][]
       pay_periods: components['schemas']['PayPeriodSummary'][]

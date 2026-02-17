@@ -7,6 +7,12 @@ export const formatSigned = (value: number): string => {
 }
 
 /**
+ * Parse a Decimal string from the API into a number for display.
+ * The backend serializes Decimal as JSON strings to avoid IEEE 754 loss.
+ */
+export const parseMoney = (value: string): number => Number(value)
+
+/**
  * Format a Date as a local YYYY-MM-DD string without UTC conversion.
  * Avoids the timezone off-by-one bug from Date.toISOString().slice(0, 10).
  */
