@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,7 +36,24 @@ async def has_any(db: AsyncSession, user_id: int) -> bool:
 
 
 async def list_active(db: AsyncSession, user_id: int) -> list[Commitment]:
-    """Return all active commitments for a user, ordered by name."""
+    """Return all active commitments for a user, ordered by name.
+
+    Automatically deactivates one-time commitments whose date has passed.
+    """
+    today = date.today()
+
+    # Deactivate expired one-time commitments in a single UPDATE.
+    await db.execute(
+        update(Commitment)
+        .where(
+            Commitment.user_id == user_id,
+            Commitment.is_active.is_(True),
+            Commitment.frequency == "once",
+            Commitment.one_time_date < today,
+        )
+        .values(is_active=False, updated_at=datetime.now(timezone.utc))
+    )
+
     result = await db.execute(
         select(Commitment)
         .where(Commitment.user_id == user_id, Commitment.is_active.is_(True))

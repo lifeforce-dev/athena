@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="modal-overlay" :class="{ show: visible }" @click.self="emit('close')">
+    <div class="modal-overlay" :class="{ show: visible }">
       <div class="modal">
         <div class="modal-title">{{ title }}</div>
 
@@ -48,7 +48,7 @@
           </div>
         </div>
 
-        <div class="field">
+        <div v-if="form.frequency !== 'once'" class="field">
           <label>Start Date</label>
           <input v-model="form.startDate" type="date">
         </div>

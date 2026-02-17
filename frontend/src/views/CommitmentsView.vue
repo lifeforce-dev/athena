@@ -115,12 +115,16 @@ const freqLabel = (f: string) => {
     biweekly: 'Biweekly',
     weekly: 'Weekly',
     daily: 'Daily',
+    day_interval: 'Custom',
     once: 'One-Time',
   }
   return labels[f] ?? f
 }
 
-function monthlyEquiv(amount: number, freq: string): number {
+function monthlyEquiv(amount: number, freq: string, intervalDays?: number | null): number {
+  if (freq === 'day_interval' && intervalDays) {
+    return amount * (30.44 / intervalDays)
+  }
   const multipliers: Record<string, number> = {
     monthly: 1,
     biweekly: 26 / 12,
@@ -138,8 +142,9 @@ interface GroupedCategory {
 }
 
 const groupedCommitments = computed<GroupedCategory[]>(() => {
-  const income = parsed.value.filter(c => parseMoney(c.amount) > 0)
-  const expenses = parsed.value.filter(c => parseMoney(c.amount) < 0)
+  const income = parsed.value.filter(c => parseMoney(c.amount) > 0 && c.frequency !== 'once')
+  const expenses = parsed.value.filter(c => parseMoney(c.amount) < 0 && c.frequency !== 'once')
+  const oneTime = parsed.value.filter(c => c.frequency === 'once')
 
   const groups: GroupedCategory[] = []
 
@@ -147,7 +152,7 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
     groups.push({
       label: 'Income',
       items: income.sort((a, b) => Math.abs(b.parsedAmount) - Math.abs(a.parsedAmount)),
-      total: income.reduce((s, c) => s + monthlyEquiv(c.parsedAmount, c.frequency), 0),
+      total: income.reduce((s, c) => s + monthlyEquiv(c.parsedAmount, c.frequency, c.interval_days), 0),
     })
   }
 
