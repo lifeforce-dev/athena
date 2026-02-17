@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     # Projection (file-based, pre-DB fallback)
     config_path: Path = Path("data.json")
     cors_origins: list[str] = ["http://localhost:5173"]
+    debug: bool = False
 
     # Database
     database_url: str | None = None
@@ -33,6 +34,11 @@ class Settings(BaseSettings):
     discord_client_secret: str = ""
     discord_redirect_uri: str = ""
     frontend_url: str = "http://localhost:5173"
+
+    @property
+    def secure_cookies(self) -> bool:
+        """True when frontend is served over HTTPS (i.e. not local dev)."""
+        return not self.frontend_url.startswith("http://localhost")
 
     model_config = {"env_prefix": "ATHENA_"}
 

@@ -1,7 +1,6 @@
 """Business logic for commitment management."""
 from __future__ import annotations
 
-from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.commitment_schemas import CommitmentCreate, CommitmentUpdate
@@ -18,19 +17,22 @@ _FREQUENCY_REQUIRED_FIELDS: dict[str, list[str]] = {
     "once": ["one_time_date"],
 }
 
+# All frequency-specific date columns. When switching frequencies, columns
+# not required by the new frequency are nulled out to prevent stale data.
+_ALL_FREQUENCY_DATE_FIELDS = {"day_of_month", "anchor_date", "one_time_date"}
+
 
 def _validate_merged_state(frequency: str, merged: dict[str, object]) -> None:
     """Ensure the merged commitment state has valid frequency-specific fields.
 
-    Raises HTTPException 422 if required fields are missing for the frequency.
+    Raises ValueError if required fields are missing for the frequency.
     """
     required = _FREQUENCY_REQUIRED_FIELDS.get(frequency, [])
     missing = [f for f in required if not merged.get(f)]
 
     if missing:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"{', '.join(missing)} required for '{frequency}' frequency",
+        raise ValueError(
+            f"{', '.join(missing)} required for '{frequency}' frequency"
         )
 
 
@@ -84,9 +86,19 @@ async def update_commitment(
         "one_time_date": existing.one_time_date,
     }
     merged.update(fields)
-    _validate_merged_state(str(merged["frequency"]), merged)
 
-    return await repo.update_by_id(db, commitment_id, user_id, **fields)
+    new_frequency = str(merged["frequency"])
+    _validate_merged_state(new_frequency, merged)
+
+    # When frequency changes, null out fields that no longer apply.
+    if "frequency" in fields:
+        required = set(_FREQUENCY_REQUIRED_FIELDS.get(new_frequency, []))
+        stale = _ALL_FREQUENCY_DATE_FIELDS - required
+
+        for field_name in stale:
+            fields.setdefault(field_name, None)
+
+    return await repo.apply_update(db, existing, **fields)
 
 
 async def delete_commitment(

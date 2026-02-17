@@ -74,7 +74,7 @@ onMounted(refresh)
 const nextCheckLabel = computed(() => {
   if (!data.value) return '--'
   const todayStr = toLocalDateString(new Date())
-  const nextInflow = data.value.ledger.find(
+  const nextInflow = ledger.value.find(
     (entry) => entry.delta > 0 && entry.date >= todayStr
   )
   return nextInflow ? shortDate(nextInflow.date) : '--'
@@ -83,8 +83,7 @@ const nextCheckLabel = computed(() => {
 const nextCheckAmount = computed(() => {
   if (!data.value) return 0
   const todayStr = toLocalDateString(new Date())
-  // First future inflow in the ledger (YYYY-MM-DD strings are safe for lexicographic ordering)
-  const nextInflow = data.value.ledger.find(
+  const nextInflow = ledger.value.find(
     (entry) => entry.delta > 0 && entry.date >= todayStr
   )
   return nextInflow?.delta ?? 0

@@ -108,16 +108,34 @@ class _AccumulationTracker:
         """Process a single sorted ledger entry."""
         is_paycheck = _is_paycheck_entry(name, delta, self._paycheck_names)
 
-        if is_paycheck and self._last_paycheck_date is not None:
+        self._handle_paycheck_boundary(occ_date, is_paycheck)
+        self._advance_month(occ_date)
+
+        self._month_net += delta
+        self._running_balance += delta
+
+        self._accumulate_period(delta, is_paycheck)
+
+        self._ledger_entries.append(
+            LedgerEntry(date=occ_date, name=name, delta=delta, balance=self._running_balance)
+        )
+
+    def _handle_paycheck_boundary(self, occ_date: date, is_paycheck: bool) -> None:
+        """Close previous pay-period and reset state when a new paycheck arrives."""
+        if not is_paycheck:
+            return
+
+        if self._last_paycheck_date is not None:
             self._close_period(end_date=occ_date, is_partial=False)
 
-        if is_paycheck:
-            self._last_paycheck_date = occ_date
-            self._period_outflows = Decimal(0)
-            self._period_net = Decimal(0)
-            self._period_start_balance = None
-            self._period_min_balance = None
+        self._last_paycheck_date = occ_date
+        self._period_outflows = Decimal(0)
+        self._period_net = Decimal(0)
+        self._period_start_balance = None
+        self._period_min_balance = None
 
+    def _advance_month(self, occ_date: date) -> None:
+        """Detect month boundary and close the previous month summary."""
         key = (occ_date.year, occ_date.month)
 
         if self._current_month_key is None:
@@ -126,25 +144,23 @@ class _AccumulationTracker:
             self._close_month()
             self._current_month_key = key
 
-        self._month_net += delta
-        self._running_balance += delta
+    def _accumulate_period(self, delta: Decimal, is_paycheck: bool) -> None:
+        """Track running pay-period stats after the balance has been updated."""
+        if self._last_paycheck_date is None:
+            return
 
-        if self._last_paycheck_date is not None:
-            if is_paycheck:
-                self._period_start_balance = self._running_balance
-                self._period_min_balance = self._running_balance
-            else:
-                self._period_net += delta
+        if is_paycheck:
+            self._period_start_balance = self._running_balance
+            self._period_min_balance = self._running_balance
+            return
 
-                if delta < 0:
-                    self._period_outflows += -delta
+        self._period_net += delta
 
-                if self._period_min_balance is None or self._running_balance < self._period_min_balance:
-                    self._period_min_balance = self._running_balance
+        if delta < 0:
+            self._period_outflows += -delta
 
-        self._ledger_entries.append(
-            LedgerEntry(date=occ_date, name=name, delta=delta, balance=self._running_balance)
-        )
+        if self._period_min_balance is None or self._running_balance < self._period_min_balance:
+            self._period_min_balance = self._running_balance
 
     def close(self) -> None:
         """Flush any open month / pay-period at the end of the ledger."""

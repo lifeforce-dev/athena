@@ -12,7 +12,6 @@ from app.config import get_settings
 from app.database import build_engine, build_session_factory
 from app.routers.auth import router as auth_router
 from app.routers.commitments import router as commitments_router
-from app.routers.designs import router as designs_router
 from app.routers.projection import router as projection_router
 
 logger = logging.getLogger(__name__)
@@ -66,7 +65,6 @@ def create_app() -> FastAPI:
     application.include_router(auth_router, prefix='/api')
     application.include_router(commitments_router, prefix='/api')
     application.include_router(projection_router, prefix='/api')
-    application.include_router(designs_router)
 
     @application.get('/health')
     async def health_check() -> dict[str, str]:

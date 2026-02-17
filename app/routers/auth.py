@@ -44,7 +44,7 @@ async def login(
         value=state,
         max_age=300,
         httponly=True,
-        secure=True,
+        secure=settings.secure_cookies,
         samesite="lax",
         path="/api/auth",
     )
@@ -60,16 +60,17 @@ async def callback(
     athena_oauth_state: Annotated[str | None, Cookie()] = None,
 ) -> RedirectResponse:
     """Handle Discord OAuth2 callback: exchange code, create session."""
-    if not athena_oauth_state or athena_oauth_state != state:
+    if not code:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid OAuth state",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Authorization code is required",
         )
 
-    if not verify_state_token(state, settings.jwt_secret):
+    # verify_state_token uses hmac.compare_digest internally (constant-time).
+    if not athena_oauth_state or not verify_state_token(state, settings.jwt_secret, athena_oauth_state):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="OAuth state expired or tampered",
+            detail="Invalid or expired OAuth state",
         )
 
     try:
@@ -93,7 +94,7 @@ async def callback(
         value=token,
         max_age=JWT_TTL_SECONDS,
         httponly=True,
-        secure=True,
+        secure=settings.secure_cookies,
         samesite="lax",
         path="/",
     )

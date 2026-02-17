@@ -49,28 +49,28 @@ async def create(db: AsyncSession, user_id: int, **fields: object) -> Commitment
     return commitment
 
 
-async def update_by_id(
+async def apply_update(
     db: AsyncSession,
-    commitment_id: int,
-    user_id: int,
+    commitment: Commitment,
     **fields: object,
-) -> Commitment | None:
-    """Update specific fields on a commitment. Returns None if not found."""
-    commitment = await get_by_id(db, commitment_id, user_id)
-    if commitment is None:
-        return None
+) -> Commitment:
+    """Apply field updates to an already-fetched commitment and commit.
 
+    The ORM column's onupdate=func.now() handles updated_at automatically.
+    """
     for key, value in fields.items():
         setattr(commitment, key, value)
 
-    commitment.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(commitment)
     return commitment
 
 
 async def soft_delete(db: AsyncSession, commitment_id: int, user_id: int) -> bool:
-    """Soft-delete a commitment by setting is_active=False. Returns True if found."""
+    """Soft-delete a commitment by setting is_active=False. Returns True if found.
+
+    Uses a Core-level UPDATE so onupdate= does not fire; updated_at is set explicitly.
+    """
     result = await db.execute(
         update(Commitment)
         .where(Commitment.id == commitment_id, Commitment.user_id == user_id)

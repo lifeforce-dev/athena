@@ -52,7 +52,13 @@ async def update_commitment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CommitmentResponse:
     """Update an existing commitment."""
-    row = await service.update_commitment(db, commitment_id, _user_id(user), data)
+    try:
+        row = await service.update_commitment(db, commitment_id, _user_id(user), data)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commitment not found")
     return CommitmentResponse.model_validate(row)

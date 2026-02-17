@@ -101,6 +101,9 @@ class BalanceSnapshot(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    # NULL gmail_message_id values intentionally bypass the uniqueness constraint,
+    # allowing multiple manually-entered records per user. PostgreSQL treats NULLs
+    # as distinct in UNIQUE constraints.
     __table_args__ = (
         UniqueConstraint("user_id", "gmail_message_id", name="uq_balance_user_gmail"),
         Index("idx_balance_user_time", "user_id", "observed_at"),
@@ -126,6 +129,9 @@ class Transaction(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    # NULL gmail_message_id values intentionally bypass the uniqueness constraint,
+    # allowing multiple manually-entered records per user. PostgreSQL treats NULLs
+    # as distinct in UNIQUE constraints.
     __table_args__ = (
         UniqueConstraint("user_id", "gmail_message_id", name="uq_transaction_user_gmail"),
         Index("idx_transactions_user_date", "user_id", "purchase_date"),

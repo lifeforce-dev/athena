@@ -129,8 +129,15 @@ def create_state_token(secret: str) -> str:
     return f"{data.decode()}.{sig}"
 
 
-def verify_state_token(token: str, secret: str) -> bool:
-    """Verify a state token's signature and check expiry."""
+def verify_state_token(token: str, secret: str, expected_token: str | None = None) -> bool:
+    """Verify a state token's signature, cookie match, and expiry.
+
+    When *expected_token* is provided (the cookie value), comparison is
+    constant-time via hmac.compare_digest to avoid timing side-channels.
+    """
+    if expected_token is not None and not hmac.compare_digest(token, expected_token):
+        return False
+
     parts = token.rsplit(".", 1)
     if len(parts) != 2:
         return False

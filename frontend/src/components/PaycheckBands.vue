@@ -18,10 +18,10 @@
 </template>
 
 <script setup lang="ts">
-import type { PayPeriodSummary } from '@/types/projection'
+import type { ParsedPayPeriod } from '@/types/projection'
 import { formatCurrency, formatSigned, parseLocalDate } from '@/utils/format'
 
-defineProps<{ payPeriods: PayPeriodSummary[] }>()
+defineProps<{ payPeriods: ParsedPayPeriod[] }>()
 
 const formatRange = (start: string, end: string) => {
   const s = parseLocalDate(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
