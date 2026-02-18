@@ -29,6 +29,8 @@
           :master-color-map="masterColorMap"
         />
 
+        <ShortfallWarning :shortfall="shortfall" />
+
         <CausePanel
           :worst-window="worstWindow"
           @highlight-cause="highlightedCause = $event"
@@ -61,6 +63,7 @@ import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import EventList from '@/components/EventList.vue'
 import CausePanel from '@/components/CausePanel.vue'
 import BillsThisWeek from '@/components/BillsThisWeek.vue'
+import ShortfallWarning from '@/components/ShortfallWarning.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import { createManualBalance } from '@/api/balance'
@@ -110,6 +113,7 @@ const {
   masterExpenseOrder,
   masterColorMap,
   billsAnalysis,
+  shortfall,
 } = useExpenseAnalysis(trajectory)
 
 const nextWeekLabel = computed(() => {

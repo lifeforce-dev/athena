@@ -37,6 +37,14 @@ export interface BillEntry {
   date: string
 }
 
+export interface Shortfall {
+  brokeDate: string
+  brokeBalance: number
+  missedCommitments: { name: string; amount: number; date: string }[]
+  recoveryDate: string | null
+  totalMissed: number
+}
+
 // ── Cause palette (shared by CausePanel + chart bands) ──
 
 export const CAUSE_COLORS = [
@@ -222,6 +230,45 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     return { bills, nextBills, nextWeekStart: nextStartStr }
   })
 
+  /** Detect first point where balance goes negative and collect missed commitments until next paycheck. */
+  const shortfall = computed<Shortfall | null>(() => {
+    const points = trajectory.value
+    if (!points.length) return null
+
+    // Find first day the balance dips below zero.
+    const brokeIdx = points.findIndex(p => p.balance < 0)
+    if (brokeIdx < 0) return null
+
+    const brokePoint = points[brokeIdx]
+    const missed: { name: string; amount: number; date: string }[] = []
+    let recoveryDate: string | null = null
+
+    // Collect expenses from the broke date forward until the next paycheck.
+    for (let i = brokeIdx; i < points.length; i++) {
+      const point = points[i]
+      const isPaycheck = point.events.some(e => e.amount > PAYCHECK_INCOME_THRESHOLD)
+
+      if (isPaycheck && i > brokeIdx) {
+        recoveryDate = point.date
+        break
+      }
+
+      for (const event of point.events) {
+        if (event.amount < 0) {
+          missed.push({ name: event.name, amount: Math.abs(event.amount), date: point.date })
+        }
+      }
+    }
+
+    return {
+      brokeDate: brokePoint.date,
+      brokeBalance: brokePoint.balance,
+      missedCommitments: missed,
+      recoveryDate,
+      totalMissed: missed.reduce((sum, m) => sum + m.amount, 0),
+    }
+  })
+
   return {
     worstWindow,
     expenseWave,
@@ -229,5 +276,6 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     masterExpenseOrder,
     masterColorMap,
     billsAnalysis,
+    shortfall,
   }
 }
