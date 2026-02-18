@@ -74,7 +74,7 @@ const amtColor = computed(() => {
   padding: 6px 12px;
   background: var(--panel);
   border: 1px solid var(--border);
-  min-height: 30px;
+  height: 30px;
   font-size: 11px;
 }
 
