@@ -10,7 +10,7 @@
       <div class="hs-card hs-editable" @click="startEdit">
         <template v-if="!editing">
           <div class="hs-val" :style="{ color: 'var(--bright)' }">{{ formatDollars(currentBalance) }}</div>
-          <div class="hs-lbl">Current <span class="hs-edit-hint">click to update</span></div>
+          <div class="hs-lbl">Current</div>
         </template>
         <template v-else>
           <input
@@ -36,8 +36,8 @@
       </div>
       <div class="hs-card hs-readonly">
         <div class="hs-val" :style="{ color: 'var(--danger)' }">{{ formatDollars(lowestBalance) }}</div>
-        <div class="hs-sub">{{ lowestDate }}</div>
         <div class="hs-lbl">Lowest Point</div>
+        <div class="hs-sub">{{ lowestDate }}</div>
       </div>
       <div class="hs-card hs-readonly">
         <div class="hs-val" :style="{ color: netColor }">{{ netLabel }}</div>
