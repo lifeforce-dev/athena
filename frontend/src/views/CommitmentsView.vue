@@ -254,7 +254,7 @@ async function handleDelete(id: number) {
   backdrop-filter: blur(16px);
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 10px 20px;
   color: var(--bright);
   font-family: var(--font-sans);
@@ -380,7 +380,7 @@ async function handleDelete(id: number) {
   color: var(--muted);
   cursor: pointer;
   font-size: 14px;
-  border-radius: 6px;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -399,7 +399,7 @@ async function handleDelete(id: number) {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: 0;
   background: rgba(167, 139, 250, 0.1);
   color: var(--income);
   margin-left: 8px;

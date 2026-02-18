@@ -4,6 +4,7 @@
       <span class="sh-t">Balance Trajectory</span>
       <span class="sh-m">{{ rangeLabel }}</span>
     </div>
+    <InfoBar :data="infoBarData" />
     <div
       class="chart-box"
       ref="wrapRef"
@@ -17,14 +18,6 @@
       @touchend="onTouchEnd"
     >
       <canvas ref="canvasRef" />
-      <div class="tt" ref="tipRef" :class="{ show: tipVisible }">
-        <div v-html="tipHtml" />
-      </div>
-    </div>
-    <div class="thresh-legend">
-      <div class="tl-item"><span class="tl-dot grn" /> Safe</div>
-      <div class="tl-item"><span class="tl-dot yel" /> Caution</div>
-      <div class="tl-item"><span class="tl-dot red" /> Danger</div>
     </div>
   </div>
 </template>
@@ -32,28 +25,46 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { TrajectoryPoint } from '@/composables/useDashboard'
+import type { WorstWindow, DailyExpenseEntry } from '@/composables/useExpenseAnalysis'
+import type { InfoBarData } from '@/components/InfoBar.vue'
+import InfoBar from '@/components/InfoBar.vue'
 import { parseLocalDate } from '@/utils/format'
+import { CAUSE_COLORS } from '@/composables/useExpenseAnalysis'
 
 const props = defineProps<{
   data: TrajectoryPoint[]
   highlightDate?: string | null
   pulseDate?: string | null
+  highlightedCause?: number | null
+  worstWindow?: WorstWindow | null
+  expenseWave?: number[]
+  dailyExpenseStack?: DailyExpenseEntry[][]
+  masterExpenseOrder?: string[]
+  masterColorMap?: Record<string, string>
+}>()
+
+const emit = defineEmits<{
+  infoUpdate: [data: InfoBarData | null]
 }>()
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const wrapRef = ref<HTMLDivElement | null>(null)
-const tipRef = ref<HTMLDivElement | null>(null)
-const tipVisible = ref(false)
-const tipHtml = ref('')
 const isDragging = ref(false)
 const rangeLabel = ref('')
+const infoBarData = ref<InfoBarData | null>(null)
 
 // Windowed view state.
 let viewStart = 0
 let viewCount = 30
 
+// Hover state for expense wave.
+let hoverInWave = false
+let hoverSliceIdx: number | null = null
+let hoverMouseY = 0
+let hoverMouseX = 0
+
 const fmtShort = (n: number) =>
-  '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  '$' + Math.abs(Math.round(n)).toLocaleString()
 
 const shortDate = (d: string) =>
   parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -81,7 +92,7 @@ function startPulse() {
   pulseAnimId = requestAnimationFrame(tick)
 }
 
-// Store chart mapping for tooltip hit-testing.
+// Store chart mapping for hover hit-testing.
 let chartState: {
   xPos: (i: number) => number
   yPos: (v: number) => number
@@ -89,6 +100,9 @@ let chartState: {
   redT: number
   yellowT: number
 } | null = null
+
+// Store hovered band info from last draw for info bar.
+let lastHoveredBand: { name: string; amount: number; color: string } | null = null
 
 function clampView() {
   if (viewStart < 0) viewStart = 0
@@ -98,19 +112,13 @@ function clampView() {
 
 /** Compute threshold for a visible slice.
  *  Splits the window into pay periods, sums expenses in each, and takes the
- *  max as the "high water mark" -- the most you need to survive the tightest
- *  pay period visible. Yellow = red + 1000. */
+ *  max as the "high water mark". Yellow = red + 1000. */
 function computeWindowThreshold(slice: TrajectoryPoint[]): { red: number; yellow: number } {
-  // Find paycheck indices within the slice.
   const payIndices: number[] = []
   for (let i = 0; i < slice.length; i++) {
-    if (slice[i].events.some(e => e.amount > 500)) {
-      payIndices.push(i)
-    }
+    if (slice[i].events.some(e => e.amount > 500)) payIndices.push(i)
   }
 
-  // Build pay windows. Each window runs from one payday to the day before next.
-  // Before first payday and after last payday are their own windows.
   const windowStarts = [0, ...payIndices]
   let maxExpenses = 0
 
@@ -148,12 +156,11 @@ function draw(pulseElapsed?: number) {
   canvas.style.height = `${rect.height}px`
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-  const P = { top: 32, right: 20, bottom: 38, left: 60 }
+  const P = { top: 28, right: 20, bottom: 38, left: 60 }
   const W = rect.width
   const H = rect.height
   const cW = W - P.left - P.right
   const cH = H - P.top - P.bottom
-  // Single flat threshold for the visible window.
   const { red: redT, yellow: yellowT } = computeWindowThreshold(slice)
   const mn = 0
   const mx = Math.max(Math.max(...slice.map(t => t.balance)), yellowT) * 1.1
@@ -177,8 +184,177 @@ function draw(pulseElapsed?: number) {
   }
   ctx.fillStyle = 'rgba(251,191,36,.02)'
   ctx.fillRect(P.left, yYellow, cW, yRed - yYellow)
-  ctx.fillStyle = 'rgba(248,113,113,.03)'
-  ctx.fillRect(P.left, yRed, cW, chartBottom - yRed)
+
+  // ── Expense wave below the threshold ──
+  const ww = props.worstWindow
+  const maxExp = ww ? ww.totalExpenses : 0
+  const waveH = chartBottom - yRed
+
+  ctx.fillStyle = 'rgba(248,113,113,.02)'
+  ctx.fillRect(P.left, yRed, cW, waveH)
+
+  const expWave = props.expenseWave ?? []
+  const dailyStack = props.dailyExpenseStack ?? []
+  const masterOrder = props.masterExpenseOrder ?? []
+  const colorMap = props.masterColorMap ?? {}
+
+  if (maxExp > 0 && masterOrder.length > 0) {
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(P.left, yRed, cW, waveH)
+    ctx.clip()
+
+    // Per-column stacks in master order for consistent band positions.
+    const sliceStacks = slice.map((_, i) => {
+      const gi = viewStart + i
+      const dayStack = dailyStack[gi] || []
+      return masterOrder.map(name => {
+        const found = dayStack.find(e => e.name === name)
+        return found ? found.amount : 0
+      })
+    })
+
+    // Determine which band the mouse is over via interpolation.
+    let hoveredBandIdx = -1
+    if (hoverInWave && hoverSliceIdx !== null && hoverSliceIdx >= 0 && hoverSliceIdx < slice.length && hoverMouseX !== undefined) {
+      let li = hoverSliceIdx
+      let ri = hoverSliceIdx
+      let frac = 0
+
+      if (hoverSliceIdx > 0 && hoverMouseX < xPos(hoverSliceIdx)) {
+        li = hoverSliceIdx - 1
+        ri = hoverSliceIdx
+        const span = xPos(ri) - xPos(li)
+        frac = span > 0 ? (hoverMouseX - xPos(li)) / span : 0
+      } else if (hoverSliceIdx < slice.length - 1 && hoverMouseX > xPos(hoverSliceIdx)) {
+        li = hoverSliceIdx
+        ri = hoverSliceIdx + 1
+        const span = xPos(ri) - xPos(li)
+        frac = span > 0 ? (hoverMouseX - xPos(li)) / span : 0
+      }
+
+      let cumPx = chartBottom
+      for (let j = 0; j < masterOrder.length; j++) {
+        const amtL = sliceStacks[li]?.[j] ?? 0
+        const amtR = sliceStacks[ri]?.[j] ?? 0
+        const amt = amtL + (amtR - amtL) * frac
+        const bandH = (amt / maxExp) * waveH
+        const topPx = cumPx - bandH
+        if (hoverMouseY >= topPx && hoverMouseY <= cumPx && amt > 0.5) {
+          hoveredBandIdx = j
+          break
+        }
+        cumPx = topPx
+      }
+    }
+
+    if (hoverInWave) {
+      // ── Stacked colored mountain ──
+      masterOrder.forEach((expName, ei) => {
+        const color = colorMap[expName] ?? CAUSE_COLORS[ei % CAUSE_COLORS.length]
+        const cr = parseInt(color.slice(1, 3), 16)
+        const cg = parseInt(color.slice(3, 5), 16)
+        const cb = parseInt(color.slice(5, 7), 16)
+        const isHovered = ei === hoveredBandIdx
+        const hasAmount = sliceStacks.some(ss => ss[ei] > 0)
+        if (!hasAmount) return
+
+        function bandTop(si: number) {
+          let s = 0
+          for (let j = 0; j <= ei; j++) s += sliceStacks[si][j]
+          return chartBottom - (s / maxExp) * waveH
+        }
+        function bandBot(si: number) {
+          let s = 0
+          for (let j = 0; j < ei; j++) s += sliceStacks[si][j]
+          return chartBottom - (s / maxExp) * waveH
+        }
+
+        // Full-width band fill (zero-height segments are naturally invisible).
+        ctx.beginPath()
+        ctx.moveTo(xPos(0), bandTop(0))
+        for (let i = 1; i < slice.length; i++) ctx.lineTo(xPos(i), bandTop(i))
+        for (let i = slice.length - 1; i >= 0; i--) ctx.lineTo(xPos(i), bandBot(i))
+        ctx.closePath()
+        ctx.fillStyle = `rgba(${cr},${cg},${cb},${isHovered ? '.28' : '.1'})`
+        ctx.fill()
+
+        // Stroke only where band has height to avoid zero-height edge artifacts.
+        ctx.beginPath()
+        let inBand = false
+        for (let i = 0; i < slice.length; i++) {
+          if (sliceStacks[i][ei] > 0) {
+            if (!inBand) { ctx.moveTo(xPos(i), bandTop(i)); inBand = true }
+            else ctx.lineTo(xPos(i), bandTop(i))
+          } else {
+            inBand = false
+          }
+        }
+        ctx.strokeStyle = `rgba(${cr},${cg},${cb},${isHovered ? '.6' : '.15'})`
+        ctx.lineWidth = isHovered ? 1.5 : 0.5
+        ctx.stroke()
+
+        // Label the hovered band at the cursor column.
+        if (isHovered && hoverSliceIdx !== null) {
+          const midY = (bandTop(hoverSliceIdx) + bandBot(hoverSliceIdx)) / 2
+          ctx.fillStyle = `rgba(${cr},${cg},${cb},.9)`
+          ctx.font = '600 9px Sora'
+          ctx.textAlign = 'center'
+          ctx.fillText(expName, xPos(hoverSliceIdx), midY + 3)
+          ctx.textAlign = 'left'
+        }
+      })
+
+      // Subtle scan line at hover column.
+      if (hoverSliceIdx !== null) {
+        ctx.strokeStyle = 'rgba(255,255,255,.06)'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(xPos(hoverSliceIdx), yRed)
+        ctx.lineTo(xPos(hoverSliceIdx), chartBottom)
+        ctx.stroke()
+      }
+
+      // Store hovered band for info bar.
+      lastHoveredBand = hoveredBandIdx >= 0 ? {
+        name: masterOrder[hoveredBandIdx],
+        amount: sliceStacks[hoverSliceIdx!][hoveredBandIdx],
+        color: colorMap[masterOrder[hoveredBandIdx]],
+      } : null
+    } else {
+      // ── Default red gradient wave ──
+      lastHoveredBand = null
+      ctx.beginPath()
+      ctx.moveTo(xPos(0), chartBottom)
+      slice.forEach((_, i) => {
+        const gi = viewStart + i
+        const cum = expWave[gi] || 0
+        ctx.lineTo(xPos(i), chartBottom - (cum / maxExp) * waveH)
+      })
+      ctx.lineTo(xPos(slice.length - 1), chartBottom)
+      ctx.closePath()
+      const grad = ctx.createLinearGradient(0, yRed, 0, chartBottom)
+      grad.addColorStop(0, 'rgba(248,113,113,.12)')
+      grad.addColorStop(0.5, 'rgba(248,113,113,.06)')
+      grad.addColorStop(1, 'rgba(248,113,113,.01)')
+      ctx.fillStyle = grad
+      ctx.fill()
+      ctx.beginPath()
+      slice.forEach((_, i) => {
+        const gi = viewStart + i
+        const cum = expWave[gi] || 0
+        const wy = chartBottom - (cum / maxExp) * waveH
+        if (!i) ctx.moveTo(xPos(i), wy)
+        else ctx.lineTo(xPos(i), wy)
+      })
+      ctx.strokeStyle = 'rgba(248,113,113,.2)'
+      ctx.lineWidth = 1.5
+      ctx.lineJoin = 'round'
+      ctx.stroke()
+    }
+
+    ctx.restore()
+  }
 
   // Trajectory fill colored by zone.
   const zoneFill = (yTop: number, yBot: number, color: string) => {
@@ -197,25 +373,18 @@ function draw(pulseElapsed?: number) {
   }
   zoneFill(P.top, yYellow, 'rgba(52,211,153,.06)')
   zoneFill(yYellow, yRed, 'rgba(251,191,36,.06)')
-  zoneFill(yRed, chartBottom, 'rgba(248,113,113,.07)')
 
-  // Threshold dashed lines.
+  // Threshold dashed lines (no text labels -- info bar replaces them).
   ctx.setLineDash([4, 6])
   if (redT > mn && redT < mx) {
-    ctx.strokeStyle = 'rgba(248,113,113,.2)'
+    ctx.strokeStyle = 'rgba(248,113,113,.25)'
     ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(P.left, yRed); ctx.lineTo(P.left + cW, yRed); ctx.stroke()
-    ctx.fillStyle = 'rgba(248,113,113,.25)'
-    ctx.font = '600 8px Sora'
-    ctx.fillText(`DANGER ${fmtShort(redT)}`, P.left + 4, yRed - 3)
   }
   if (yellowT > mn && yellowT < mx) {
-    ctx.strokeStyle = 'rgba(251,191,36,.15)'
+    ctx.strokeStyle = 'rgba(251,191,36,.18)'
     ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(P.left, yYellow); ctx.lineTo(P.left + cW, yYellow); ctx.stroke()
-    ctx.fillStyle = 'rgba(251,191,36,.2)'
-    ctx.font = '600 8px Sora'
-    ctx.fillText(`CAUTION ${fmtShort(yellowT)}`, P.left + 4, yYellow - 3)
   }
   ctx.setLineDash([])
 
@@ -267,6 +436,22 @@ function draw(pulseElapsed?: number) {
     if (inc) { c = '#A78BFA'; r = 5 }
     if (isRent) { c = '#FBBF24'; r = 5 }
 
+    // Highlight cause from CausePanel hover (scoped to worst window).
+    if (props.highlightedCause !== null && props.highlightedCause !== undefined && ww && ww.expenses[props.highlightedCause]) {
+      const causeName = ww.expenses[props.highlightedCause].name
+      if (t.events.some(e => e.name === causeName) && t.date >= ww.startDate && t.date <= ww.endDate) {
+        c = CAUSE_COLORS[props.highlightedCause % CAUSE_COLORS.length]
+        r = 8
+        const cc = c
+        const ccr = parseInt(cc.slice(1, 3), 16)
+        const ccg = parseInt(cc.slice(3, 5), 16)
+        const ccb = parseInt(cc.slice(5, 7), 16)
+        ctx.beginPath(); ctx.arc(x, y, 14, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(${ccr},${ccg},${ccb},.1)`
+        ctx.fill()
+      }
+    }
+
     // Highlight from event list hover.
     if (props.highlightDate && t.date === props.highlightDate) {
       c = '#E8ECF2'; r = 8
@@ -299,24 +484,34 @@ function draw(pulseElapsed?: number) {
     ctx.fillStyle = c; ctx.fill()
   })
 
-  // Lowest point marker.
+  // Lowest point marker -- sharp pill.
   const lx = xPos(lowI)
   const ly = yPos(slice[lowI].balance)
   ctx.beginPath(); ctx.arc(lx, ly, 12, 0, Math.PI * 2)
   ctx.strokeStyle = 'rgba(248,113,113,.25)'; ctx.lineWidth = 1.5; ctx.stroke()
   ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2)
   ctx.fillStyle = '#F87171'; ctx.fill()
-  const gl = ctx.createRadialGradient(lx, ly, 0, lx, ly, 18)
-  gl.addColorStop(0, 'rgba(248,113,113,.15)')
-  gl.addColorStop(1, 'rgba(248,113,113,0)')
-  ctx.fillStyle = gl
-  ctx.beginPath(); ctx.arc(lx, ly, 18, 0, Math.PI * 2); ctx.fill()
+
+  // Pill background for readability.
+  const lowText = fmtShort(slice[lowI].balance)
+  ctx.font = '700 13px IBM Plex Mono'
+  const lowTW = ctx.measureText(lowText).width
+  ctx.font = '600 9px Sora'
+  const lowLabelW = ctx.measureText('LOWEST').width
+  const pillContentW = Math.max(lowTW, lowLabelW)
+  const pillW = pillContentW + 16
+  const pillH = 32
+  ctx.fillStyle = 'rgba(6,8,12,.85)'
+  ctx.fillRect(lx - pillW / 2, ly - 18 - pillH, pillW, pillH)
+  ctx.strokeStyle = 'rgba(248,113,113,.2)'
+  ctx.lineWidth = 1
+  ctx.strokeRect(lx - pillW / 2, ly - 18 - pillH, pillW, pillH)
   ctx.fillStyle = '#F87171'
   ctx.textAlign = 'center'
-  ctx.font = '700 9px Sora'
-  ctx.fillText('LOWEST', lx, ly - 16)
-  ctx.font = '700 11px IBM Plex Mono'
-  ctx.fillText(fmtShort(slice[lowI].balance), lx, ly - 6)
+  ctx.font = '700 13px IBM Plex Mono'
+  ctx.fillText(lowText, lx, ly - 22)
+  ctx.font = '600 9px Sora'
+  ctx.fillText('LOWEST', lx, ly - 36)
   ctx.textAlign = 'left'
 
   // X-axis labels.
@@ -336,12 +531,13 @@ function draw(pulseElapsed?: number) {
   ctx.textAlign = 'left'
 }
 
-// ── Tooltip on hover ──
-function showTooltip(clientX: number) {
-  if (!chartState || !wrapRef.value || !tipRef.value) return
+// ── Info bar update on hover ──
+function updateInfoBar(clientX: number, clientY: number) {
+  if (!chartState || !wrapRef.value) return
   const rect = wrapRef.value.getBoundingClientRect()
   const mx = clientX - rect.left
-  const { xPos, yPos, slice } = chartState
+  const my = clientY - rect.top
+  const { xPos, yPos, slice, redT, yellowT } = chartState
 
   let ci = 0
   let cd = Infinity
@@ -350,36 +546,63 @@ function showTooltip(clientX: number) {
     if (d < cd) { cd = d; ci = i }
   })
 
-  if (cd > 25) { tipVisible.value = false; return }
-
-  const t = slice[ci]
-  const x = xPos(ci)
-  const y = yPos(t.balance)
-  const dt = parseLocalDate(t.date)
-  const dateStr = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-  const days = daysBetween(props.data[0].date, t.date)
-  const dayLabel = days === 0 ? 'Today' : `+${days}d`
-
-  const bc = t.balance < chartState.redT
-    ? 'var(--danger)'
-    : t.balance < chartState.yellowT
-      ? 'var(--tight)'
-      : 'var(--safe)'
-
-  let h = `<div style="font-weight:700;color:var(--bright);margin-bottom:3px">${dateStr} \u00B7 ${dayLabel}</div>`
-  h += `<div style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:${bc};margin-bottom:5px">${fmtShort(t.balance)}</div>`
-  for (const ev of t.events) {
-    const c = ev.amount > 0 ? 'var(--income)' : 'var(--danger)'
-    const sign = ev.amount > 0 ? '+' : '-'
-    h += `<div style="font-size:10px;color:var(--dim);display:flex;justify-content:space-between;gap:8px"><span>${ev.name}</span><span style="font-family:var(--font-mono);font-weight:700;color:${c}">${sign}${fmtShort(ev.amount)}</span></div>`
+  if (cd > 25) {
+    infoBarData.value = null
+    hoverInWave = false
+    hoverSliceIdx = null
+    draw()
+    return
   }
 
-  tipHtml.value = h
-  tipVisible.value = true
-  let tx = x + 12
-  if (tx + 180 > rect.width - 10) tx = x - 190
-  tipRef.value.style.left = `${tx}px`
-  tipRef.value.style.top = `${Math.max(6, y - 30)}px`
+  const t = slice[ci]
+  const yRedPos = yPos(redT)
+
+  // Below the threshold line activates the stacked mountain.
+  hoverInWave = my > yRedPos
+  hoverSliceIdx = hoverInWave ? ci : null
+  hoverMouseY = my
+  hoverMouseX = mx
+
+  // Redraw first so lastHoveredBand is computed.
+  draw()
+
+  const hasEvents = t.events.length > 0
+  const hasBand = hoverInWave && lastHoveredBand
+  const nearNode = Math.abs(yPos(t.balance) - my) < 18 && hasEvents
+
+  if (!nearNode && !hasBand) {
+    infoBarData.value = null
+    return
+  }
+
+  const days = daysBetween(props.data[0].date, t.date)
+  const zone: 'safe' | 'tight' | 'danger' =
+    t.balance < redT ? 'danger' : t.balance < yellowT ? 'tight' : 'safe'
+
+  let name: string
+  let amount: number
+  let isIncome: boolean
+
+  if (hasBand && lastHoveredBand) {
+    name = lastHoveredBand.name
+    amount = lastHoveredBand.amount
+    isIncome = false
+  } else {
+    const ev = t.events[0]
+    name = ev.name
+    amount = Math.abs(ev.amount)
+    isIncome = ev.amount > 0
+  }
+
+  infoBarData.value = {
+    date: t.date,
+    dayOffset: days,
+    balance: t.balance,
+    balanceZone: zone,
+    name,
+    amount,
+    isIncome,
+  }
 }
 
 // ── Mouse interactions ──
@@ -390,7 +613,7 @@ function onMouseDown(e: MouseEvent) {
   isDragging.value = true
   dragStartX = e.clientX
   dragStartView = viewStart
-  tipVisible.value = false
+  infoBarData.value = null
   window.addEventListener('mousemove', onWindowMouseMove)
   window.addEventListener('mouseup', onMouseUp)
 }
@@ -412,11 +635,14 @@ function onMouseUp() {
 
 function onMouseMove(e: MouseEvent) {
   if (isDragging.value) return
-  showTooltip(e.clientX)
+  updateInfoBar(e.clientX, e.clientY)
 }
 
 function onMouseLeave() {
-  tipVisible.value = false
+  infoBarData.value = null
+  hoverInWave = false
+  hoverSliceIdx = null
+  draw()
 }
 
 function onWheel(e: WheelEvent) {
@@ -426,7 +652,6 @@ function onWheel(e: WheelEvent) {
   const delta = e.deltaY > 0 ? 5 : -5
   const oldCount = viewCount
   viewCount = Math.max(10, Math.min(props.data.length, viewCount + delta))
-  // Keep the point under cursor stable.
   const shift = Math.round((viewCount - oldCount) * pct)
   viewStart -= shift
   clampView()
@@ -497,10 +722,9 @@ watch(() => props.data, () => {
   nextTick(draw)
 }, { immediate: true })
 
-// Redraw when highlight changes (event list hover).
 watch(() => props.highlightDate, () => { draw() })
+watch(() => props.highlightedCause, () => { draw() })
 
-// Start pulse animation when pulseDate changes.
 watch(() => props.pulseDate, (val) => {
   if (val) startPulse()
   else draw()
@@ -514,7 +738,6 @@ function zoomToDate(targetDate: string) {
   const bufferMs = 10 * 864e5
   const endCal = targetCal + bufferMs
 
-  // Find last data index whose date <= targetDate + 10 days.
   let endIdx = props.data.length - 1
   for (let i = props.data.length - 1; i >= 0; i--) {
     if (parseLocalDate(props.data[i].date).getTime() <= endCal) {
@@ -528,7 +751,6 @@ function zoomToDate(targetDate: string) {
   clampView()
   draw()
 
-  // Scroll the chart into view.
   wrapRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
@@ -558,15 +780,12 @@ defineExpose({ zoomToDate })
 }
 
 .chart-box {
-  backdrop-filter: blur(16px);
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  height: 280px;
+  height: 340px;
   position: relative;
   overflow: hidden;
-  cursor: grab;
-  box-shadow: var(--shadow-card);
+  cursor: crosshair;
   touch-action: none;
 }
 
@@ -580,53 +799,7 @@ defineExpose({ zoomToDate })
   display: block;
 }
 
-.tt {
-  position: absolute;
-  pointer-events: none;
-  opacity: 0;
-  backdrop-filter: blur(16px);
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 11px;
-  min-width: 170px;
-  transition: opacity 0.1s;
-  z-index: 5;
-  box-shadow: var(--shadow-tooltip);
-}
-
-.tt.show {
-  opacity: 1;
-}
-
-.thresh-legend {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.tl-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 9px;
-  color: var(--dim);
-  font-weight: 600;
-}
-
-.tl-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-}
-
-.tl-dot.red { background: var(--danger); }
-.tl-dot.yel { background: var(--tight); }
-.tl-dot.grn { background: var(--safe); }
-
 @media (max-width: 700px) {
-  .chart-box { height: 200px; }
+  .chart-box { height: 220px; }
 }
 </style>

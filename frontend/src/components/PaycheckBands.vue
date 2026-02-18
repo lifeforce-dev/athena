@@ -35,7 +35,7 @@ const formatRange = (start: string, end: string) => {
   margin-top: 28px;
   background: var(--panel);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
+  border-radius: 0;
   padding: 22px;
   position: relative;
   overflow: hidden;
@@ -84,7 +84,7 @@ const formatRange = (start: string, end: string) => {
 .band {
   position: relative;
   height: 44px;
-  border-radius: 12px;
+  border-radius: 0;
   background: linear-gradient(90deg, rgba(110, 231, 255, 0.15), rgba(155, 123, 255, 0.08));
   border: 1px solid rgba(110, 231, 255, 0.2);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);

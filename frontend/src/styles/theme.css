@@ -31,11 +31,11 @@
   --font-mono: 'IBM Plex Mono', monospace;
 
   /* ── Radii ───────────────────────────────────────── */
-  --radius-xs: 6px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 14px;
-  --radius-xl: 16px;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
 
   /* ── Shadows ─────────────────────────────────────── */
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.15);

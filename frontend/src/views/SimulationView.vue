@@ -322,14 +322,14 @@ function updateInfo() {
   width: 100%;
   height: 4px;
   background: var(--muted);
-  border-radius: 2px;
+  border-radius: 0;
   overflow: hidden;
   margin: 8px 0;
 }
 
 .mo-bar-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: 0;
   transition: width 0.3s;
 }
 

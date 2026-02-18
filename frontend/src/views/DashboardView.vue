@@ -15,7 +15,33 @@
       <div v-else-if="error" class="error-msg">{{ error }}</div>
 
       <template v-else-if="trajectory.length">
-        <TrajectoryChart ref="chartRef" :data="trajectory" :highlight-date="highlightDate" :pulse-date="pulseDate" />
+        <TrajectoryChart
+          ref="chartRef"
+          :data="trajectory"
+          :highlight-date="highlightDate"
+          :pulse-date="pulseDate"
+          :highlighted-cause="highlightedCause"
+          :worst-window="worstWindow"
+          :expense-wave="expenseWave"
+          :daily-expense-stack="dailyExpenseStack"
+          :master-expense-order="masterExpenseOrder"
+          :master-color-map="masterColorMap"
+        />
+
+        <CausePanel
+          :worst-window="worstWindow"
+          @highlight-cause="highlightedCause = $event"
+        />
+
+        <div class="sh" style="margin-top: 20px">
+          <span class="sh-t">Bills This Week</span>
+          <span class="sh-m">resets {{ nextWeekLabel }}</span>
+        </div>
+        <BillsThisWeek
+          :bills="billsAnalysis.bills"
+          :next-bills="billsAnalysis.nextBills"
+        />
+
         <EventList :ledger="ledger" @hover-date="highlightDate = $event" @click-date="onClickDate" />
       </template>
 
@@ -28,20 +54,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import DashboardHero from '@/components/DashboardHero.vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import EventList from '@/components/EventList.vue'
+import CausePanel from '@/components/CausePanel.vue'
+import BillsThisWeek from '@/components/BillsThisWeek.vue'
 import { useDashboard } from '@/composables/useDashboard'
+import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
+import { parseLocalDate } from '@/utils/format'
 
 const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
+const highlightedCause = ref<number | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
 
 function onClickDate(date: string) {
   pulseDate.value = null
   chartRef.value?.zoomToDate(date)
-  // Set on next tick so the watch fires even if the same date is clicked again.
   nextTick(() => { pulseDate.value = date })
 }
 
@@ -56,6 +86,21 @@ const {
   daysCovered,
   ledger,
 } = useDashboard()
+
+const {
+  worstWindow,
+  expenseWave,
+  dailyExpenseStack,
+  masterExpenseOrder,
+  masterColorMap,
+  billsAnalysis,
+} = useExpenseAnalysis(trajectory)
+
+const nextWeekLabel = computed(() => {
+  const start = billsAnalysis.value.nextWeekStart
+  if (!start) return ''
+  return parseLocalDate(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+})
 </script>
 
 <style scoped>
@@ -63,6 +108,28 @@ const {
   max-width: 1060px;
   margin: 0 auto;
   padding: 0 24px 40px;
+}
+
+.sh {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 28px 0 12px;
+  gap: 12px;
+}
+
+.sh-t {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sh-m {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
 }
 
 .loading,
