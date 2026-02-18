@@ -126,26 +126,28 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     return wave
   })
 
-  /** Per-day breakdown of accumulated expenses since last paycheck. */
+  /** Per-day breakdown of accumulated expenses since last paycheck, aggregated by name. */
   const dailyExpenseStack = computed<DailyExpenseEntry[][]>(() => {
     const points = trajectory.value
     const stacks: DailyExpenseEntry[][] = []
-    let currentWindowExpenses: DailyExpenseEntry[] = []
+    let windowTotals = new Map<string, number>()
 
     for (const point of points) {
-      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) currentWindowExpenses = []
+      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) {
+        windowTotals = new Map()
+      }
+
       for (const event of point.events) {
         if (event.amount < 0) {
-          currentWindowExpenses.push({
-            name: event.name,
-            amount: Math.abs(event.amount),
-            date: point.date,
-          })
+          const prev = windowTotals.get(event.name) ?? 0
+          windowTotals.set(event.name, prev + Math.abs(event.amount))
         }
       }
-      stacks.push(
-        [...currentWindowExpenses].sort((a, b) => b.amount - a.amount)
-      )
+
+      const dayStack: DailyExpenseEntry[] = Array.from(windowTotals.entries())
+        .map(([name, amount]) => ({ name, amount, date: point.date }))
+        .sort((a, b) => b.amount - a.amount)
+      stacks.push(dayStack)
     }
 
     return stacks
