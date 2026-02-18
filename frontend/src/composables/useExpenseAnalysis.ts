@@ -1,7 +1,8 @@
 import { computed } from 'vue'
 import type { Ref } from 'vue'
-import type { TrajectoryPoint } from './useDashboard'
+import type { TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString, parseLocalDate } from '@/utils/format'
+import { PAYCHECK_INCOME_THRESHOLD } from '@/utils/constants'
 
 // ── Types ──
 
@@ -49,40 +50,40 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
 
   /** Find the pay period with the lowest minimum balance. */
   const worstWindow = computed<WorstWindow | null>(() => {
-    const T = trajectory.value
-    if (!T.length) return null
+    const points = trajectory.value
+    if (!points.length) return null
 
-    // Identify paycheck indices (income > 500).
+    // Identify paycheck indices (income above threshold).
     const payIndices: number[] = []
-    T.forEach((t, i) => {
-      if (t.events.some(e => e.amount > 500)) payIndices.push(i)
+    points.forEach((point, i) => {
+      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) payIndices.push(i)
     })
     if (payIndices.length && payIndices[0] > 0) payIndices.unshift(0)
     if (!payIndices.length) payIndices.push(0)
 
     let worst: WorstWindow | null = null
 
-    for (let w = 0; w < payIndices.length; w++) {
-      const start = payIndices[w]
-      const end = w + 1 < payIndices.length ? payIndices[w + 1] - 1 : T.length - 1
-      const window = T.slice(start, end + 1)
+    for (let windowIdx = 0; windowIdx < payIndices.length; windowIdx++) {
+      const start = payIndices[windowIdx]
+      const end = windowIdx + 1 < payIndices.length ? payIndices[windowIdx + 1] - 1 : points.length - 1
+      const window = points.slice(start, end + 1)
       const expenses: WorstWindowExpense[] = []
       let totalExp = 0
       let minBal = Infinity
       let minDate = ''
       let income = 0
 
-      for (const t of window) {
-        if (t.balance < minBal) {
-          minBal = t.balance
-          minDate = t.date
+      for (const point of window) {
+        if (point.balance < minBal) {
+          minBal = point.balance
+          minDate = point.date
         }
-        for (const e of t.events) {
-          if (e.amount > 0) {
-            income += e.amount
+        for (const event of point.events) {
+          if (event.amount > 0) {
+            income += event.amount
           } else {
-            expenses.push({ name: e.name, amount: Math.abs(e.amount), date: t.date })
-            totalExp += Math.abs(e.amount)
+            expenses.push({ name: event.name, amount: Math.abs(event.amount), date: point.date })
+            totalExp += Math.abs(event.amount)
           }
         }
       }
@@ -90,8 +91,8 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
       expenses.sort((a, b) => b.amount - a.amount)
 
       const data: WorstWindow = {
-        startDate: T[start].date,
-        endDate: T[end].date,
+        startDate: points[start].date,
+        endDate: points[end].date,
         startIdx: start,
         endIdx: end,
         minBal,
@@ -110,14 +111,14 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
 
   /** Cumulative expense wave per day (resets at each paycheck). */
   const expenseWave = computed<number[]>(() => {
-    const T = trajectory.value
+    const points = trajectory.value
     const wave: number[] = []
     let cumExp = 0
 
-    for (const t of T) {
-      if (t.events.some(e => e.amount > 500)) cumExp = 0
-      for (const e of t.events) {
-        if (e.amount < 0) cumExp += Math.abs(e.amount)
+    for (const point of points) {
+      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) cumExp = 0
+      for (const event of point.events) {
+        if (event.amount < 0) cumExp += Math.abs(event.amount)
       }
       wave.push(cumExp)
     }
@@ -127,18 +128,18 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
 
   /** Per-day breakdown of accumulated expenses since last paycheck. */
   const dailyExpenseStack = computed<DailyExpenseEntry[][]>(() => {
-    const T = trajectory.value
+    const points = trajectory.value
     const stacks: DailyExpenseEntry[][] = []
     let currentWindowExpenses: DailyExpenseEntry[] = []
 
-    for (const t of T) {
-      if (t.events.some(e => e.amount > 500)) currentWindowExpenses = []
-      for (const e of t.events) {
-        if (e.amount < 0) {
+    for (const point of points) {
+      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) currentWindowExpenses = []
+      for (const event of point.events) {
+        if (event.amount < 0) {
           currentWindowExpenses.push({
-            name: e.name,
-            amount: Math.abs(e.amount),
-            date: t.date,
+            name: event.name,
+            amount: Math.abs(event.amount),
+            date: point.date,
           })
         }
       }
@@ -180,8 +181,8 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
 
   /** Bills due in the current week and next week. */
   const billsAnalysis = computed(() => {
-    const T = trajectory.value
-    if (!T.length) return { bills: [] as BillEntry[], nextBills: [] as BillEntry[], nextWeekStart: '' }
+    const points = trajectory.value
+    if (!points.length) return { bills: [] as BillEntry[], nextBills: [] as BillEntry[], nextWeekStart: '' }
 
     const now = new Date()
     const day = now.getDay()
@@ -197,26 +198,26 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     nextEnd.setDate(nextStart.getDate() + 6)
 
     const todayStr = toLocalDateString(now)
-    const weStr = toLocalDateString(weekEnd)
-    const nsStr = toLocalDateString(nextStart)
-    const neStr = toLocalDateString(nextEnd)
+    const weekEndStr = toLocalDateString(weekEnd)
+    const nextStartStr = toLocalDateString(nextStart)
+    const nextEndStr = toLocalDateString(nextEnd)
 
     const bills: BillEntry[] = []
     const nextBills: BillEntry[] = []
 
-    for (const t of T) {
-      for (const e of t.events) {
-        if (e.amount >= 0) continue
-        if (t.date >= todayStr && t.date <= weStr) {
-          bills.push({ name: e.name, amount: Math.abs(e.amount), date: t.date })
+    for (const point of points) {
+      for (const event of point.events) {
+        if (event.amount >= 0) continue
+        if (point.date >= todayStr && point.date <= weekEndStr) {
+          bills.push({ name: event.name, amount: Math.abs(event.amount), date: point.date })
         }
-        if (t.date >= nsStr && t.date <= neStr) {
-          nextBills.push({ name: e.name, amount: Math.abs(e.amount), date: t.date })
+        if (point.date >= nextStartStr && point.date <= nextEndStr) {
+          nextBills.push({ name: event.name, amount: Math.abs(event.amount), date: point.date })
         }
       }
     }
 
-    return { bills, nextBills, nextWeekStart: nsStr }
+    return { bills, nextBills, nextWeekStart: nextStartStr }
   })
 
   return {

@@ -25,9 +25,9 @@
         <span class="ev-d">{{ shortDay(ev.date) }}</span>
         <span class="ev-n" :class="{ inc: ev.amount > 0 }">{{ ev.name }}</span>
         <span class="ev-a" :class="ev.amount > 0 ? 'pos' : 'neg'">
-          {{ ev.amount > 0 ? '+' : '-' }}{{ fmtShort(ev.amount) }}
+          {{ ev.amount > 0 ? '+' : '-' }}{{ formatCents(ev.amount) }}
         </span>
-        <span class="ev-b">{{ fmtShort(ev.balance) }}</span>
+        <span class="ev-b">{{ formatCents(ev.balance) }}</span>
       </div>
     </div>
   </div>
@@ -36,7 +36,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ParsedLedgerEntry } from '@/types/projection'
-import { parseLocalDate } from '@/utils/format'
+import { parseLocalDate, formatCents } from '@/utils/format'
 
 const props = defineProps<{
   ledger: ParsedLedgerEntry[]
@@ -59,11 +59,8 @@ interface MonthGroup {
   events: EventRow[]
 }
 
-const fmtShort = (n: number) =>
-  '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
-const shortDay = (d: string) =>
-  parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const shortDay = (dateStr: string) =>
+  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 const eventCount = computed(() => props.ledger.length)
 
@@ -71,8 +68,8 @@ const groupedEvents = computed<MonthGroup[]>(() => {
   const groups = new Map<string, EventRow[]>()
 
   for (const entry of props.ledger) {
-    const dt = parseLocalDate(entry.date)
-    const monthKey = dt.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const parsed = parseLocalDate(entry.date)
+    const monthKey = parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
     if (!groups.has(monthKey)) {
       groups.set(monthKey, [])

@@ -9,16 +9,16 @@
       <!-- Summary cards -->
       <div class="summary">
         <div class="sum-card">
-          <div class="sum-val" style="color: var(--income)">{{ fmtInt(totalMonthlyIncome) }}</div>
+          <div class="sum-val" style="color: var(--income)">{{ formatDollars(totalMonthlyIncome) }}</div>
           <div class="sum-lbl">Monthly Income</div>
         </div>
         <div class="sum-card">
-          <div class="sum-val" style="color: var(--danger)">{{ fmtInt(totalMonthlyExpenses) }}</div>
+          <div class="sum-val" style="color: var(--danger)">{{ formatDollars(totalMonthlyExpenses) }}</div>
           <div class="sum-lbl">Monthly Expenses</div>
         </div>
         <div class="sum-card">
           <div class="sum-val" :style="{ color: netMonthly >= 0 ? 'var(--safe)' : 'var(--danger)' }">
-            {{ netMonthly >= 0 ? '+' : '-' }}{{ fmtInt(netMonthly) }}
+            {{ netMonthly >= 0 ? '+' : '-' }}{{ formatDollars(netMonthly) }}
           </div>
           <div class="sum-lbl">Net / Month</div>
         </div>
@@ -45,7 +45,7 @@
           <div class="cat-hdr">
             <span class="cat-name">{{ group.label }} ({{ group.items.length }})</span>
             <span class="cat-total" :class="{ pos: group.total > 0 }">
-              {{ group.total > 0 ? '+' : '-' }}{{ fmtInt(group.total) }}/mo
+              {{ group.total > 0 ? '+' : '-' }}{{ formatDollars(group.total) }}/mo
             </span>
           </div>
           <div class="col-hdr">
@@ -59,8 +59,8 @@
             <span class="c-name">
               {{ item.name }}
             </span>
-            <span class="c-amt" :class="item.parsedAmount > 0 ? 'pos' : 'neg'">
-              {{ item.parsedAmount > 0 ? '+' : '-' }}{{ fmtDollar(item.parsedAmount) }}
+            <span class="c-amt c-amt-edit" :class="item.parsedAmount > 0 ? 'pos' : 'neg'" @click="openEdit(item)">
+              {{ item.parsedAmount > 0 ? '+' : '-' }}{{ formatCents(item.parsedAmount) }}
             </span>
             <span class="c-freq">{{ freqLabel(item.frequency) }}</span>
             <span class="c-next">{{ '-' }}</span>
@@ -73,7 +73,7 @@
           <div class="cat-hdr">
             <span class="cat-name">One-Time Payments ({{ oneTimeItems.length }})</span>
             <span class="cat-total">
-              {{ fmtInt(oneTimeTotal) }} total
+              {{ formatDollars(oneTimeTotal) }} total
             </span>
           </div>
           <div class="col-hdr ot-hdr">
@@ -85,8 +85,8 @@
           <div v-for="item in oneTimeItems" :key="item.id" class="c-row ot-row">
             <span class="c-date">{{ fmtDate(item.one_time_date ?? item.start_date) }}</span>
             <span class="c-name">{{ item.name }}</span>
-            <span class="c-amt" :class="item.parsedAmount > 0 ? 'pos' : 'neg'">
-              {{ item.parsedAmount > 0 ? '+' : '-' }}{{ fmtDollar(item.parsedAmount) }}
+            <span class="c-amt c-amt-edit" :class="item.parsedAmount > 0 ? 'pos' : 'neg'" @click="openEdit(item)">
+              {{ item.parsedAmount > 0 ? '+' : '-' }}{{ formatCents(item.parsedAmount) }}
             </span>
             <button class="c-del" @click="handleDelete(item.id)" title="Remove">&times;</button>
           </div>
@@ -108,7 +108,7 @@ import { ref, computed } from 'vue'
 import CommitmentModal from '@/components/CommitmentModal.vue'
 import { useCommitments } from '@/composables/useCommitments'
 import type { CommitmentCreate } from '@/types/commitment'
-import { parseMoney, parseLocalDate } from '@/utils/format'
+import { parseMoney, parseLocalDate, formatDollars, formatCents } from '@/utils/format'
 
 const {
   commitments,
@@ -124,15 +124,21 @@ const {
 } = useCommitments()
 
 const modalOpen = ref(false)
-const editTarget = ref<any>(null)
 
-const fmtInt = (n: number) =>
-  '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+interface EditTarget {
+  id: number
+  name: string
+  amount: string
+  frequency: string
+  day_of_month: number | null
+  anchor_date: string | null
+  one_time_date: string | null
+  start_date: string
+}
 
-const fmtDollar = (n: number) =>
-  '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const editTarget = ref<EditTarget | null>(null)
 
-const freqLabel = (f: string) => {
+const freqLabel = (frequency: string) => {
   const labels: Record<string, string> = {
     monthly: 'Monthly',
     biweekly: 'Biweekly',
@@ -141,7 +147,7 @@ const freqLabel = (f: string) => {
     day_interval: 'Custom',
     once: 'One-Time',
   }
-  return labels[f] ?? f
+  return labels[frequency] ?? frequency
 }
 
 function monthlyEquiv(amount: number, freq: string, intervalDays?: number | null): number {
@@ -165,9 +171,8 @@ interface GroupedCategory {
 }
 
 const groupedCommitments = computed<GroupedCategory[]>(() => {
-  const income = parsed.value.filter(c => parseMoney(c.amount) > 0 && c.frequency !== 'once')
-  const expenses = parsed.value.filter(c => parseMoney(c.amount) < 0 && c.frequency !== 'once')
-  const oneTime = parsed.value.filter(c => c.frequency === 'once')
+  const income = parsed.value.filter(commitment => parseMoney(commitment.amount) > 0 && commitment.frequency !== 'once')
+  const expenses = parsed.value.filter(commitment => parseMoney(commitment.amount) < 0 && commitment.frequency !== 'once')
 
   const groups: GroupedCategory[] = []
 
@@ -175,7 +180,7 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
     groups.push({
       label: 'Income',
       items: income.sort((a, b) => Math.abs(b.parsedAmount) - Math.abs(a.parsedAmount)),
-      total: income.reduce((s, c) => s + monthlyEquiv(c.parsedAmount, c.frequency, c.interval_days), 0),
+      total: income.reduce((total, commitment) => total + monthlyEquiv(commitment.parsedAmount, commitment.frequency, commitment.interval_days), 0),
     })
   }
 
@@ -183,7 +188,7 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
     groups.push({
       label: 'Expenses',
       items: expenses.sort((a, b) => Math.abs(b.parsedAmount) - Math.abs(a.parsedAmount)),
-      total: expenses.reduce((s, c) => s + monthlyEquiv(c.parsedAmount, c.frequency), 0),
+      total: expenses.reduce((total, commitment) => total + monthlyEquiv(commitment.parsedAmount, commitment.frequency), 0),
     })
   }
 
@@ -192,29 +197,41 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
 
 const oneTimeItems = computed(() =>
   parsed.value
-    .filter(c => c.frequency === 'once')
+    .filter(commitment => commitment.frequency === 'once')
     .sort((a, b) => (a.one_time_date ?? a.start_date).localeCompare(b.one_time_date ?? b.start_date))
 )
 
 const oneTimeTotal = computed(() =>
-  oneTimeItems.value.reduce((s, c) => s + Math.abs(c.parsedAmount), 0)
+  oneTimeItems.value.reduce((total, commitment) => total + Math.abs(commitment.parsedAmount), 0)
 )
 
-const fmtDate = (d: string) =>
-  parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const fmtDate = (dateStr: string) =>
+  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 function openAdd() {
   editTarget.value = null
   modalOpen.value = true
 }
 
-async function handleSave(data: CommitmentCreate, editId?: number) {
-  if (editId) {
-    await update(editId, data)
-  } else {
-    await create(data)
+function openEdit(item: typeof parsed.value[number]) {
+  editTarget.value = {
+    id: item.id,
+    name: item.name,
+    amount: item.amount,
+    frequency: item.frequency,
+    day_of_month: item.day_of_month,
+    anchor_date: item.anchor_date,
+    one_time_date: item.one_time_date,
+    start_date: item.start_date,
   }
-  modalOpen.value = false
+  modalOpen.value = true
+}
+
+async function handleSave(data: CommitmentCreate, editId?: number) {
+  const ok = editId ? await update(editId, data) : await create(data)
+  if (ok) {
+    modalOpen.value = false
+  }
 }
 
 async function handleDelete(id: number) {
@@ -390,6 +407,16 @@ async function handleDelete(id: number) {
   font-size: 12px;
   font-weight: 700;
   text-align: right;
+}
+
+.c-amt-edit {
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+
+.c-amt-edit:hover {
+  border-bottom-color: currentColor;
 }
 
 .c-amt.neg { color: var(--danger); }

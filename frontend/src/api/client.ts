@@ -6,9 +6,20 @@ export class ApiError extends Error {
 
 const API_BASE = '/api'
 
+// Registered by the app after Pinia is ready (avoids circular imports).
+let onUnauthorized: (() => void) | null = null
+export function registerUnauthorizedHandler(handler: () => void) {
+  onUnauthorized = handler
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {}
+  if (options?.body != null) {
+    headers['Content-Type'] = 'application/json'
+  }
+
   const response = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     credentials: 'include',
     ...options,
   })
@@ -23,6 +34,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     } catch {
       // Response wasn't JSON; fall back to statusText.
     }
+
+    if (response.status === 401) {
+      onUnauthorized?.()
+    }
+
     throw new ApiError(response.status, message)
   }
 

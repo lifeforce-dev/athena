@@ -7,20 +7,20 @@
       <div v-for="bill in bills" :key="bill.name + bill.date" class="btw-row">
         <span class="btw-day">{{ weekday(bill.date) }}</span>
         <span class="btw-name">{{ bill.name }}</span>
-        <span class="btw-amt">-{{ fmt(bill.amount) }}</span>
+        <span class="btw-amt">-{{ formatDollars(bill.amount) }}</span>
       </div>
       <div class="btw-total">
         <span>Total</span>
-        <span>-{{ fmt(thisWeekTotal) }}</span>
+        <span>-{{ formatDollars(thisWeekTotal) }}</span>
       </div>
     </template>
 
     <template v-if="nextBills.length > 0">
-      <div class="btw-next-label">Next week -- {{ fmt(nextWeekTotal) }} in bills</div>
+      <div class="btw-next-label">Next week -- {{ formatDollars(nextWeekTotal) }} in bills</div>
       <div v-for="bill in nextBills" :key="bill.name + bill.date" class="btw-row btw-next">
         <span class="btw-day">{{ weekday(bill.date) }}</span>
         <span class="btw-name">{{ bill.name }}</span>
-        <span class="btw-amt">-{{ fmt(bill.amount) }}</span>
+        <span class="btw-amt">-{{ formatDollars(bill.amount) }}</span>
       </div>
     </template>
   </div>
@@ -29,25 +29,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { BillEntry } from '@/composables/useExpenseAnalysis'
-import { parseLocalDate } from '@/utils/format'
+import { parseLocalDate, formatDollars } from '@/utils/format'
 
 const props = defineProps<{
   bills: BillEntry[]
   nextBills: BillEntry[]
 }>()
 
-const fmt = (n: number) =>
-  '$' + Math.abs(Math.round(n)).toLocaleString()
-
-const weekday = (d: string) =>
-  parseLocalDate(d).toLocaleDateString('en-US', { weekday: 'short' })
+const weekday = (dateStr: string) =>
+  parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short' })
 
 const thisWeekTotal = computed(() =>
-  props.bills.reduce((s, b) => s + b.amount, 0)
+  props.bills.reduce((total, bill) => total + bill.amount, 0)
 )
 
 const nextWeekTotal = computed(() =>
-  props.nextBills.reduce((s, b) => s + b.amount, 0)
+  props.nextBills.reduce((total, bill) => total + bill.amount, 0)
 )
 </script>
 

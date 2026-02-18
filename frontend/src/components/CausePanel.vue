@@ -3,7 +3,7 @@
     <div class="cause-header">
       <div class="cause-title">Your tightest pay period</div>
       <div class="cause-window">
-        {{ windowRange }} | {{ fmtCurrency(worstWindow.totalExpenses) }} total
+        {{ windowRange }} | {{ formatDollars(worstWindow.totalExpenses) }} total
       </div>
     </div>
 
@@ -40,8 +40,8 @@
           {{ exp.name }}
           <span class="cause-date">{{ shortDate(exp.date) }}</span>
         </div>
-        <div class="cause-amt">-{{ fmtCurrency(exp.amount) }}</div>
-        <div class="cause-pct">{{ pct(exp.amount) }}%</div>
+        <div class="cause-amt">-{{ formatDollars(exp.amount) }}</div>
+        <div class="cause-pct">{{ percentOfTotal(exp.amount) }}%</div>
       </div>
     </div>
   </div>
@@ -51,7 +51,7 @@
 import { ref, computed } from 'vue'
 import type { WorstWindow } from '@/composables/useExpenseAnalysis'
 import { CAUSE_COLORS } from '@/composables/useExpenseAnalysis'
-import { parseLocalDate } from '@/utils/format'
+import { parseLocalDate, formatDollars } from '@/utils/format'
 
 const props = defineProps<{
   worstWindow: WorstWindow | null
@@ -68,11 +68,8 @@ function onHighlight(idx: number | null) {
   emit('highlightCause', idx)
 }
 
-const fmtCurrency = (n: number) =>
-  '$' + Math.abs(Math.round(n)).toLocaleString()
-
-const shortDate = (d: string) =>
-  parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const shortDate = (dateStr: string) =>
+  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
 const windowRange = computed(() => {
   if (!props.worstWindow) return ''
@@ -84,7 +81,7 @@ function segWidth(amount: number) {
   return (amount / props.worstWindow.totalExpenses) * 100
 }
 
-function pct(amount: number) {
+function percentOfTotal(amount: number) {
   if (!props.worstWindow || !props.worstWindow.totalExpenses) return 0
   return Math.round((amount / props.worstWindow.totalExpenses) * 100)
 }

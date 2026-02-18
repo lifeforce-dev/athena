@@ -94,20 +94,20 @@ const form = reactive({
 
 const title = computed(() => props.editData ? 'Edit Commitment' : 'Add Commitment')
 
-watch(() => props.visible, (vis) => {
-  if (!vis) return
+watch(() => props.visible, (isVisible) => {
+  if (!isVisible) return
 
   if (props.editData) {
-    const d = props.editData
-    const amt = Number(d.amount)
-    form.name = d.name
-    form.rawAmount = Math.abs(amt)
-    form.type = amt >= 0 ? 'income' : 'expense'
-    form.frequency = d.frequency as Frequency
-    form.dayOfMonth = d.day_of_month ?? 1
-    form.anchorDate = d.anchor_date ?? ''
-    form.oneTimeDate = d.one_time_date ?? ''
-    form.startDate = d.start_date
+    const existing = props.editData
+    const parsedAmount = Number(existing.amount)
+    form.name = existing.name
+    form.rawAmount = Math.abs(parsedAmount)
+    form.type = parsedAmount >= 0 ? 'income' : 'expense'
+    form.frequency = existing.frequency as Frequency
+    form.dayOfMonth = existing.day_of_month ?? 1
+    form.anchorDate = existing.anchor_date ?? ''
+    form.oneTimeDate = existing.one_time_date ?? ''
+    form.startDate = existing.start_date
   } else {
     form.name = ''
     form.rawAmount = 0

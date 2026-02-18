@@ -23,23 +23,23 @@
       <!-- Hero strip -->
       <div class="hero-strip">
         <div class="hs-card">
-          <div class="hs-val" style="color: var(--bright)">{{ fmtInt(currentBalance) }}</div>
+          <div class="hs-val" style="color: var(--bright)">{{ formatDollars(currentBalance) }}</div>
           <div class="hs-lbl">Current</div>
         </div>
         <div class="hs-card">
           <div class="hs-val" :style="{ color: afterBalance >= currentBalance ? 'var(--safe)' : 'var(--danger)' }">
-            {{ fmtInt(afterBalance) }}
+            {{ formatDollars(afterBalance) }}
           </div>
           <div class="hs-lbl">After Window</div>
         </div>
         <div class="hs-card">
-          <div class="hs-val" style="color: var(--danger)">{{ lowestPoint ? fmtInt(lowestPoint.balance) : '-' }}</div>
+          <div class="hs-val" style="color: var(--danger)">{{ lowestPoint ? formatDollars(lowestPoint.balance) : '-' }}</div>
           <div v-if="lowestPoint" class="hs-sub">{{ shortDate(lowestPoint.date) }}</div>
           <div class="hs-lbl">Lowest Point</div>
         </div>
         <div class="hs-card">
           <div class="hs-val" :style="{ color: avgGainedPerMonth >= 0 ? 'var(--safe)' : 'var(--danger)' }">
-            {{ avgGainedPerMonth >= 0 ? '+' : '-' }}{{ fmtInt(avgGainedPerMonth) }}
+            {{ avgGainedPerMonth >= 0 ? '+' : '-' }}{{ formatDollars(avgGainedPerMonth) }}
           </div>
           <div class="hs-lbl">Avg Gained / Month</div>
         </div>
@@ -58,7 +58,7 @@
           <div class="mo-header">
             <span class="mo-name">{{ month.label }}</span>
             <span class="mo-net" :class="month.net >= 0 ? 'pos' : 'neg'">
-              {{ month.net >= 0 ? '+' : '-' }}{{ fmtInt(month.net) }}
+              {{ month.net >= 0 ? '+' : '-' }}{{ formatDollars(month.net) }}
             </span>
           </div>
           <div class="mo-bar">
@@ -73,11 +73,11 @@
           <div class="mo-stats">
             <div class="mo-start">
               <span class="mo-date-label">{{ shortDate(month.startDate) }}</span>
-              <span class="mo-val">{{ fmtInt(month.startBal) }}</span>
+              <span class="mo-val">{{ formatDollars(month.startBal) }}</span>
             </div>
             <div class="mo-end">
               <span class="mo-date-label">{{ shortDate(month.endDate) }}</span>
-              <span class="mo-val">{{ fmtInt(month.endBal) }}</span>
+              <span class="mo-val">{{ formatDollars(month.endBal) }}</span>
             </div>
           </div>
         </div>
@@ -100,7 +100,7 @@
 import { computed } from 'vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import { useSimulation } from '@/composables/useSimulation'
-import { parseLocalDate } from '@/utils/format'
+import { parseLocalDate, formatDollars } from '@/utils/format'
 
 const {
   startDate,
@@ -118,13 +118,10 @@ const {
   monthBreaks,
 } = useSimulation()
 
-const fmtInt = (n: number) =>
-  '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+const shortDate = (dateStr: string) =>
+  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
-const shortDate = (d: string) =>
-  parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-
-const maxAbsNet = computed(() => Math.max(...monthBreaks.value.map(m => Math.abs(m.net)), 1))
+const maxAbsNet = computed(() => Math.max(...monthBreaks.value.map(month => Math.abs(month.net)), 1))
 
 function barPercent(net: number): number {
   return Math.min((Math.abs(net) / maxAbsNet.value) * 100, 100)

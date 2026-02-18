@@ -1,6 +1,10 @@
 /**
- * This file is generated from the FastAPI OpenAPI schema.
- * Regenerate with: npm run generate:types
+ * Manually maintained types matching the FastAPI OpenAPI schema.
+ *
+ * Structured to match openapi-typescript output (components.schemas.*)
+ * so the type aliases in types/*.ts work with either approach.
+ * If you run `npm run generate:types`, review the diff before committing
+ * -- the generator output may need manual cleanup.
  */
 
 export interface components {

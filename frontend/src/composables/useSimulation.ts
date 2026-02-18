@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useProjection } from './useProjection'
-import type { TrajectoryPoint } from './useDashboard'
+import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString, parseLocalDate } from '@/utils/format'
 
 export interface MonthBreak {
@@ -28,46 +28,24 @@ export function useSimulation() {
   }
 
   /** Build trajectory array from ledger entries. */
-  const trajectory = computed<TrajectoryPoint[]>(() => {
-    const entries = projection.ledger.value
-    if (!entries.length) return []
-
-    const byDate = new Map<string, { balance: number; events: { name: string; amount: number }[] }>()
-
-    for (const entry of entries) {
-      const existing = byDate.get(entry.date)
-      if (existing) {
-        existing.balance = entry.balance
-        existing.events.push({ name: entry.name, amount: entry.delta })
-      } else {
-        byDate.set(entry.date, {
-          balance: entry.balance,
-          events: [{ name: entry.name, amount: entry.delta }],
-        })
-      }
-    }
-
-    return Array.from(byDate.entries()).map(([date, data]) => ({
-      date,
-      balance: data.balance,
-      events: data.events,
-    }))
-  })
+  const trajectory = computed<TrajectoryPoint[]>(() =>
+    buildTrajectory(projection.ledger.value)
+  )
 
   const dayWindow = computed(() => {
-    const s = parseLocalDate(startDate.value)
-    const e = parseLocalDate(endDate.value)
-    return Math.round((e.getTime() - s.getTime()) / 86_400_000)
+    const start = parseLocalDate(startDate.value)
+    const end = parseLocalDate(endDate.value)
+    return Math.round((end.getTime() - start.getTime()) / 86_400_000)
   })
 
   const currentBalance = computed(() => {
-    const t = trajectory.value
-    return t.length ? t[0].balance : 0
+    const points = trajectory.value
+    return points.length ? points[0].balance : 0
   })
 
   const afterBalance = computed(() => {
-    const t = trajectory.value
-    return t.length ? t[t.length - 1].balance : 0
+    const points = trajectory.value
+    return points.length ? points[points.length - 1].balance : 0
   })
 
   const lowestPoint = computed(() => {
@@ -83,40 +61,40 @@ export function useSimulation() {
 
   /** Compute monthly breakdown from trajectory. */
   const monthBreaks = computed<MonthBreak[]>(() => {
-    const t = trajectory.value
-    if (t.length < 2) return []
+    const points = trajectory.value
+    if (points.length < 2) return []
 
     const breaks: MonthBreak[] = []
-    let curMonth = t[0].date.slice(0, 7)
+    let curMonth = points[0].date.slice(0, 7)
     let monthStartIdx = 0
 
-    const shortLabel = (d: string) =>
-      parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+    const shortLabel = (dateStr: string) =>
+      parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
 
-    for (let i = 1; i < t.length; i++) {
-      const m = t[i].date.slice(0, 7)
-      if (m !== curMonth) {
+    for (let i = 1; i < points.length; i++) {
+      const monthKey = points[i].date.slice(0, 7)
+      if (monthKey !== curMonth) {
         breaks.push({
-          label: shortLabel(t[monthStartIdx].date),
-          startBal: t[monthStartIdx].balance,
-          endBal: t[i - 1].balance,
-          net: t[i - 1].balance - t[monthStartIdx].balance,
-          startDate: t[monthStartIdx].date,
-          endDate: t[i - 1].date,
+          label: shortLabel(points[monthStartIdx].date),
+          startBal: points[monthStartIdx].balance,
+          endBal: points[i - 1].balance,
+          net: points[i - 1].balance - points[monthStartIdx].balance,
+          startDate: points[monthStartIdx].date,
+          endDate: points[i - 1].date,
         })
         monthStartIdx = i
-        curMonth = m
+        curMonth = monthKey
       }
     }
 
     // Last partial month.
     breaks.push({
-      label: shortLabel(t[monthStartIdx].date),
-      startBal: t[monthStartIdx].balance,
-      endBal: t[t.length - 1].balance,
-      net: t[t.length - 1].balance - t[monthStartIdx].balance,
-      startDate: t[monthStartIdx].date,
-      endDate: t[t.length - 1].date,
+      label: shortLabel(points[monthStartIdx].date),
+      startBal: points[monthStartIdx].balance,
+      endBal: points[points.length - 1].balance,
+      net: points[points.length - 1].balance - points[monthStartIdx].balance,
+      startDate: points[monthStartIdx].date,
+      endDate: points[points.length - 1].date,
     })
 
     return breaks

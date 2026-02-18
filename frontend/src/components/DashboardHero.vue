@@ -9,7 +9,7 @@
     <div class="hero-strip">
       <div class="hs-card hs-editable" @click="startEdit">
         <template v-if="!editing">
-          <div class="hs-val" :style="{ color: 'var(--bright)' }">{{ fmtShort(currentBalance) }}</div>
+          <div class="hs-val" :style="{ color: 'var(--bright)' }">{{ formatDollars(currentBalance) }}</div>
           <div class="hs-lbl">Current <span class="hs-edit-hint">click to update</span></div>
         </template>
         <template v-else>
@@ -31,11 +31,11 @@
         </template>
       </div>
       <div class="hs-card hs-readonly">
-        <div class="hs-val" :style="{ color: endColor }">{{ fmtShort(endBalance) }}</div>
+        <div class="hs-val" :style="{ color: endColor }">{{ formatDollars(endBalance) }}</div>
         <div class="hs-lbl">After Window</div>
       </div>
       <div class="hs-card hs-readonly">
-        <div class="hs-val" :style="{ color: 'var(--danger)' }">{{ fmtShort(lowestBalance) }}</div>
+        <div class="hs-val" :style="{ color: 'var(--danger)' }">{{ formatDollars(lowestBalance) }}</div>
         <div class="hs-sub">{{ lowestDate }}</div>
         <div class="hs-lbl">Lowest Point</div>
       </div>
@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { parseLocalDate } from '@/utils/format'
+import { parseLocalDate, formatDollars } from '@/utils/format'
 
 const props = defineProps<{
   currentBalance: number
@@ -90,9 +90,6 @@ function saveBalance() {
   emit('updateBalance', num)
 }
 
-const fmtShort = (n: number) =>
-  '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-
 const statusClass = computed(() => {
   if (props.lowestBalance < 0) return 'danger'
   if (props.lowestBalance < 3000) return 'tight'
@@ -115,7 +112,7 @@ const netColor = computed(() =>
 
 const netLabel = computed(() => {
   const sign = props.netChange >= 0 ? '+' : '-'
-  return `${sign}${fmtShort(props.netChange)}`
+  return `${sign}${formatDollars(props.netChange)}`
 })
 
 const lowestDate = computed(() => {

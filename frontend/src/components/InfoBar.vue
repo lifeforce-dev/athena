@@ -15,6 +15,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatDollars } from '@/utils/format'
 
 export interface InfoBarData {
   date: string
@@ -32,17 +33,14 @@ const props = defineProps<{
 
 const hasData = computed(() => props.data !== null)
 
-const fmtShort = (n: number) =>
-  '$' + Math.abs(Math.round(n)).toLocaleString()
-
 const dateStr = computed(() => {
   if (!props.data) return ''
-  const dt = new Date(props.data.date + 'T12:00:00')
-  const cal = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const parsed = new Date(props.data.date + 'T12:00:00')
+  const cal = parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   return `${cal} | +${props.data.dayOffset}d`
 })
 
-const balStr = computed(() => (props.data ? fmtShort(props.data.balance) : ''))
+const balStr = computed(() => (props.data ? formatDollars(props.data.balance) : ''))
 
 const balColor = computed(() => {
   if (!props.data) return ''
@@ -57,7 +55,7 @@ const name = computed(() => props.data?.name ?? '')
 const amtStr = computed(() => {
   if (!props.data) return ''
   const sign = props.data.isIncome ? '+' : '-'
-  return `${sign}${fmtShort(props.data.amount)}`
+  return `${sign}${formatDollars(props.data.amount)}`
 })
 
 const amtColor = computed(() => {

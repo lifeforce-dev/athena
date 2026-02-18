@@ -27,22 +27,40 @@ export function useCommitments() {
 
   onMounted(load)
 
-  async function create(data: CommitmentCreate) {
-    const created = await apiCreate(data)
-    commitments.value.push(created)
-  }
-
-  async function update(id: number, data: CommitmentUpdate) {
-    const updated = await apiUpdate(id, data)
-    const idx = commitments.value.findIndex(c => c.id === id)
-    if (idx >= 0) {
-      commitments.value[idx] = updated
+  async function create(data: CommitmentCreate): Promise<boolean> {
+    try {
+      const created = await apiCreate(data)
+      commitments.value.push(created)
+      return true
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      return false
     }
   }
 
-  async function remove(id: number) {
-    await apiDelete(id)
-    commitments.value = commitments.value.filter(c => c.id !== id)
+  async function update(id: number, data: CommitmentUpdate): Promise<boolean> {
+    try {
+      const updated = await apiUpdate(id, data)
+      const idx = commitments.value.findIndex(commitment => commitment.id === id)
+      if (idx >= 0) {
+        commitments.value[idx] = updated
+      }
+      return true
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      return false
+    }
+  }
+
+  async function remove(id: number): Promise<boolean> {
+    try {
+      await apiDelete(id)
+      commitments.value = commitments.value.filter(commitment => commitment.id !== id)
+      return true
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : String(err)
+      return false
+    }
   }
 
   /** Monthly equivalent for a commitment. */
@@ -58,22 +76,22 @@ export function useCommitments() {
   }
 
   const parsed = computed(() =>
-    commitments.value.map(c => ({
-      ...c,
-      parsedAmount: parseMoney(c.amount),
+    commitments.value.map(commitment => ({
+      ...commitment,
+      parsedAmount: parseMoney(commitment.amount),
     }))
   )
 
   const totalMonthlyIncome = computed(() =>
     parsed.value
-      .filter(c => parseMoney(c.amount) > 0 && c.frequency !== 'once')
-      .reduce((sum, c) => sum + monthlyEquiv(parseMoney(c.amount), c.frequency), 0)
+      .filter(commitment => parseMoney(commitment.amount) > 0 && commitment.frequency !== 'once')
+      .reduce((total, commitment) => total + monthlyEquiv(parseMoney(commitment.amount), commitment.frequency), 0)
   )
 
   const totalMonthlyExpenses = computed(() =>
     parsed.value
-      .filter(c => parseMoney(c.amount) < 0 && c.frequency !== 'once')
-      .reduce((sum, c) => sum + monthlyEquiv(parseMoney(c.amount), c.frequency), 0)
+      .filter(commitment => parseMoney(commitment.amount) < 0 && commitment.frequency !== 'once')
+      .reduce((total, commitment) => total + monthlyEquiv(parseMoney(commitment.amount), commitment.frequency), 0)
   )
 
   const netMonthly = computed(() => totalMonthlyIncome.value + totalMonthlyExpenses.value)

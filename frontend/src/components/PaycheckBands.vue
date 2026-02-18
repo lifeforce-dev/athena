@@ -24,9 +24,9 @@ import { formatCurrency, formatSigned, parseLocalDate } from '@/utils/format'
 defineProps<{ payPeriods: ParsedPayPeriod[] }>()
 
 const formatRange = (start: string, end: string) => {
-  const s = parseLocalDate(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const e = parseLocalDate(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `${s} → ${e}`
+  const startLabel = parseLocalDate(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const endLabel = parseLocalDate(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${startLabel} \u2192 ${endLabel}`
 }
 </script>
 

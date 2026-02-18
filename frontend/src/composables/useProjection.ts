@@ -32,15 +32,15 @@ export function useProjection() {
   )
 
   const payPeriods = computed<ParsedPayPeriod[]>(() =>
-    (data.value?.pay_periods ?? []).map((pp) => ({
-      start_date: pp.start_date,
-      end_date: pp.end_date,
-      is_partial: pp.is_partial,
-      spent: parseMoney(pp.spent),
-      net: parseMoney(pp.net),
-      start_balance: parseMoney(pp.start_balance),
-      end_balance: parseMoney(pp.end_balance),
-      min_balance: parseMoney(pp.min_balance),
+    (data.value?.pay_periods ?? []).map((period) => ({
+      start_date: period.start_date,
+      end_date: period.end_date,
+      is_partial: period.is_partial,
+      spent: parseMoney(period.spent),
+      net: parseMoney(period.net),
+      start_balance: parseMoney(period.start_balance),
+      end_balance: parseMoney(period.end_balance),
+      min_balance: parseMoney(period.min_balance),
     }))
   )
 

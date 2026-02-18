@@ -23,6 +23,11 @@ const routes: RouteRecordRaw[] = [
     name: 'simulation',
     component: () => import('@/views/SimulationView.vue'),
   },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    redirect: { name: 'dashboard' },
+  },
 ]
 
 const router = createRouter({

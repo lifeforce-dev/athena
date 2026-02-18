@@ -1,13 +1,9 @@
 import { computed, ref, onMounted } from 'vue'
 import { useProjection } from './useProjection'
+import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString } from '@/utils/format'
 
-/** Derived trajectory point for chart/event display. */
-export interface TrajectoryPoint {
-  date: string
-  balance: number
-  events: { name: string; amount: number }[]
-}
+export type { TrajectoryPoint } from '@/utils/trajectory'
 
 export function useDashboard() {
   const today = new Date()
@@ -25,31 +21,9 @@ export function useDashboard() {
   onMounted(refresh)
 
   /** Build trajectory array from ledger entries. */
-  const trajectory = computed<TrajectoryPoint[]>(() => {
-    const entries = projection.ledger.value
-    if (!entries.length) return []
-
-    const byDate = new Map<string, { balance: number; events: { name: string; amount: number }[] }>()
-
-    for (const entry of entries) {
-      const existing = byDate.get(entry.date)
-      if (existing) {
-        existing.balance = entry.balance
-        existing.events.push({ name: entry.name, amount: entry.delta })
-      } else {
-        byDate.set(entry.date, {
-          balance: entry.balance,
-          events: [{ name: entry.name, amount: entry.delta }],
-        })
-      }
-    }
-
-    return Array.from(byDate.entries()).map(([date, data]) => ({
-      date,
-      balance: data.balance,
-      events: data.events,
-    }))
-  })
+  const trajectory = computed<TrajectoryPoint[]>(() =>
+    buildTrajectory(projection.ledger.value)
+  )
 
   /** Lowest balance point in the trajectory. */
   const lowestPoint = computed(() => {
@@ -62,8 +36,8 @@ export function useDashboard() {
 
   /** End balance (last trajectory point). */
   const endBalance = computed(() => {
-    const t = trajectory.value
-    return t.length ? t[t.length - 1].balance : 0
+    const points = trajectory.value
+    return points.length ? points[points.length - 1].balance : 0
   })
 
   /** Net change over the projection window. */
@@ -71,10 +45,10 @@ export function useDashboard() {
 
   /** Calendar days covered by the projection window. */
   const daysCovered = computed(() => {
-    const t = trajectory.value
-    if (t.length < 2) return t.length
-    const first = new Date(t[0].date + 'T12:00:00').getTime()
-    const last = new Date(t[t.length - 1].date + 'T12:00:00').getTime()
+    const points = trajectory.value
+    if (points.length < 2) return points.length
+    const first = new Date(points[0].date + 'T12:00:00').getTime()
+    const last = new Date(points[points.length - 1].date + 'T12:00:00').getTime()
     return Math.round((last - first) / (24 * 60 * 60 * 1000))
   })
 
