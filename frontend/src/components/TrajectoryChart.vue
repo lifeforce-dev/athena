@@ -152,7 +152,11 @@ function updateInfoBar(clientX: number, clientY: number) {
     if (distance < closestDistance) { closestDistance = distance; closestIndex = i }
   })
 
-  if (closestDistance > 25) {
+  // Scale rejection threshold to point spacing so zoomed-in views stay interactive.
+  const pointSpacing = slice.length > 1 ? Math.abs(xPos(1) - xPos(0)) : 50
+  const rejectThreshold = Math.max(25, pointSpacing * 0.6)
+
+  if (closestDistance > rejectThreshold) {
     infoBarData.value = null
     hover.inWave = false
     hover.sliceIdx = null

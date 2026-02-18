@@ -140,7 +140,7 @@ async def _process_message(
         return False
 
     if isinstance(notification, BalanceNotification):
-        await balance_repository.create_from_gmail(
+        inserted = await balance_repository.create_from_gmail(
             db,
             user_id,
             notification.balance,
@@ -148,7 +148,14 @@ async def _process_message(
             gmail_message_id,
             notification.account_label,
         )
-        logger.info("Balance snapshot recorded from Gmail")
+        if inserted:
+            logger.info(
+                f"Balance snapshot recorded from Gmail: "
+                f"balance={notification.balance}, observed_at={notification.observed_at}, "
+                f"account={notification.account_label}"
+            )
+        else:
+            logger.info(f"Gmail balance skipped (duplicate message_id={gmail_message_id})")
     else:
         await transaction_repository.create_from_gmail(
             db,

@@ -129,7 +129,8 @@ def parse_balance_email(html: str, received_at: datetime | None = None) -> Balan
     account_match = _ACCOUNT_RE.search(text)
     account_label = f"Account - {account_match.group(1)}" if account_match else None
 
-    observed_at = _parse_date(text) or received_at or datetime.now(timezone.utc)
+    # Prefer the email Date header (precise timestamp) over body date (midnight-only).
+    observed_at = received_at or _parse_date(text) or datetime.now(timezone.utc)
 
     return BalanceNotification(
         balance=balance,
