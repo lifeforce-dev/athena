@@ -58,13 +58,36 @@
           <div v-for="item in group.items" :key="item.id" class="c-row">
             <span class="c-name">
               {{ item.name }}
-              <span v-if="item.frequency === 'once'" class="once-tag">one-time</span>
             </span>
             <span class="c-amt" :class="item.parsedAmount > 0 ? 'pos' : 'neg'">
               {{ item.parsedAmount > 0 ? '+' : '-' }}{{ fmtDollar(item.parsedAmount) }}
             </span>
             <span class="c-freq">{{ freqLabel(item.frequency) }}</span>
             <span class="c-next">{{ '-' }}</span>
+            <button class="c-del" @click="handleDelete(item.id)" title="Remove">&times;</button>
+          </div>
+        </div>
+
+        <!-- One-time payments -->
+        <div v-if="oneTimeItems.length" class="cat-box">
+          <div class="cat-hdr">
+            <span class="cat-name">One-Time Payments ({{ oneTimeItems.length }})</span>
+            <span class="cat-total">
+              {{ fmtInt(oneTimeTotal) }} total
+            </span>
+          </div>
+          <div class="col-hdr ot-hdr">
+            <span>Date</span>
+            <span>Name</span>
+            <span style="text-align: right">Amount</span>
+            <span></span>
+          </div>
+          <div v-for="item in oneTimeItems" :key="item.id" class="c-row ot-row">
+            <span class="c-date">{{ fmtDate(item.one_time_date ?? item.start_date) }}</span>
+            <span class="c-name">{{ item.name }}</span>
+            <span class="c-amt" :class="item.parsedAmount > 0 ? 'pos' : 'neg'">
+              {{ item.parsedAmount > 0 ? '+' : '-' }}{{ fmtDollar(item.parsedAmount) }}
+            </span>
             <button class="c-del" @click="handleDelete(item.id)" title="Remove">&times;</button>
           </div>
         </div>
@@ -85,7 +108,7 @@ import { ref, computed } from 'vue'
 import CommitmentModal from '@/components/CommitmentModal.vue'
 import { useCommitments } from '@/composables/useCommitments'
 import type { CommitmentCreate } from '@/types/commitment'
-import { parseMoney } from '@/utils/format'
+import { parseMoney, parseLocalDate } from '@/utils/format'
 
 const {
   commitments,
@@ -166,6 +189,19 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
 
   return groups
 })
+
+const oneTimeItems = computed(() =>
+  parsed.value
+    .filter(c => c.frequency === 'once')
+    .sort((a, b) => (a.one_time_date ?? a.start_date).localeCompare(b.one_time_date ?? b.start_date))
+)
+
+const oneTimeTotal = computed(() =>
+  oneTimeItems.value.reduce((s, c) => s + Math.abs(c.parsedAmount), 0)
+)
+
+const fmtDate = (d: string) =>
+  parseLocalDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 function openAdd() {
   editTarget.value = null
@@ -411,9 +447,20 @@ async function handleDelete(id: number) {
   color: var(--dim);
 }
 
+.ot-hdr, .ot-row {
+  grid-template-columns: 100px 1fr 90px 40px;
+}
+
+.c-date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--dim);
+}
+
 @media (max-width: 700px) {
   .summary { grid-template-columns: 1fr 1fr; }
   .col-hdr, .c-row { grid-template-columns: 1fr 70px 70px 30px; }
+  .ot-hdr, .ot-row { grid-template-columns: 80px 1fr 70px 30px; }
   .c-next, .col-hdr > span:nth-child(4) { display: none; }
 }
 </style>
