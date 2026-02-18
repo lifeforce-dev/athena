@@ -7,20 +7,39 @@
     </div>
 
     <div class="hero-strip">
-      <div class="hs-card">
-        <div class="hs-val" :style="{ color: 'var(--bright)' }">{{ fmtShort(currentBalance) }}</div>
-        <div class="hs-lbl">Current</div>
+      <div class="hs-card hs-editable" @click="startEdit">
+        <template v-if="!editing">
+          <div class="hs-val" :style="{ color: 'var(--bright)' }">{{ fmtShort(currentBalance) }}</div>
+          <div class="hs-lbl">Current <span class="hs-edit-hint">click to update</span></div>
+        </template>
+        <template v-else>
+          <input
+            ref="inputRef"
+            v-model="editValue"
+            class="hs-input"
+            type="text"
+            inputmode="decimal"
+            placeholder="0"
+            @keydown.enter="saveBalance"
+            @keydown.escape="cancelEdit"
+            @blur="cancelEdit"
+          />
+          <div class="hs-lbl">
+            <button class="hs-save" @mousedown.prevent="saveBalance">Save</button>
+            <span class="hs-cancel" @mousedown.prevent="cancelEdit">Esc</span>
+          </div>
+        </template>
       </div>
-      <div class="hs-card">
+      <div class="hs-card hs-readonly">
         <div class="hs-val" :style="{ color: endColor }">{{ fmtShort(endBalance) }}</div>
         <div class="hs-lbl">After Window</div>
       </div>
-      <div class="hs-card">
+      <div class="hs-card hs-readonly">
         <div class="hs-val" :style="{ color: 'var(--danger)' }">{{ fmtShort(lowestBalance) }}</div>
         <div class="hs-sub">{{ lowestDate }}</div>
         <div class="hs-lbl">Lowest Point</div>
       </div>
-      <div class="hs-card">
+      <div class="hs-card hs-readonly">
         <div class="hs-val" :style="{ color: netColor }">{{ netLabel }}</div>
         <div class="hs-lbl">Net Change</div>
       </div>
@@ -29,8 +48,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { formatCurrency, parseLocalDate } from '@/utils/format'
+import { ref, computed, nextTick } from 'vue'
+import { parseLocalDate } from '@/utils/format'
 
 const props = defineProps<{
   currentBalance: number
@@ -40,6 +59,36 @@ const props = defineProps<{
   lowestDate: string
   daysCovered: number
 }>()
+
+const emit = defineEmits<{
+  updateBalance: [balance: number]
+}>()
+
+const editing = ref(false)
+const editValue = ref('')
+const inputRef = ref<HTMLInputElement | null>(null)
+
+function startEdit() {
+  if (editing.value) return
+  editing.value = true
+  editValue.value = Math.round(props.currentBalance).toString()
+  nextTick(() => {
+    inputRef.value?.focus()
+    inputRef.value?.select()
+  })
+}
+
+function cancelEdit() {
+  editing.value = false
+}
+
+function saveBalance() {
+  const raw = editValue.value.replace(/[,$\s]/g, '')
+  const num = parseFloat(raw)
+  if (isNaN(num) || num < 0) return
+  editing.value = false
+  emit('updateBalance', num)
+}
 
 const fmtShort = (n: number) =>
   '$' + Math.abs(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
@@ -169,6 +218,73 @@ const lowestDate = computed(() => {
   text-align: center;
   min-width: 120px;
   box-shadow: var(--shadow-sm);
+}
+
+.hs-editable {
+  cursor: pointer;
+  border-color: rgba(232, 236, 242, 0.12);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.hs-editable:hover {
+  border-color: rgba(232, 236, 242, 0.25);
+  background: rgba(22, 26, 35, 0.95);
+}
+
+.hs-readonly {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.hs-edit-hint {
+  font-size: 7px;
+  color: var(--muted);
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+.hs-input {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--bright);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(232, 236, 242, 0.2);
+  text-align: center;
+  width: 100%;
+  outline: none;
+  padding: 0 0 4px;
+}
+
+.hs-input::placeholder {
+  color: var(--muted);
+}
+
+.hs-save {
+  background: none;
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  color: var(--safe);
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+
+.hs-save:hover {
+  background: rgba(52, 211, 153, 0.08);
+}
+
+.hs-cancel {
+  font-size: 7px;
+  color: var(--muted);
+  margin-left: 6px;
+  cursor: pointer;
 }
 
 .hs-val {

@@ -8,6 +8,7 @@
       :lowest-balance="lowestPoint?.balance ?? 0"
       :lowest-date="lowestPoint?.date ?? ''"
       :days-covered="daysCovered"
+      @update-balance="onUpdateBalance"
     />
 
     <div class="wrap">
@@ -62,6 +63,7 @@ import CausePanel from '@/components/CausePanel.vue'
 import BillsThisWeek from '@/components/BillsThisWeek.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
+import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
 
 const highlightDate = ref<string | null>(null)
@@ -75,6 +77,19 @@ function onClickDate(date: string) {
   nextTick(() => { pulseDate.value = date })
 }
 
+async function onUpdateBalance(balance: number) {
+  try {
+    await createManualBalance({
+      balance: balance.toString(),
+      observed_at: new Date().toISOString(),
+      account_label: null,
+    })
+    await refresh()
+  } catch (err) {
+    console.error('Failed to update balance:', err)
+  }
+}
+
 const {
   loading,
   error,
@@ -85,6 +100,7 @@ const {
   netChange,
   daysCovered,
   ledger,
+  refresh,
 } = useDashboard()
 
 const {

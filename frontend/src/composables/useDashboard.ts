@@ -69,8 +69,14 @@ export function useDashboard() {
   /** Net change over the projection window. */
   const netChange = computed(() => endBalance.value - currentBalance.value)
 
-  /** Days covered by the projection. */
-  const daysCovered = computed(() => trajectory.value.length)
+  /** Calendar days covered by the projection window. */
+  const daysCovered = computed(() => {
+    const t = trajectory.value
+    if (t.length < 2) return t.length
+    const first = new Date(t[0].date + 'T12:00:00').getTime()
+    const last = new Date(t[t.length - 1].date + 'T12:00:00').getTime()
+    return Math.round((last - first) / (24 * 60 * 60 * 1000))
+  })
 
   return {
     ...projection,
