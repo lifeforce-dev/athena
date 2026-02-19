@@ -137,6 +137,26 @@ function draw(pulseElapsed?: number) {
 
 // ── Info bar update on hover ──
 
+/** Find the trajectory point closest to hoverDate that has an event matching expenseName. */
+function findClosestOccurrence(hoverDate: string, expenseName: string): { date: string; amount: number } | null {
+  const hoverTime = parseLocalDate(hoverDate).getTime()
+  let best: { date: string; amount: number; dist: number } | null = null
+
+  for (const point of props.data) {
+    for (const event of point.events) {
+      if (event.name === expenseName && event.amount < 0) {
+        const dist = Math.abs(parseLocalDate(point.date).getTime() - hoverTime)
+
+        if (!best || dist < best.dist) {
+          best = { date: point.date, amount: Math.abs(event.amount), dist }
+        }
+      }
+    }
+  }
+
+  return best ? { date: best.date, amount: best.amount } : null
+}
+
 function updateInfoBar(clientX: number, clientY: number) {
   if (!currentLayout || !wrapRef.value) return
 
@@ -176,43 +196,44 @@ function updateInfoBar(clientX: number, clientY: number) {
   // Redraw first so lastHoveredBand is computed.
   draw()
 
-  const hasEvents = point.events.length > 0
-  const hasBand = hover.inWave && lastHoveredBand
-  const nearNode = Math.abs(yPos(point.balance) - mouseY) < 18 && hasEvents
-
-  if (!nearNode && !hasBand) {
-    infoBarData.value = null
-    return
-  }
-
   const days = daysBetween(props.data[0].date, point.date)
   const zone: 'safe' | 'tight' | 'danger' =
     point.balance < redThreshold ? 'danger' : point.balance < yellowThreshold ? 'tight' : 'safe'
 
-  let name: string
-  let amount: number
-  let isIncome: boolean
-
-  if (hasBand && lastHoveredBand) {
-    name = lastHoveredBand.name
-    amount = lastHoveredBand.amount
-    isIncome = false
-  } else {
-    const event = point.events[0]
-    name = event.name
-    amount = Math.abs(event.amount)
-    isIncome = event.amount > 0
-  }
-
-  infoBarData.value = {
+  // Baseline is always populated.
+  const result: InfoBarData = {
     date: point.date,
     dayOffset: days,
     balance: point.balance,
     balanceZone: zone,
-    name,
-    amount,
-    isIncome,
   }
+
+  const hasBand = hover.inWave && lastHoveredBand
+  const hasEvents = point.events.length > 0
+  const nearNode = Math.abs(yPos(point.balance) - mouseY) < 18 && hasEvents
+
+  if (hasBand && lastHoveredBand) {
+    // Find the closest actual occurrence of this expense.
+    const occurrence = findClosestOccurrence(point.date, lastHoveredBand.name)
+
+    if (occurrence) {
+      result.band = {
+        name: lastHoveredBand.name,
+        occurrenceDate: occurrence.date,
+        occurrenceDayOffset: daysBetween(props.data[0].date, occurrence.date),
+        amount: occurrence.amount,
+      }
+    }
+  } else if (nearNode) {
+    const event = point.events[0]
+    result.event = {
+      name: event.name,
+      amount: Math.abs(event.amount),
+      isIncome: event.amount > 0,
+    }
+  }
+
+  infoBarData.value = result
 }
 
 // ── Mouse interactions ──

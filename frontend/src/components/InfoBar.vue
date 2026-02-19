@@ -1,13 +1,28 @@
 <template>
-  <div class="info-bar">
+  <div class="info-bar" :style="{ gridTemplateColumns: gridCols }">
     <template v-if="hasData">
+      <!-- Baseline: always shown -->
       <span class="info-col info-date">{{ dateStr }}</span>
       <div class="info-sep" />
       <span class="info-col info-bal" :style="{ color: balColor }">{{ balStr }}</span>
-      <div class="info-sep" />
-      <span class="info-col info-name">{{ name }}</span>
-      <div class="info-sep" />
-      <span class="info-col info-amt" :style="{ color: amtColor }">{{ amtStr }}</span>
+
+      <!-- Band overlay: bill name + closest occurrence date + amount -->
+      <template v-if="data!.band">
+        <div class="info-sep" />
+        <span class="info-col info-name">{{ data!.band.name }}</span>
+        <div class="info-sep" />
+        <span class="info-col info-billdate">{{ billDateStr }}</span>
+        <div class="info-sep" />
+        <span class="info-col info-amt" style="color: var(--danger)">{{ bandAmtStr }}</span>
+      </template>
+
+      <!-- Event overlay: income/one-time near the trajectory line -->
+      <template v-else-if="data!.event">
+        <div class="info-sep" />
+        <span class="info-col info-name">{{ data!.event.name }}</span>
+        <div class="info-sep" />
+        <span class="info-col info-amt" :style="{ color: eventAmtColor }">{{ eventAmtStr }}</span>
+      </template>
     </template>
     <span v-else class="info-hint">hover chart to inspect</span>
   </div>
@@ -22,9 +37,19 @@ export interface InfoBarData {
   dayOffset: number
   balance: number
   balanceZone: 'safe' | 'tight' | 'danger'
-  name: string
-  amount: number
-  isIncome: boolean
+  // Band hover: expense band closest occurrence info.
+  band?: {
+    name: string
+    occurrenceDate: string
+    occurrenceDayOffset: number
+    amount: number
+  }
+  // Event hover: income/one-time payment near trajectory line.
+  event?: {
+    name: string
+    amount: number
+    isIncome: boolean
+  }
 }
 
 const props = defineProps<{
@@ -32,6 +57,13 @@ const props = defineProps<{
 }>()
 
 const hasData = computed(() => props.data !== null)
+
+const gridCols = computed(() => {
+  if (!props.data) return '1fr'
+  if (props.data.band) return '160px 1px 100px 1px 140px 1px 120px 1px 80px'
+  if (props.data.event) return '160px 1px 100px 1px 140px 1px 80px'
+  return '160px 1px 100px'
+})
 
 const dateStr = computed(() => {
   if (!props.data) return ''
@@ -50,24 +82,39 @@ const balColor = computed(() => {
   return 'var(--safe)'
 })
 
-const name = computed(() => props.data?.name ?? '')
-
-const amtStr = computed(() => {
-  if (!props.data) return ''
-  const sign = props.data.isIncome ? '+' : '-'
-  return `${sign}${formatDollars(props.data.amount)}`
+// Band: closest occurrence date formatted.
+const billDateStr = computed(() => {
+  const band = props.data?.band
+  if (!band) return ''
+  const parsed = new Date(band.occurrenceDate + 'T12:00:00')
+  const cal = parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${cal} | +${band.occurrenceDayOffset}d`
 })
 
-const amtColor = computed(() => {
-  if (!props.data) return ''
-  return props.data.isIncome ? 'var(--income)' : 'var(--danger)'
+const bandAmtStr = computed(() => {
+  const band = props.data?.band
+  if (!band) return ''
+  return `-${formatDollars(band.amount)}`
+})
+
+// Event: income/one-time payment.
+const eventAmtStr = computed(() => {
+  const event = props.data?.event
+  if (!event) return ''
+  const sign = event.isIncome ? '+' : '-'
+  return `${sign}${formatDollars(event.amount)}`
+})
+
+const eventAmtColor = computed(() => {
+  const event = props.data?.event
+  if (!event) return ''
+  return event.isIncome ? 'var(--income)' : 'var(--danger)'
 })
 </script>
 
 <style scoped>
 .info-bar {
   display: grid;
-  grid-template-columns: 160px 1px 100px 1px 140px 1px 80px;
   align-items: center;
   gap: 0;
   margin-bottom: 6px;
@@ -105,6 +152,12 @@ const amtColor = computed(() => {
 .info-name {
   font-size: 11px;
   color: var(--dim);
+}
+
+.info-billdate {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--font-mono);
 }
 
 .info-amt {
