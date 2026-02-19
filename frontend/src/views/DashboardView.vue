@@ -18,6 +18,7 @@
       <template v-else-if="trajectory.length">
         <TrajectoryChart
           ref="chartRef"
+          data-tour="trajectory"
           :data="trajectory"
           :highlight-date="highlightDate"
           :pulse-date="pulseDate"
@@ -32,11 +33,12 @@
         <ShortfallWarning :shortfall="shortfall" />
 
         <CausePanel
+          data-tour="cause-panel"
           :worst-window="worstWindow"
           @highlight-cause="highlightedCause = $event"
         />
 
-        <div class="sh" style="margin-top: 20px">
+        <div class="sh" data-tour="bills" style="margin-top: 20px">
           <span class="sh-t">Bills This Week</span>
           <span class="sh-m">resets {{ nextWeekLabel }}</span>
         </div>
@@ -66,6 +68,7 @@ import BillsThisWeek from '@/components/BillsThisWeek.vue'
 import ShortfallWarning from '@/components/ShortfallWarning.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
+import { useTour } from '@/composables/useTour'
 import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
 
@@ -73,6 +76,8 @@ const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
 const highlightedCause = ref<number | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
+
+useTour()
 
 function onClickDate(date: string) {
   pulseDate.value = null

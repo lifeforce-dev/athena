@@ -1,7 +1,7 @@
 <template>
   <section class="hero" :class="statusClass">
     <!-- Balance headline -->
-    <div class="hero-top" @click="startEdit">
+    <div class="hero-top" data-tour="balance" @click="startEdit">
       <template v-if="!editing">
         <div class="hero-balance">{{ formatDollars(currentBalance) }}</div>
         <div class="hero-bal-lbl">Current Balance</div>
@@ -26,7 +26,7 @@
     </div>
 
     <!-- Shield gauge -->
-    <div class="gauge-wrap">
+    <div class="gauge-wrap" data-tour="gauge">
       <div class="gauge-header">
         <div class="gauge-verdict" :class="statusClass">{{ verdict }}</div>
         <div>
@@ -34,8 +34,7 @@
           <span class="gauge-days-lbl"> days projected</span>
         </div>
       </div>
-      <div class="gauge-track">
-        <div class="gauge-fill" :class="statusClass" :style="{ width: gaugePct + '%' }" />
+      <div class="gauge-track" :style="{ '--gauge-pct': gaugePct + '%' }">
         <div class="gauge-marker" :style="{ left: gaugePct + '%' }" />
       </div>
       <div class="gauge-labels">
@@ -289,28 +288,19 @@ const gaugePct = computed(() => Math.min(100, Math.round((props.daysCovered / 90
 .gauge-track {
   position: relative;
   height: 8px;
-  background: var(--muted);
+  background: linear-gradient(90deg, var(--danger) 0%, var(--tight) 40%, var(--safe) 85%);
   overflow: hidden;
 }
 
-.gauge-fill {
+.gauge-track::after {
+  content: '';
   position: absolute;
   top: 0;
-  left: 0;
+  right: 0;
   height: 100%;
+  width: calc(100% - var(--gauge-pct, 0%));
+  background: var(--muted);
   transition: width 0.6s ease;
-}
-
-.gauge-fill.safe {
-  background: linear-gradient(90deg, var(--danger), var(--tight) 30%, var(--safe) 70%);
-}
-
-.gauge-fill.tight {
-  background: linear-gradient(90deg, var(--danger), var(--tight));
-}
-
-.gauge-fill.danger {
-  background: var(--danger);
 }
 
 .gauge-marker {

@@ -67,6 +67,40 @@
         </div>
       </div>
     </div>
+
+    <!-- One-time -->
+    <div v-if="oneTimeItems.length">
+      <div class="sec-hdr">
+        <span class="sec-title">One-Time ({{ oneTimeItems.length }})</span>
+        <span class="sec-total dim">{{ formatSigned(oneTimeTotal) }}</span>
+      </div>
+      <div class="rail-list">
+        <div
+          v-for="item in oneTimeItems"
+          :key="item.id"
+          class="rail"
+          :class="{ off: !isActive(item.id), modified: isModified(item.id) }"
+          :style="{ '--weight': weight(item) + '%' }"
+        >
+          <div class="rail-toggle" @click="toggleCommitment(item.id)">
+            <div class="toggle-pip" />
+          </div>
+          <div class="rail-info">
+            <span class="rail-name">{{ item.name }}</span>
+            <span class="rail-freq once">{{ item.one_time_date ?? 'once' }}</span>
+          </div>
+          <div class="rail-amt" :class="parseMoney(item.amount) >= 0 ? 'pos' : 'neg'">
+            <input
+              class="amt-input"
+              :value="formatAmountDisplay(item)"
+              @focus="onFocus($event, item)"
+              @blur="onBlur($event, item)"
+              @keydown.enter="($event.target as HTMLInputElement).blur()"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -104,6 +138,19 @@ const expenseItems = computed(() =>
   props.commitments.filter(
     commitment => parseMoney(commitment.amount) < 0 && commitment.frequency !== 'once',
   ),
+)
+
+const oneTimeItems = computed(() =>
+  props.commitments.filter(commitment => commitment.frequency === 'once'),
+)
+
+const oneTimeTotal = computed(() =>
+  oneTimeItems.value
+    .filter(commitment => props.overrides.get(commitment.id)?.active !== false)
+    .reduce((sum, commitment) => {
+      const override = props.overrides.get(commitment.id)
+      return sum + (override?.amount ?? parseMoney(commitment.amount))
+    }, 0),
 )
 
 // ── Override helpers ──
@@ -203,6 +250,7 @@ function onBlur(event: Event, commitment: CommitmentResponse) {
 
 .sec-total.income { color: var(--income); }
 .sec-total.expense { color: var(--danger); }
+.sec-total.dim { color: var(--dim); }
 
 /* ── Rail list ── */
 

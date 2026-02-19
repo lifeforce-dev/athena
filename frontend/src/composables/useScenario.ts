@@ -153,6 +153,7 @@ export function useScenario() {
   })
 
   const ledger = ref<ParsedLedgerEntry[]>([])
+  const apiBalance = ref<number | null>(null)
 
   async function runSimulation() {
     hasRun.value = true
@@ -166,6 +167,8 @@ export function useScenario() {
         amount_overrides: amountOverrides.value,
       }
       const response = await fetchScenarioProjection(body)
+
+      apiBalance.value = parseMoney(response.current_balance)
 
       ledger.value = (response.ledger ?? []).map(entry => ({
         date: entry.date,
@@ -183,6 +186,7 @@ export function useScenario() {
   const trajectory = computed<TrajectoryPoint[]>(() => buildTrajectory(ledger.value))
 
   const currentBalance = computed(() => {
+    if (apiBalance.value !== null) return apiBalance.value
     const points = trajectory.value
     return points.length ? points[0].balance : 0
   })

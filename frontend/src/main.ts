@@ -6,6 +6,7 @@ import { registerUnauthorizedHandler } from './api/client'
 import { useAuthStore } from './stores/auth'
 import './styles/base.css'
 import './styles/utilities.css'
+import './styles/tour.css'
 
 const app = createApp(App)
 app.use(createPinia())

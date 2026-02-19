@@ -1,0 +1,61 @@
+/* ============================================================
+   Athena — driver.js popover theme overrides
+   ============================================================ */
+
+.athena-tour-popover {
+  background: var(--panel) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
+}
+
+.athena-tour-popover .driver-popover-title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bright);
+}
+
+.athena-tour-popover .driver-popover-description {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+
+.athena-tour-popover .driver-popover-progress-text {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.athena-tour-popover .driver-popover-prev-btn,
+.athena-tour-popover .driver-popover-next-btn {
+  background: transparent;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  color: var(--income);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  text-shadow: none;
+}
+
+.athena-tour-popover .driver-popover-prev-btn:hover,
+.athena-tour-popover .driver-popover-next-btn:hover {
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.35);
+}
+
+.athena-tour-popover .driver-popover-close-btn {
+  color: var(--muted);
+}
+
+.athena-tour-popover .driver-popover-close-btn:hover {
+  color: var(--bright);
+}
+
+.athena-tour-popover .driver-popover-arrow-side-left .driver-popover-arrow,
+.athena-tour-popover .driver-popover-arrow-side-right .driver-popover-arrow,
+.athena-tour-popover .driver-popover-arrow-side-top .driver-popover-arrow,
+.athena-tour-popover .driver-popover-arrow-side-bottom .driver-popover-arrow {
+  border-color: var(--panel) !important;
+}

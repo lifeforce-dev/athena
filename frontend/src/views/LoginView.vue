@@ -13,6 +13,10 @@
           <span class="login-btn-label">Sign in with Discord</span>
           <span class="login-btn-arrow">&rarr;</span>
         </button>
+        <button class="demo-btn" @click="startDemo">
+          <span class="demo-btn-label">Try Demo</span>
+          <span class="demo-btn-sub">No account required</span>
+        </button>
         <div class="login-footer">
           <span class="login-foot-dot" />
           <span class="login-foot-text">Secure session via OAuth 2.0</span>
@@ -23,10 +27,17 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { loginRedirect } from '@/api/auth'
+
+const router = useRouter()
 
 function login() {
   loginRedirect()
+}
+
+function startDemo() {
+  router.push('/demo')
 }
 </script>
 
@@ -145,6 +156,44 @@ function login() {
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+.demo-btn {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 16px;
+  margin-top: 10px;
+  background: transparent;
+  border: 1px solid rgba(52, 211, 153, 0.15);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.demo-btn:hover {
+  background: rgba(52, 211, 153, 0.06);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.demo-btn:active {
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.demo-btn-label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--safe);
+}
+
+.demo-btn-sub {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: var(--muted);
+  margin-top: 2px;
+  letter-spacing: 0.04em;
 }
 
 .login-foot-dot {
