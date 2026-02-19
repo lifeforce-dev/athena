@@ -1,0 +1,161 @@
+{
+  "initial_balance": 4820.50,
+  "templates": [
+    {
+      "name": "Paycheck (Meridian Corp biweekly Friday)",
+      "amount": 2950.00,
+      "direction": "inflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 2,
+        "weekday": 4,
+        "anchor_date": "2026-01-30"
+      },
+      "start_date": "2026-01-30",
+      "tags": ["paycheck"]
+    },
+    {
+      "name": "Rent (Oakridge Terrace)",
+      "amount": 1875.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 1
+      },
+      "start_date": "2026-02-01"
+    },
+    {
+      "name": "Consolidated Loan Pmt",
+      "amount": 412.50,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 2,
+        "weekday": 4,
+        "anchor_date": "2026-01-30"
+      },
+      "start_date": "2026-01-30"
+    },
+    {
+      "name": "Auto Loan (Westfield Credit)",
+      "amount": 289.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 15
+      },
+      "start_date": "2026-01-15"
+    },
+    {
+      "name": "Prescott Electric Co",
+      "amount": 185.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 30,
+        "anchor_date": "2026-01-08"
+      },
+      "start_date": "2026-01-08"
+    },
+    {
+      "name": "Summit Fiber Internet",
+      "amount": 69.99,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 12
+      },
+      "start_date": "2026-01-12"
+    },
+    {
+      "name": "Pinnacle Auto Insurance",
+      "amount": 142.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 20
+      },
+      "start_date": "2026-01-20"
+    },
+    {
+      "name": "Metro Water & Sewer",
+      "amount": 48.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 30,
+        "anchor_date": "2026-01-18"
+      },
+      "start_date": "2026-01-18"
+    },
+    {
+      "name": "Groceries (weekly Saturday)",
+      "amount": 95.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 1,
+        "weekday": 5,
+        "anchor_date": "2026-02-07"
+      },
+      "start_date": "2026-02-07"
+    },
+    {
+      "name": "Gas (biweekly payday)",
+      "amount": 55.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "weekday_cadence",
+        "interval_weeks": 2,
+        "weekday": 4,
+        "anchor_date": "2026-01-30"
+      },
+      "start_date": "2026-01-30"
+    },
+    {
+      "name": "Household Supplies",
+      "amount": 75.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 1
+      },
+      "start_date": "2026-02-01"
+    },
+    {
+      "name": "Renter's Insurance (Beacon Mutual)",
+      "amount": 24.50,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "month_day",
+        "day_of_month": 1
+      },
+      "start_date": "2026-02-01"
+    },
+    {
+      "name": "Dog Food (every 3 weeks)",
+      "amount": 68.00,
+      "direction": "outflow",
+      "recurrence": {
+        "type": "day_interval",
+        "interval_days": 21,
+        "anchor_date": "2026-02-22"
+      },
+      "start_date": "2026-02-22"
+    },
+    { "name": "Gym Membership", "amount": 34.99, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 3 }, "start_date": "2026-02-03" },
+    { "name": "Cloudflare Pro", "amount": 25.00, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 9 }, "start_date": "2026-02-09" },
+    { "name": "Spotify Family", "amount": 16.99, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 22 }, "start_date": "2026-01-22" },
+    { "name": "iCloud Storage", "amount": 2.99, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 14 }, "start_date": "2026-01-14" },
+    { "name": "Phone Plan (Visible)", "amount": 25.00, "direction": "outflow", "recurrence": { "type": "month_day", "day_of_month": 28 }, "start_date": "2026-01-28" },
+    {
+      "name": "Tax Refund",
+      "amount": 2400.00,
+      "direction": "inflow",
+      "recurrence": {
+        "type": "one_time"
+      },
+      "start_date": "2026-04-10"
+    }
+  ]
+}
