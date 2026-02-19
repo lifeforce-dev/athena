@@ -1,97 +1,162 @@
 <template>
   <div class="wrap">
-    <!-- Date controls -->
-    <div class="sim-controls">
-      <div class="ctrl-field">
-        <span class="ctrl-label">Start Date</span>
-        <input type="date" class="ctrl-input" v-model="startDate" @change="updateInfo" />
-      </div>
-      <div class="ctrl-field">
-        <span class="ctrl-label">End Date</span>
-        <input type="date" class="ctrl-input" v-model="endDate" @change="updateInfo" />
-      </div>
-      <button class="sim-btn" @click="runSimulation" :disabled="loading">
-        {{ loading ? 'Running...' : 'Run Simulation' }}
-      </button>
-      <span class="sim-info">{{ dayWindow }} day window</span>
-    </div>
-
-    <!-- Loading / error states -->
+    <!-- ══════════════ SIMULATION RESULTS (above the grid) ══════════════ -->
     <div v-if="loading" class="empty-state">Running simulation...</div>
     <div v-else-if="error" class="empty-state" style="color: var(--danger)">{{ error }}</div>
+
     <template v-else-if="hasRun && trajectory.length">
-      <!-- Hero strip -->
-      <div class="hero-strip">
-        <div class="hs-card">
-          <div class="hs-val" style="color: var(--bright)">{{ formatDollars(currentBalance) }}</div>
-          <div class="hs-lbl">Current</div>
-        </div>
-        <div class="hs-card">
-          <div class="hs-val" :style="{ color: afterBalance >= currentBalance ? 'var(--safe)' : 'var(--danger)' }">
-            {{ formatDollars(afterBalance) }}
+      <div class="sim-results">
+        <!-- Hero strip -->
+        <div class="hero-strip">
+          <div class="hs-card">
+            <div class="hs-val" style="color: var(--bright)">{{ formatDollars(currentBalance) }}</div>
+            <div class="hs-lbl">Current</div>
           </div>
-          <div class="hs-lbl">After Window</div>
-        </div>
-        <div class="hs-card">
-          <div class="hs-val" style="color: var(--danger)">{{ lowestPoint ? formatDollars(lowestPoint.balance) : '-' }}</div>
-          <div v-if="lowestPoint" class="hs-sub">{{ shortDate(lowestPoint.date) }}</div>
-          <div class="hs-lbl">Lowest Point</div>
-        </div>
-        <div class="hs-card">
-          <div class="hs-val" :style="{ color: avgGainedPerMonth >= 0 ? 'var(--safe)' : 'var(--danger)' }">
-            {{ avgGainedPerMonth >= 0 ? '+' : '-' }}{{ formatDollars(avgGainedPerMonth) }}
-          </div>
-          <div class="hs-lbl">Avg Gained / Month</div>
-        </div>
-      </div>
-
-      <!-- Trajectory Chart (reused component) -->
-      <TrajectoryChart :data="trajectory" />
-
-      <!-- Monthly Breakdown -->
-      <div class="sh">
-        <span class="sh-t">Monthly Breakdown</span>
-        <span class="sh-m">{{ monthBreaks.length }} months</span>
-      </div>
-      <div class="month-grid">
-        <div v-for="month in monthBreaks" :key="month.label" class="mo-card">
-          <div class="mo-header">
-            <span class="mo-name">{{ month.label }}</span>
-            <span class="mo-net" :class="month.net >= 0 ? 'pos' : 'neg'">
-              {{ month.net >= 0 ? '+' : '-' }}{{ formatDollars(month.net) }}
-            </span>
-          </div>
-          <div class="mo-bar">
-            <div
-              class="mo-bar-fill"
-              :style="{
-                width: barPercent(month.net) + '%',
-                background: month.net >= 0 ? 'var(--safe)' : 'var(--danger)',
-              }"
-            />
-          </div>
-          <div class="mo-stats">
-            <div class="mo-start">
-              <span class="mo-date-label">{{ shortDate(month.startDate) }}</span>
-              <span class="mo-val">{{ formatDollars(month.startBal) }}</span>
+          <div class="hs-card">
+            <div class="hs-val" :style="{ color: afterBalance >= currentBalance ? 'var(--safe)' : 'var(--danger)' }">
+              {{ formatDollars(afterBalance) }}
             </div>
-            <div class="mo-end">
-              <span class="mo-date-label">{{ shortDate(month.endDate) }}</span>
-              <span class="mo-val">{{ formatDollars(month.endBal) }}</span>
+            <div class="hs-lbl">After Window</div>
+          </div>
+          <div class="hs-card">
+            <div class="hs-val" style="color: var(--danger)">
+              {{ lowestPoint ? formatDollars(lowestPoint.balance) : '-' }}
+            </div>
+            <div v-if="lowestPoint" class="hs-sub">{{ shortDate(lowestPoint.date) }}</div>
+            <div class="hs-lbl">Lowest Point</div>
+          </div>
+          <div class="hs-card">
+            <div class="hs-val" :style="{ color: avgGainedPerMonth >= 0 ? 'var(--safe)' : 'var(--danger)' }">
+              {{ avgGainedPerMonth >= 0 ? '+' : '-' }}{{ formatDollars(avgGainedPerMonth) }}
+            </div>
+            <div class="hs-lbl">Avg Gained / Month</div>
+          </div>
+        </div>
+
+        <!-- Trajectory chart -->
+        <TrajectoryChart :data="trajectory" />
+
+        <!-- Monthly breakdown -->
+        <div class="sh">
+          <span class="sh-t">Monthly Breakdown</span>
+          <span class="sh-m">{{ monthBreaks.length }} months</span>
+        </div>
+        <div class="month-grid">
+          <div v-for="month in monthBreaks" :key="month.label" class="mo-card">
+            <div class="mo-header">
+              <span class="mo-name">{{ month.label }}</span>
+              <span class="mo-net" :class="month.net >= 0 ? 'pos' : 'neg'">
+                {{ month.net >= 0 ? '+' : '-' }}{{ formatDollars(month.net) }}
+              </span>
+            </div>
+            <div class="mo-bar">
+              <div
+                class="mo-bar-fill"
+                :style="{
+                  width: barPercent(month.net) + '%',
+                  background: month.net >= 0 ? 'var(--safe)' : 'var(--danger)',
+                }"
+              />
+            </div>
+            <div class="mo-stats">
+              <div class="mo-start">
+                <span class="mo-date-label">{{ shortDate(month.startDate) }}</span>
+                <span class="mo-val">{{ formatDollars(month.startBal) }}</span>
+              </div>
+              <div class="mo-end">
+                <span class="mo-date-label">{{ shortDate(month.endDate) }}</span>
+                <span class="mo-val">{{ formatDollars(month.endBal) }}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </template>
 
-    <!-- Empty state -->
     <div v-else-if="hasRun" class="empty-state">
       <h3>No Data</h3>
       <p>No projection data returned for the selected window. Check your commitments and balance.</p>
     </div>
-    <div v-else class="empty-state">
+
+    <!-- ══════════════ TWO-PANEL: Rails left, Sticky Summary right ══════════════ -->
+    <div class="scenario-grid">
+      <!-- LEFT: Commitment rails -->
+      <ScenarioCommitments
+        :commitments="commitments"
+        :overrides="overrides"
+        :scenario-income="scenarioIncome"
+        :scenario-expenses="scenarioExpenses"
+        @toggle="toggleCommitment"
+        @amount-change="setAmountOverride"
+      />
+
+      <!-- RIGHT: Sticky scenario summary -->
+      <div class="summary-panel">
+        <div class="summary-box">
+          <div class="summary-title">Scenario Summary</div>
+          <div class="summary-body">
+            <!-- Date pickers -->
+            <div class="date-row">
+              <div class="date-field">
+                <span class="date-label">Start Date</span>
+                <input type="date" class="date-input" v-model="startDate" />
+              </div>
+              <div class="date-field">
+                <span class="date-label">End Date</span>
+                <input type="date" class="date-input" v-model="endDate" />
+              </div>
+            </div>
+
+            <!-- Big net number -->
+            <div class="s-big" :class="scenarioNet >= 0 ? '' : 'neg'">
+              {{ scenarioNet >= 0 ? '+' : '-' }}${{ formatDollars(scenarioNet) }}
+            </div>
+            <div class="s-sub">Simulated Net / Month</div>
+
+            <!-- Breakdown -->
+            <div class="s-line">
+              <span class="s-line-name">Income</span>
+              <span class="s-line-val" style="color: var(--income)">
+                +${{ formatDollars(scenarioIncome) }}
+              </span>
+            </div>
+            <div class="s-line">
+              <span class="s-line-name">Expenses</span>
+              <span class="s-line-val" style="color: var(--danger)">
+                -${{ formatDollars(scenarioExpenses) }}
+              </span>
+            </div>
+
+            <hr class="s-divider" />
+
+            <div class="s-line">
+              <span class="s-line-name">Active Items</span>
+              <span class="s-line-val" style="color: var(--bright)">
+                {{ commitments.length - disabledCount }} / {{ commitments.length }}
+              </span>
+            </div>
+
+            <div v-if="hasChanges" class="changes-note">
+              <template v-if="disabledCount">{{ disabledCount }} disabled</template>
+              <template v-if="disabledCount && editedCount">, </template>
+              <template v-if="editedCount">{{ editedCount }} edited</template>
+              <span class="reset-link" @click="resetOverrides">Reset</span>
+            </div>
+
+            <button class="run-btn" @click="runSimulation" :disabled="loading">
+              {{ loading ? 'Running...' : 'Run Simulation' }}
+            </button>
+
+            <div class="window-note">{{ dayWindow }} day window</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pre-run placeholder (only if never run and no results) -->
+    <div v-if="!hasRun && !loading" class="empty-state pre-run">
       <h3>Configure & Run</h3>
-      <p>Set your date range above and click "Run Simulation" to project your cash flow trajectory.</p>
+      <p>Toggle commitments, adjust amounts, then click "Run Simulation" to project your cash flow.</p>
     </div>
   </div>
 </template>
@@ -99,24 +164,36 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
-import { useSimulation } from '@/composables/useSimulation'
+import ScenarioCommitments from '@/components/ScenarioCommitments.vue'
+import { useScenario } from '@/composables/useScenario'
 import { parseLocalDate, formatDollars } from '@/utils/format'
 
 const {
+  commitments,
+  overrides,
+  toggleCommitment,
+  setAmountOverride,
+  resetOverrides,
+  scenarioIncome,
+  scenarioExpenses,
+  scenarioNet,
+  disabledCount,
+  editedCount,
+  hasChanges,
   startDate,
   endDate,
+  dayWindow,
   hasRun,
   loading,
   error,
   runSimulation,
   trajectory,
-  dayWindow,
   currentBalance,
   afterBalance,
   lowestPoint,
   avgGainedPerMonth,
   monthBreaks,
-} = useSimulation()
+} = useScenario()
 
 const shortDate = (dateStr: string) =>
   parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -125,10 +202,6 @@ const maxAbsNet = computed(() => Math.max(...monthBreaks.value.map(month => Math
 
 function barPercent(net: number): number {
   return Math.min((Math.abs(net) / maxAbsNet.value) * 100, 100)
-}
-
-function updateInfo() {
-  // Reactive dayWindow auto-updates via computed.
 }
 </script>
 
@@ -139,75 +212,12 @@ function updateInfo() {
   padding: 32px 24px 48px;
 }
 
-/* Date picker row */
-.sim-controls {
-  display: flex;
-  gap: 14px;
-  align-items: flex-end;
-  flex-wrap: wrap;
+/* ══════════════════════════════════════════
+   SIMULATION RESULTS — full-width above grid
+   ══════════════════════════════════════════ */
+
+.sim-results {
   margin-bottom: 28px;
-}
-
-.ctrl-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ctrl-label {
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--dim);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.ctrl-input {
-  background: var(--raised);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  color: var(--bright);
-  font-family: var(--font-sans);
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.15s;
-  min-width: 160px;
-}
-
-.ctrl-input:focus {
-  border-color: rgba(167, 139, 250, 0.3);
-}
-
-.sim-btn {
-  padding: 10px 24px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  background: rgba(167, 139, 250, 0.1);
-  color: var(--income);
-  transition: all 0.15s;
-  height: 41px;
-}
-
-.sim-btn:hover:not(:disabled) {
-  background: rgba(167, 139, 250, 0.2);
-}
-
-.sim-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.sim-info {
-  font-size: 11px;
-  color: var(--dim);
-  margin-left: auto;
-  align-self: center;
-  font-family: var(--font-mono);
 }
 
 /* Hero strip */
@@ -319,14 +329,12 @@ function updateInfo() {
   width: 100%;
   height: 4px;
   background: var(--muted);
-  border-radius: 0;
   overflow: hidden;
   margin: 8px 0;
 }
 
 .mo-bar-fill {
   height: 100%;
-  border-radius: 0;
   transition: width 0.3s;
 }
 
@@ -361,10 +369,205 @@ function updateInfo() {
   font-size: 10px;
 }
 
+/* ══════════════════════════════════════════
+   TWO-PANEL GRID
+   ══════════════════════════════════════════ */
+
+.scenario-grid {
+  display: grid;
+  grid-template-columns: 1fr 290px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ── Right panel: sticky summary ── */
+
+.summary-panel {
+  position: sticky;
+  top: 24px;
+}
+
+.summary-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.summary-title {
+  padding: 10px 16px;
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.summary-body {
+  padding: 18px 16px 16px;
+}
+
+/* ── Date pickers ── */
+
+.date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.date-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-label {
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.date-input {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--bright);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 7px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.date-input:focus {
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+/* ── Big number ── */
+
+.s-big {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--safe);
+  margin-bottom: 2px;
+}
+
+.s-big.neg { color: var(--danger); }
+
+.s-sub {
+  font-size: 9px;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+/* ── Breakdown lines ── */
+
+.s-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+}
+
+.s-line:last-child { border-bottom: none; }
+
+.s-line-name {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+.s-line-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.s-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+.changes-note {
+  font-size: 10px;
+  color: var(--tight);
+  font-family: var(--font-mono);
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.reset-link {
+  color: var(--dim);
+  margin-left: 8px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 9px;
+  transition: color 0.15s;
+}
+
+.reset-link:hover {
+  color: var(--text);
+}
+
+/* ── Run button ── */
+
+.run-btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 0;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+  border-radius: var(--radius-sm);
+  background: rgba(167, 139, 250, 0.1);
+  color: var(--income);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.run-btn:hover:not(:disabled) {
+  background: rgba(167, 139, 250, 0.2);
+}
+
+.run-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.window-note {
+  font-size: 10px;
+  color: var(--dim);
+  font-family: var(--font-mono);
+  text-align: center;
+  margin-top: 8px;
+}
+
+/* ══════════════════════════════════════════
+   EMPTY / PRE-RUN
+   ══════════════════════════════════════════ */
+
 .empty-state {
   text-align: center;
   padding: 60px 20px;
   color: var(--dim);
+}
+
+.empty-state.pre-run {
+  padding: 40px 20px;
 }
 
 .empty-state h3 {
@@ -380,10 +583,19 @@ function updateInfo() {
   margin: 0 auto;
 }
 
-@media (max-width: 700px) {
+/* ══════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════ */
+
+@media (max-width: 740px) {
+  .scenario-grid {
+    grid-template-columns: 1fr;
+  }
+  .summary-panel {
+    position: static;
+    order: -1;
+  }
   .hero-strip { gap: 8px; }
   .hs-card { min-width: 100px; padding: 12px; }
-  .sim-controls { flex-direction: column; align-items: stretch; }
-  .sim-info { margin-left: 0; margin-top: 8px; }
 }
 </style>

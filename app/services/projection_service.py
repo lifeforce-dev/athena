@@ -15,6 +15,7 @@ from app.core.projection import project_cash_on
 from app.models.domain import CashFlowConfig, CashFlowTemplate, TemplateTag
 from app.models.schemas import ProjectionResponse
 from app.repositories import balance_repository, commitment_repository
+from app.repositories.commitment_repository import list_active, to_domain
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,66 @@ async def build_projection(
     logger.info(
         f'Projection built. entries={len(processed.ledger)} '
         f'months={len(processed.months)} pay_periods={len(processed.pay_periods)}'
+    )
+
+    return ProjectionResponse(
+        as_of=as_of,
+        from_date=from_date,
+        current_balance=initial_balance,
+        has_initial_balance=has_initial_balance,
+        ledger=processed.ledger,
+        months=processed.months,
+        pay_periods=processed.pay_periods,
+    )
+
+
+async def build_scenario_projection(
+    as_of: date,
+    from_date: date | None,
+    excluded_ids: list[int],
+    amount_overrides: dict[int, Decimal],
+    db: AsyncSession,
+    user_id: int,
+) -> ProjectionResponse:
+    """Build a projection with commitment overrides for what-if scenarios.
+
+    Loads all active commitments, applies exclusions and amount changes,
+    then runs the normal projection pipeline.
+    """
+    rows = await list_active(db, user_id)
+
+    # Filter out excluded commitments and apply amount overrides.
+    templates: list[CashFlowTemplate] = []
+    for row in rows:
+        if row.id in excluded_ids:
+            continue
+        if row.id in amount_overrides:
+            row.amount = amount_overrides[row.id]
+        templates.append(to_domain(row))
+
+    latest_snapshot = await balance_repository.get_latest(db, user_id)
+    initial_balance = latest_snapshot.balance if latest_snapshot else Decimal(0)
+    has_initial_balance = latest_snapshot is not None
+
+    if from_date is None:
+        from_date = date.today()
+
+    ending, raw_ledger = project_cash_on(
+        initial_balance=initial_balance,
+        templates=templates,
+        as_of=as_of,
+        from_date=from_date,
+    )
+
+    window_start = min(from_date, as_of)
+    window_end = max(from_date, as_of)
+
+    paycheck_names = {t.name for t in templates if TemplateTag.PAYCHECK in t.tags}
+    processed = process_ledger(raw_ledger, initial_balance, window_start, window_end, paycheck_names)
+
+    logger.info(
+        f'Scenario projection built. user_id={user_id} excluded={len(excluded_ids)} '
+        f'overrides={len(amount_overrides)} entries={len(processed.ledger)}'
     )
 
     return ProjectionResponse(

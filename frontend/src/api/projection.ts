@@ -8,3 +8,14 @@ export async function fetchProjection(asOf: string, fromDate?: string): Promise<
   }
   return api.get<ProjectionResponse>(`/projection?${params.toString()}`)
 }
+
+export interface ScenarioRequest {
+  as_of: string
+  from_date?: string
+  excluded_ids: number[]
+  amount_overrides: Record<number, string>
+}
+
+export async function fetchScenarioProjection(body: ScenarioRequest): Promise<ProjectionResponse> {
+  return api.post<ProjectionResponse>('/projection/scenario', body)
+}

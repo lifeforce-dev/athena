@@ -42,3 +42,12 @@ class ProjectionResponse(BaseModel):
     ledger: list[LedgerEntry]
     months: list[MonthSummary]
     pay_periods: list[PayPeriodSummary]
+
+
+class ScenarioRequest(BaseModel):
+    """Request body for running a what-if scenario projection."""
+
+    as_of: date
+    from_date: date | None = None
+    excluded_ids: list[int] = Field(default_factory=list)
+    amount_overrides: dict[int, Decimal] = Field(default_factory=dict)

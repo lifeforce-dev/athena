@@ -1,7 +1,7 @@
 import { computed } from 'vue'
 import type { Ref } from 'vue'
 import type { TrajectoryPoint } from '@/utils/trajectory'
-import { toLocalDateString, parseLocalDate } from '@/utils/format'
+import { toLocalDateString } from '@/utils/format'
 import { PAYCHECK_INCOME_THRESHOLD } from '@/utils/constants'
 
 // ── Types ──
@@ -52,66 +52,95 @@ export const CAUSE_COLORS = [
   '#34D399', '#F472B6', '#94A3B8',
 ]
 
+// ── Helpers ──
+
+/** A point marks a paycheck boundary if any event exceeds the income threshold. */
+function isPaycheck(point: TrajectoryPoint): boolean {
+  return point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)
+}
+
+/** Index boundary for a single paycheck-to-paycheck window. */
+interface PayWindow {
+  start: number
+  end: number
+}
+
+/** Analyze a single paycheck-to-paycheck window slice of the trajectory. */
+function analyzeWindow(points: TrajectoryPoint[], start: number, end: number): WorstWindow {
+  let minBal = Infinity
+  let minDate = ''
+  let income = 0
+
+  const expenses: WorstWindowExpense[] = []
+  let totalExp = 0
+
+  for (let i = start; i <= end; i++) {
+    const point = points[i]
+
+    if (point.balance < minBal) {
+      minBal = point.balance
+      minDate = point.date
+    }
+
+    for (const event of point.events) {
+      if (event.amount > 0) {
+        income += event.amount
+      } else {
+        const amt = -event.amount
+        expenses.push({ name: event.name, amount: amt, date: point.date })
+        totalExp += amt
+      }
+    }
+  }
+
+  expenses.sort((a, b) => b.amount - a.amount)
+
+  return {
+    startDate: points[start].date,
+    endDate: points[end].date,
+    startIdx: start,
+    endIdx: end,
+    minBal,
+    minDate,
+    totalExpenses: totalExp,
+    income,
+    expenses,
+    pctOfIncome: income > 0 ? Math.round((totalExp / income) * 100) : 0,
+  }
+}
+
 // ── Composable ──
 
 export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
 
+  // Segment trajectory into paycheck-to-paycheck windows.
+  // If no paychecks exist, the entire trajectory is treated as one window.
+  const paycheckWindows = computed<PayWindow[]>(() => {
+    const points = trajectory.value
+    if (!points.length) return []
+
+    const starts: number[] = [0]
+    for (let i = 1; i < points.length; i++) {
+      if (isPaycheck(points[i])) starts.push(i)
+    }
+
+    return starts.map((s, idx) => ({
+      start: s,
+      end: idx + 1 < starts.length ? starts[idx + 1] - 1 : points.length - 1,
+    }))
+  })
+
   /** Find the pay period with the lowest minimum balance. */
   const worstWindow = computed<WorstWindow | null>(() => {
     const points = trajectory.value
-    if (!points.length) return null
-
-    // Identify paycheck indices (income above threshold).
-    const payIndices: number[] = []
-    points.forEach((point, i) => {
-      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) payIndices.push(i)
-    })
-    if (payIndices.length && payIndices[0] > 0) payIndices.unshift(0)
-    if (!payIndices.length) payIndices.push(0)
+    const windows = paycheckWindows.value
+    if (!windows.length) return null
 
     let worst: WorstWindow | null = null
 
-    for (let windowIdx = 0; windowIdx < payIndices.length; windowIdx++) {
-      const start = payIndices[windowIdx]
-      const end = windowIdx + 1 < payIndices.length ? payIndices[windowIdx + 1] - 1 : points.length - 1
-      const window = points.slice(start, end + 1)
-      const expenses: WorstWindowExpense[] = []
-      let totalExp = 0
-      let minBal = Infinity
-      let minDate = ''
-      let income = 0
-
-      for (const point of window) {
-        if (point.balance < minBal) {
-          minBal = point.balance
-          minDate = point.date
-        }
-        for (const event of point.events) {
-          if (event.amount > 0) {
-            income += event.amount
-          } else {
-            expenses.push({ name: event.name, amount: Math.abs(event.amount), date: point.date })
-            totalExp += Math.abs(event.amount)
-          }
-        }
-      }
-
-      expenses.sort((a, b) => b.amount - a.amount)
-
-      const data: WorstWindow = {
-        startDate: points[start].date,
-        endDate: points[end].date,
-        startIdx: start,
-        endIdx: end,
-        minBal,
-        minDate,
-        totalExpenses: totalExp,
-        income,
-        expenses,
-        pctOfIncome: income > 0 ? Math.round((totalExp / income) * 100) : 0,
-      }
-
-      if (!worst || minBal < worst.minBal) worst = data
+    for (const { start, end } of windows) {
+      const data = analyzeWindow(points, start, end)
+      if (!worst || data.minBal < worst.minBal) worst = data
     }
 
     return worst
@@ -124,7 +153,7 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     let cumExp = 0
 
     for (const point of points) {
-      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) cumExp = 0
+      if (isPaycheck(point)) cumExp = 0
       for (const event of point.events) {
         if (event.amount < 0) cumExp += Math.abs(event.amount)
       }
@@ -141,9 +170,7 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     let windowTotals = new Map<string, number>()
 
     for (const point of points) {
-      if (point.events.some(event => event.amount > PAYCHECK_INCOME_THRESHOLD)) {
-        windowTotals = new Map()
-      }
+      if (isPaycheck(point)) windowTotals = new Map()
 
       for (const event of point.events) {
         if (event.amount < 0) {
@@ -152,17 +179,18 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
         }
       }
 
-      const dayStack: DailyExpenseEntry[] = Array.from(windowTotals.entries())
-        .map(([name, amount]) => ({ name, amount, date: point.date }))
-        .sort((a, b) => b.amount - a.amount)
-      stacks.push(dayStack)
+      // No per-day sort needed: masterExpenseOrder controls rendering order.
+      stacks.push(
+        Array.from(windowTotals.entries())
+          .map(([name, amount]) => ({ name, amount, date: point.date }))
+      )
     }
 
     return stacks
   })
 
-  /** Stable ordering of expense names by max amount (largest first). */
-  const masterExpenseOrder = computed<string[]>(() => {
+  /** Stable ordering + color map for expense names, computed in a single pass. */
+  const expensePresentation = computed(() => {
     const amounts: Record<string, number> = {}
     const order: string[] = []
 
@@ -177,17 +205,17 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     }
 
     order.sort((a, b) => amounts[b] - amounts[a])
-    return order
+
+    const colorMap: Record<string, string> = {}
+    order.forEach((name, i) => {
+      colorMap[name] = CAUSE_COLORS[i % CAUSE_COLORS.length]
+    })
+
+    return { order, colorMap }
   })
 
-  /** Consistent color map: expense name -> hex color. */
-  const masterColorMap = computed<Record<string, string>>(() => {
-    const map: Record<string, string> = {}
-    masterExpenseOrder.value.forEach((name, i) => {
-      map[name] = CAUSE_COLORS[i % CAUSE_COLORS.length]
-    })
-    return map
-  })
+  const masterExpenseOrder = computed(() => expensePresentation.value.order)
+  const masterColorMap = computed(() => expensePresentation.value.colorMap)
 
   /** Bills due in the current week and next week. */
   const billsAnalysis = computed(() => {
@@ -246,9 +274,7 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     // Collect expenses from the broke date forward until the next paycheck.
     for (let i = brokeIdx; i < points.length; i++) {
       const point = points[i]
-      const isPaycheck = point.events.some(e => e.amount > PAYCHECK_INCOME_THRESHOLD)
-
-      if (isPaycheck && i > brokeIdx) {
+      if (isPaycheck(point) && i > brokeIdx) {
         recoveryDate = point.date
         break
       }
