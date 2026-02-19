@@ -140,12 +140,12 @@ function weight(commitment: CommitmentResponse): number {
 function formatAmountDisplay(commitment: CommitmentResponse): string {
   const amt = effectiveAmount(commitment)
   const sign = amt >= 0 ? '+' : '-'
-  return `${sign}$${formatDollars(amt)}`
+  return `${sign}${formatDollars(amt)}`
 }
 
 function formatSigned(value: number): string {
   const sign = value >= 0 ? '+' : '-'
-  return `${sign}$${formatDollars(value)}`
+  return `${sign}${formatDollars(value)}`
 }
 
 function onFocus(event: Event, _commitment: CommitmentResponse) {

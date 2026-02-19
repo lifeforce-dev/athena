@@ -109,7 +109,7 @@
 
             <!-- Big net number -->
             <div class="s-big" :class="scenarioNet >= 0 ? '' : 'neg'">
-              {{ scenarioNet >= 0 ? '+' : '-' }}${{ formatDollars(scenarioNet) }}
+              {{ scenarioNet >= 0 ? '+' : '-' }}{{ formatDollars(scenarioNet) }}
             </div>
             <div class="s-sub">Simulated Net / Month</div>
 
@@ -117,13 +117,13 @@
             <div class="s-line">
               <span class="s-line-name">Income</span>
               <span class="s-line-val" style="color: var(--income)">
-                +${{ formatDollars(scenarioIncome) }}
+                +{{ formatDollars(scenarioIncome) }}
               </span>
             </div>
             <div class="s-line">
               <span class="s-line-name">Expenses</span>
               <span class="s-line-val" style="color: var(--danger)">
-                -${{ formatDollars(scenarioExpenses) }}
+                -{{ formatDollars(scenarioExpenses) }}
               </span>
             </div>
 
