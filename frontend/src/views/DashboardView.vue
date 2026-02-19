@@ -1,17 +1,17 @@
 <template>
   <div>
-    <DashboardHero
-      v-if="!loading && trajectory.length"
-      :current-balance="currentBalance"
-      :end-balance="endBalance"
-      :net-change="netChange"
-      :lowest-balance="lowestPoint?.balance ?? 0"
-      :lowest-date="lowestPoint?.date ?? ''"
-      :days-covered="daysCovered"
-      @update-balance="onUpdateBalance"
-    />
-
     <div class="wrap">
+      <DashboardHero
+        v-if="!loading && trajectory.length"
+        :current-balance="currentBalance"
+        :end-balance="endBalance"
+        :net-change="netChange"
+        :lowest-balance="lowestPoint?.balance ?? 0"
+        :lowest-date="lowestPoint?.date ?? ''"
+        :days-covered="daysCovered"
+        @update-balance="onUpdateBalance"
+      />
+
       <div v-if="loading" class="loading">Loading projection...</div>
       <div v-else-if="error" class="error-msg">{{ error }}</div>
 
