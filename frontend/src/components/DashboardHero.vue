@@ -136,8 +136,12 @@ const lowestDate = computed(() => {
   return parseLocalDate(props.lowestDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 })
 
-/** Gauge fill: daysCovered as a percentage of the projection window (capped at 90 days). */
-const gaugePct = computed(() => Math.min(100, Math.round((props.daysCovered / 90) * 100)))
+/** Gauge fill: maps lowest projected balance to a financial comfort scale.
+ *  $0 or below = 3% (tiny red sliver), ~$8,000+ = 100% (full gradient). */
+const gaugePct = computed(() => {
+  const lb = Math.max(0, props.lowestBalance)
+  return Math.min(100, Math.max(3, Math.round((lb / 8000) * 100)))
+})
 </script>
 
 <style scoped>
