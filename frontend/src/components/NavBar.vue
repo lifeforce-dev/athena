@@ -18,29 +18,70 @@
       data-tour="currency-toggle"
       :class="{ converted: currency.isConverted }"
       :disabled="currency.rateLoading"
-      @click="currency.toggleDisplay()"
+      @click="handleCurrencyToggle"
     >
       {{ currency.displayCurrency === 'USD' ? '$ USD' : '\u20A9 KRW' }}
     </button>
     <span v-if="auth.user" class="nav-user">{{ auth.user.username }}</span>
     <button class="nav-logout" @click="handleLogout">Logout</button>
   </nav>
+
+  <CurrencyExplainer
+    v-if="showExplainer"
+    :account-ccy="currency.accountCurrency"
+    :display-ccy="currency.displayCurrency"
+    :rate="currency.krwRate ?? 1"
+    @dismiss="onExplainerDismiss"
+  />
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrencyStore } from '@/stores/currency'
+import { dismissModal } from '@/api/auth'
+import CurrencyExplainer from '@/components/CurrencyExplainer.vue'
+
+const EXPLAINER_KEY = 'currency-explainer'
 
 const auth = useAuthStore()
 const currency = useCurrencyStore()
 const router = useRouter()
+const showExplainer = ref(false)
 
 const tabs = [
   { to: '/', label: 'Dashboard' },
   { to: '/commitments', label: 'Commitments' },
   { to: '/simulation', label: 'Simulation' },
 ]
+
+function hasSeenExplainer(): boolean {
+  return (auth.user?.dismissed_modals ?? []).includes(EXPLAINER_KEY)
+}
+
+async function handleCurrencyToggle() {
+  await currency.toggleDisplay()
+
+  // Show explainer once on the first toggle that switches away from account currency.
+  if (currency.isConverted && !hasSeenExplainer()) {
+    showExplainer.value = true
+  }
+}
+
+async function onExplainerDismiss() {
+  showExplainer.value = false
+
+  // Persist so it never shows again.
+  if (auth.user && !hasSeenExplainer()) {
+    try {
+      await dismissModal(EXPLAINER_KEY)
+      auth.user.dismissed_modals = [...(auth.user.dismissed_modals ?? []), EXPLAINER_KEY]
+    } catch {
+      // Non-critical, explainer still ran.
+    }
+  }
+}
 
 async function handleLogout() {
   await auth.logout()

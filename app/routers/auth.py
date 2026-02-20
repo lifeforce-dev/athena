@@ -131,6 +131,7 @@ async def me(
         "account_currency": user.account_currency if user else None,
         "display_currency": user.account_currency if user else None,
         "completed_tours": json.loads(user.completed_tours) if user and user.completed_tours else [],
+        "dismissed_modals": json.loads(user.dismissed_modals) if user and user.dismissed_modals else [],
     }
 
 
@@ -153,6 +154,30 @@ async def mark_tour_complete(
     if tour_name not in completed:
         completed.append(tour_name)
         user.completed_tours = json.dumps(completed)
+        await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/me/dismiss-modal")
+async def dismiss_modal(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    modal_key: str = Query(..., description="Key of the modal to dismiss"),
+) -> Response:
+    """Mark a specific modal as permanently dismissed for the current user."""
+    user_id = int(current_user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    dismissed: list[str] = json.loads(user.dismissed_modals) if user.dismissed_modals else []
+
+    if modal_key not in dismissed:
+        dismissed.append(modal_key)
+        user.dismissed_modals = json.dumps(dismissed)
         await db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

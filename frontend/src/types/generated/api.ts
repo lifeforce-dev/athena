@@ -111,6 +111,7 @@ export interface components {
       account_currency: string | null
       display_currency: string | null
       completed_tours: string[]
+      dismissed_modals: string[]
     }
   }
 }

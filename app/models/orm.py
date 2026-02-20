@@ -32,6 +32,7 @@ class User(Base):
     account_currency: Mapped[str | None] = mapped_column(String(3))
     display_currency: Mapped[str | None] = mapped_column(String(3))
     completed_tours: Mapped[str | None] = mapped_column(Text)
+    dismissed_modals: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
