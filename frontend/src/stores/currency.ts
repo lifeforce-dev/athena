@@ -43,13 +43,20 @@ export const useCurrencyStore = defineStore('currency', () => {
   }
 
   /** Persist the user's currency choice to the server. */
-  async function saveAccountCurrency(currency: CurrencyCode) {
-    await setAccountCurrency(currency)
+  async function saveAccountCurrency(code: CurrencyCode) {
+    await setAccountCurrency(code)
     accountCurrencySet.value = true
-    displayCurrency.value = currency
+    displayCurrency.value = code
+
+    // Keep the auth store's user object in sync.
+    const { useAuthStore } = await import('@/stores/auth')
+    const auth = useAuthStore()
+    if (auth.user) {
+      auth.user.account_currency = code
+    }
 
     // Pre-fetch the exchange rate if they chose KRW.
-    if (currency === 'KRW' && krwRate.value === null) {
+    if (code === 'KRW' && krwRate.value === null) {
       await loadRate()
     }
   }
@@ -59,7 +66,12 @@ export const useCurrencyStore = defineStore('currency', () => {
     if (displayCurrency.value === 'USD') {
       // Switching to KRW -- need the rate.
       if (krwRate.value === null) {
-        await loadRate()
+        try {
+          await loadRate()
+        } catch {
+          console.error('Failed to fetch exchange rate')
+          return
+        }
       }
       displayCurrency.value = 'KRW'
     } else {

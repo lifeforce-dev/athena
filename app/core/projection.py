@@ -34,7 +34,8 @@ def project_cash_on(
     ledger: list[tuple[date, str, Decimal]] = []
     for template in templates:
         for occ in iter_occurrences(template, end):
-            if occ < start:
+            # Exclusive start: the initial_balance already reflects from_date.
+            if occ <= start:
                 continue
             ledger.append((occ, template.name, template.signed_amount))
 

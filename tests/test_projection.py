@@ -191,8 +191,9 @@ class TestProjectCashOn:
             from_date=date(2026, 1, 1),
         )
 
-        # 2 paychecks (+4000), 2 rents (-3000), net +1000 from initial 1000
-        assert balance == Decimal("2000")
+        # from_date is exclusive (balance already reflects that date).
+        # Feb 1 paycheck (+2000), Jan 5 + Feb 5 rent (-3000), net -1000 from initial 1000.
+        assert balance == Decimal("0")
 
     def test_empty_templates_returns_initial_balance(self):
         balance, ledger = project_cash_on(

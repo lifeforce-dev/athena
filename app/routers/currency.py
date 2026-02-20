@@ -21,7 +21,7 @@ router = APIRouter(prefix="/currency", tags=["currency"])
 
 ALLOWED_CURRENCIES = {"USD", "KRW"}
 
-EXCHANGE_RATE_URL = "https://api.exchangerate.host/latest"
+EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest"
 
 # Simple in-memory cache: (timestamp, rate_dict).
 _rate_cache: dict[str, tuple[float, float]] = {}
@@ -103,7 +103,7 @@ async def get_exchange_rate(
     # Fetch from upstream.
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(EXCHANGE_RATE_URL, params={"base": "USD", "symbols": target})
+            resp = await client.get(EXCHANGE_RATE_URL, params={"from": "USD", "to": target})
             resp.raise_for_status()
             data = resp.json()
     except Exception:
