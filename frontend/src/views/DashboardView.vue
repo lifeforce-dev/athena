@@ -12,6 +12,15 @@
         @update-balance="onUpdateBalance"
       />
 
+        <div class="sh" data-tour="bills" style="margin-top: 20px">
+          <span class="sh-t">Bills This Week</span>
+          <span class="sh-m">resets {{ nextWeekLabel }}</span>
+        </div>
+        <BillsThisWeek
+          :bills="billsAnalysis.bills"
+          :next-bills="billsAnalysis.nextBills"
+        />
+
       <div v-if="loading" class="loading">Loading projection...</div>
       <div v-else-if="error" class="error-msg">{{ error }}</div>
 
@@ -36,15 +45,6 @@
           data-tour="cause-panel"
           :worst-window="worstWindow"
           @highlight-cause="highlightedCause = $event"
-        />
-
-        <div class="sh" data-tour="bills" style="margin-top: 20px">
-          <span class="sh-t">Bills This Week</span>
-          <span class="sh-m">resets {{ nextWeekLabel }}</span>
-        </div>
-        <BillsThisWeek
-          :bills="billsAnalysis.bills"
-          :next-bills="billsAnalysis.nextBills"
         />
 
         <EventList :ledger="ledger" @hover-date="highlightDate = $event" @click-date="onClickDate" />
