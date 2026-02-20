@@ -79,7 +79,7 @@
     </div>
 
     <!-- ══════════════ TWO-PANEL: Rails left, Sticky Summary right ══════════════ -->
-    <div class="scenario-grid">
+    <div class="scenario-grid" data-tour="sim-grid">
       <!-- LEFT: Commitment rails -->
       <ScenarioCommitments
         :commitments="commitments"
@@ -91,7 +91,7 @@
       />
 
       <!-- RIGHT: Sticky scenario summary -->
-      <div class="summary-panel">
+      <div class="summary-panel" data-tour="sim-summary">
         <div class="summary-box">
           <div class="summary-title">Scenario Summary</div>
           <div class="summary-body">
@@ -166,7 +166,10 @@ import { computed } from 'vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import ScenarioCommitments from '@/components/ScenarioCommitments.vue'
 import { useScenario } from '@/composables/useScenario'
+import { useTour } from '@/composables/useTour'
 import { parseLocalDate, formatDollars } from '@/utils/format'
+
+useTour()
 
 const {
   commitments,

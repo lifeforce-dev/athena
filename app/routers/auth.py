@@ -9,6 +9,8 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from datetime import datetime, timezone
+
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.dependencies import AUTH_COOKIE_NAME, get_current_user
@@ -121,7 +123,28 @@ async def me(
         "discord_id": current_user["discord_id"],
         "username": current_user["username"],
         "account_currency": user.account_currency if user else None,
+        "tour_completed_at": user.tour_completed_at.isoformat() if user and user.tour_completed_at else None,
     }
+
+
+@router.patch("/me/tour-complete")
+async def mark_tour_complete(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Mark the guided tour as completed for the current user."""
+    user_id = int(current_user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not user.tour_completed_at:
+        user.tour_completed_at = datetime.now(timezone.utc)
+        await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/logout")

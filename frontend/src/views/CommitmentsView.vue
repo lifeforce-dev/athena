@@ -7,7 +7,7 @@
       <div class="page-sub">Manage recurring expenses, income, and one-time payments that drive your trajectory.</div>
 
       <!-- Summary cards -->
-      <div class="summary">
+      <div class="summary" data-tour="commitments-summary">
         <div class="sum-card">
           <div class="sum-val" style="color: var(--income)">{{ formatDollars(totalMonthlyIncome) }}</div>
           <div class="sum-lbl">Monthly Income</div>
@@ -29,7 +29,7 @@
       </div>
 
       <!-- Add buttons -->
-      <div class="add-bar">
+      <div class="add-bar" data-tour="commitments-add">
         <button class="add-btn" @click="openAdd">
           <span class="plus">+</span> Add Commitment
         </button>
@@ -41,7 +41,7 @@
 
       <!-- Grouped commitment list -->
       <template v-else>
-        <div v-for="group in groupedCommitments" :key="group.label" class="cat-box">
+        <div v-for="(group, gi) in groupedCommitments" :key="group.label" class="cat-box" :data-tour="gi === 0 ? 'commitments-group' : undefined">
           <div class="cat-hdr">
             <span class="cat-name">{{ group.label }} ({{ group.items.length }})</span>
             <span class="cat-total" :class="{ pos: group.total > 0 }">
@@ -107,8 +107,11 @@
 import { ref, computed } from 'vue'
 import CommitmentModal from '@/components/CommitmentModal.vue'
 import { useCommitments } from '@/composables/useCommitments'
+import { useTour } from '@/composables/useTour'
 import type { CommitmentCreate } from '@/types/commitment'
 import { parseMoney, parseLocalDate, formatDollars, formatCents } from '@/utils/format'
+
+useTour()
 
 const {
   commitments,

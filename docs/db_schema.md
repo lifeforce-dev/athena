@@ -16,6 +16,8 @@ erDiagram
         varchar(32) discord_id UK
         varchar(128) discord_username
         varchar(128) display_name
+        varchar(3) account_currency "nullable, USD or KRW"
+        timestamptz tour_completed_at "nullable, first tour done"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -25,9 +27,10 @@ erDiagram
         bigint user_id FK
         varchar(255) name
         numeric(12_2) amount "signed: negative = expense"
-        varchar(32) frequency "daily | weekly | biweekly | monthly | once"
+        varchar(32) frequency "daily | weekly | biweekly | monthly | day_interval | once"
         int day_of_month "nullable, for monthly"
-        date anchor_date "nullable, for weekly/biweekly"
+        int interval_days "nullable, for day_interval"
+        date anchor_date "nullable, for weekly/biweekly/day_interval"
         date one_time_date "nullable, for one-time"
         date start_date
         date end_date "nullable"
@@ -81,6 +84,8 @@ Discord-authenticated application users.
 | `discord_id` | `VARCHAR(32)` | UNIQUE, NOT NULL | Discord snowflake ID |
 | `discord_username` | `VARCHAR(128)` | NOT NULL | |
 | `display_name` | `VARCHAR(128)` | | Optional display name |
+| `account_currency` | `VARCHAR(3)` | | `USD` or `KRW`, null until chosen |
+| `tour_completed_at` | `TIMESTAMPTZ` | | Set after first guided tour |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT now() | |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT now() | |
 
@@ -97,7 +102,8 @@ Recurring expenses, income, and one-time payments. Uses signed amounts (negative
 | `user_id` | `BIGINT` | FK -> users.id, NOT NULL | |
 | `name` | `VARCHAR(255)` | NOT NULL | |
 | `amount` | `NUMERIC(12,2)` | NOT NULL | Signed: negative = outflow |
-| `frequency` | `VARCHAR(32)` | NOT NULL | `daily`, `weekly`, `biweekly`, `monthly`, `once` |
+| `frequency` | `VARCHAR(32)` | NOT NULL | `weekly`, `biweekly`, `monthly`, `semi_monthly`, `quarterly`, `annual`, `every_n_days`, `once` |
+| `interval_days` | `INTEGER` | | Custom interval for `every_n_days` frequency |
 | `day_of_month` | `INTEGER` | | For `monthly` frequency |
 | `anchor_date` | `DATE` | | For `weekly`/`biweekly` cadence alignment |
 | `one_time_date` | `DATE` | | For `once` frequency |
@@ -165,4 +171,4 @@ Tracks Gmail Pub/Sub push notification watch state per user.
 
 ---
 
-*Migration: `6c52f14865f5_initial_schema.py`*
+*Migrations: `6c52f14865f5_initial_schema`, `a1b2c3d4e5f6_add_cascade_and_unique`, `b2c3d4e5f6a7_add_interval_days`, `c3d4e5f6a7b8_add_account_currency`, `d4e5f6a7b8c9_add_tour_completed_at`*

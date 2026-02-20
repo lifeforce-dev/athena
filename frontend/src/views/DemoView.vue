@@ -34,7 +34,7 @@ onMounted(async () => {
     auth.checked = false
     await auth.checkAuth()
 
-    router.replace({ name: 'dashboard', query: { tour: '1' } })
+    router.replace({ name: 'dashboard', query: { tour: 'dashboard' } })
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Failed to start demo'
   }

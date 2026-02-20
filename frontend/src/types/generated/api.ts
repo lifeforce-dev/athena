@@ -109,6 +109,7 @@ export interface components {
       discord_id: string
       username: string
       account_currency: string | null
+      tour_completed_at: string | null
     }
   }
 }

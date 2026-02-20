@@ -15,6 +15,7 @@
     <div class="nav-spacer" />
     <button
       class="nav-currency"
+      data-tour="currency-toggle"
       :class="{ converted: currency.isConverted }"
       :disabled="currency.rateLoading"
       @click="currency.toggleDisplay()"
