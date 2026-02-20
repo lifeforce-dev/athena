@@ -135,6 +135,12 @@
                 {{ commitments.length - disabledCount }} / {{ commitments.length }}
               </span>
             </div>
+            <div v-if="savingsFromCuts > 0" class="s-line">
+              <span class="s-line-name">Savings from Cuts</span>
+              <span class="s-line-val" style="color: var(--safe)">
+                +{{ formatDollars(savingsFromCuts) }}/mo
+              </span>
+            </div>
 
             <div v-if="hasChanges" class="changes-note">
               <template v-if="disabledCount">{{ disabledCount }} disabled</template>
@@ -183,6 +189,7 @@ const {
   disabledCount,
   editedCount,
   hasChanges,
+  savingsFromCuts,
   startDate,
   endDate,
   dayWindow,

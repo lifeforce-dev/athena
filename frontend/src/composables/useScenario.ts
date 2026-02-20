@@ -136,6 +136,18 @@ export function useScenario() {
 
   const hasChanges = computed(() => disabledCount.value > 0 || editedCount.value > 0)
 
+  // Monthly savings from disabled recurring expenses.
+  const savingsFromCuts = computed(() =>
+    commitments.value
+      .filter(commitment =>
+        overrides.value.get(commitment.id)?.active === false
+        && parseMoney(commitment.amount) < 0
+        && commitment.frequency !== 'once',
+      )
+      .reduce((total, commitment) =>
+        total + Math.abs(monthlyEquiv(parseMoney(commitment.amount), commitment.frequency)), 0),
+  )
+
   // ── Simulation dates & projection ──
   const today = new Date()
   const threeMonthsOut = new Date(today.getFullYear(), today.getMonth() + 3, today.getDate())
@@ -264,6 +276,7 @@ export function useScenario() {
     disabledCount,
     editedCount,
     hasChanges,
+    savingsFromCuts,
 
     // Simulation
     startDate,
