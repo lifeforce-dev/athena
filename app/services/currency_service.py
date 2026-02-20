@@ -69,14 +69,28 @@ class UserCurrencyInfo:
         return self.display != self.account
 
 
-async def get_user_currencies(user_id: int, db: AsyncSession) -> UserCurrencyInfo:
-    """Return the user's account and display currencies."""
+async def get_user_currencies(
+    user_id: int,
+    db: AsyncSession,
+    display_override: str | None = None,
+) -> UserCurrencyInfo:
+    """Return the user's account and display currencies.
+
+    When `display_override` is provided (from the X-Display-Currency header),
+    it takes precedence over the DB value. This eliminates race conditions
+    between the frontend toggle and the backend conversion.
+    """
     result = await db.execute(
         select(User.account_currency, User.display_currency).where(User.id == user_id)
     )
     row = result.one_or_none()
     account = (row[0] if row and row[0] else "USD")
-    display = (row[1] if row and row[1] else account)
+
+    if display_override and display_override.upper() in ("USD", "KRW"):
+        display = display_override.upper()
+    else:
+        display = (row[1] if row and row[1] else account)
+
     return UserCurrencyInfo(account=account, display=display)
 
 

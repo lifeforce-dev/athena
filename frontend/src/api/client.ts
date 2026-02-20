@@ -12,10 +12,19 @@ export function registerUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler
 }
 
+// Injected by the currency store so every request carries the display currency.
+let getDisplayCurrency: (() => string) | null = null
+export function registerDisplayCurrencyProvider(provider: () => string) {
+  getDisplayCurrency = provider
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {}
   if (options?.body != null) {
     headers['Content-Type'] = 'application/json'
+  }
+  if (getDisplayCurrency) {
+    headers['X-Display-Currency'] = getDisplayCurrency()
   }
 
   const response = await fetch(`${API_BASE}${path}`, {

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Header, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -46,9 +46,10 @@ async def create_manual_balance(
     data: ManualBalanceCreate,
     user_id: Annotated[int, Depends(get_current_user_id)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    x_display_currency: Annotated[str | None, Header()] = None,
 ) -> BalanceSnapshotResponse:
     """Manually record a balance snapshot."""
-    info = await get_user_currencies(user_id, db)
+    info = await get_user_currencies(user_id, db, display_override=x_display_currency)
     data.balance = await to_account_currency(data.balance, info)
     row = await repo.create_manual(
         db,

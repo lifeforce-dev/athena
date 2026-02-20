@@ -130,6 +130,31 @@ class TestGetUserCurrencies:
         assert info.account == "KRW"
         assert info.display == "KRW"
 
+    @pytest.mark.asyncio
+    async def test_header_override_takes_precedence(self):
+        """X-Display-Currency header overrides the DB value."""
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = ("USD", "USD")
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        info = await get_user_currencies(1, mock_db, display_override="KRW")
+        assert info.account == "USD"
+        assert info.display == "KRW"
+        assert info.needs_conversion
+
+    @pytest.mark.asyncio
+    async def test_header_override_ignores_invalid(self):
+        """Invalid header values are ignored, falling back to DB."""
+        mock_db = AsyncMock()
+        mock_result = MagicMock()
+        mock_result.one_or_none.return_value = ("USD", "USD")
+        mock_db.execute = AsyncMock(return_value=mock_result)
+
+        info = await get_user_currencies(1, mock_db, display_override="EUR")
+        assert info.display == "USD"
+        assert not info.needs_conversion
+
 
 # ---------------------------------------------------------------------------
 # Intake conversion (router-level integration)
@@ -176,7 +201,7 @@ class TestIntakeConversion:
                 day_of_month=1,
                 start_date=date(2026, 1, 1),
             )
-            await create_commitment(data=data, user_id=1, db=mock_db)
+            await create_commitment(data=data, user_id=1, db=mock_db, x_display_currency=None)
 
             # The raw $100 display amount should have been converted.
             mock_convert.assert_awaited_once_with(Decimal("100.00"), info)
@@ -210,7 +235,7 @@ class TestIntakeConversion:
 
             from app.models.commitment_schemas import CommitmentUpdate
             data = CommitmentUpdate(amount=Decimal("50.00"))
-            await update_commitment(commitment_id=1, data=data, user_id=1, db=mock_db)
+            await update_commitment(commitment_id=1, data=data, user_id=1, db=mock_db, x_display_currency=None)
 
             mock_convert.assert_awaited_once_with(Decimal("50.00"), info)
             assert data.amount == converted
@@ -239,7 +264,7 @@ class TestIntakeConversion:
 
             from app.models.commitment_schemas import CommitmentUpdate
             data = CommitmentUpdate(name="Updated")
-            await update_commitment(commitment_id=1, data=data, user_id=1, db=mock_db)
+            await update_commitment(commitment_id=1, data=data, user_id=1, db=mock_db, x_display_currency=None)
 
             # No amount means no currency lookup or conversion.
             mock_get.assert_not_awaited()
@@ -269,7 +294,7 @@ class TestIntakeConversion:
 
             from app.models.balance_schemas import ManualBalanceCreate
             data = ManualBalanceCreate(balance=Decimal("1000.00"), observed_at=now)
-            await create_manual_balance(data=data, user_id=1, db=mock_db)
+            await create_manual_balance(data=data, user_id=1, db=mock_db, x_display_currency=None)
 
             mock_convert.assert_awaited_once_with(Decimal("1000.00"), info)
             assert data.balance == converted
@@ -298,9 +323,7 @@ class TestIntakeConversion:
                 as_of=date(2026, 2, 19),
                 amount_overrides={10: Decimal("100.00"), 20: Decimal("50.00")},
             )
-            await run_scenario(body=data, user_id=1, db=mock_db)
-
-            # Both overrides should have been converted.
+            await run_scenario(body=data, user_id=1, db=mock_db, x_display_currency=None)
             assert mock_convert.await_count == 2
             # build_scenario_projection should receive KRW amounts.
             call_kwargs = mock_build.call_args[1]

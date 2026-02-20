@@ -4,7 +4,7 @@ import logging
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -40,6 +40,7 @@ async def run_scenario(
     body: ScenarioRequest,
     user_id: Annotated[int, Depends(get_current_user_id)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    x_display_currency: Annotated[str | None, Header()] = None,
 ) -> ProjectionResponse:
     """Run a what-if scenario projection with commitment overrides."""
     logger.info(
@@ -48,7 +49,7 @@ async def run_scenario(
     )
     # Convert override amounts from display currency to account currency.
     if body.amount_overrides:
-        info = await get_user_currencies(user_id, db)
+        info = await get_user_currencies(user_id, db, display_override=x_display_currency)
         body.amount_overrides = {
             cid: await to_account_currency(amt, info)
             for cid, amt in body.amount_overrides.items()

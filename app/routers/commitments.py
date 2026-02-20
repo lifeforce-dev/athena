@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -34,9 +34,10 @@ async def create_commitment(
     data: CommitmentCreate,
     user_id: Annotated[int, Depends(get_current_user_id)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    x_display_currency: Annotated[str | None, Header()] = None,
 ) -> CommitmentResponse:
     """Create a new commitment."""
-    info = await get_user_currencies(user_id, db)
+    info = await get_user_currencies(user_id, db, display_override=x_display_currency)
     data.amount = await to_account_currency(data.amount, info)
     row = await service.create_commitment(db, user_id, data)
     await db.commit()
@@ -49,10 +50,11 @@ async def update_commitment(
     data: CommitmentUpdate,
     user_id: Annotated[int, Depends(get_current_user_id)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    x_display_currency: Annotated[str | None, Header()] = None,
 ) -> CommitmentResponse:
     """Update an existing commitment."""
     if data.amount is not None:
-        info = await get_user_currencies(user_id, db)
+        info = await get_user_currencies(user_id, db, display_override=x_display_currency)
         data.amount = await to_account_currency(data.amount, info)
     try:
         row = await service.update_commitment(db, commitment_id, user_id, data)
