@@ -127,6 +127,6 @@ async def me(
 @router.post("/logout")
 async def logout() -> Response:
     """Clear the session cookie."""
-    response = Response(status_code=status.HTTP_200_OK)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
     response.delete_cookie(key=AUTH_COOKIE_NAME, path="/")
     return response
