@@ -119,7 +119,7 @@ const {
   masterColorMap,
   billsAnalysis,
   shortfall,
-} = useExpenseAnalysis(trajectory)
+} = useExpenseAnalysis(trajectory, currentBalance)
 
 const nextWeekLabel = computed(() => {
   const start = billsAnalysis.value.nextWeekStart

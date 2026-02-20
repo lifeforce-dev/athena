@@ -111,7 +111,7 @@ function analyzeWindow(points: TrajectoryPoint[], start: number, end: number): W
 
 // ── Composable ──
 
-export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
+export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>, currentBalance: Ref<number>) {
 
   // Segment trajectory into paycheck-to-paycheck windows.
   // If no paychecks exist, the entire trajectory is treated as one window.
@@ -258,37 +258,62 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>) {
     return { bills, nextBills, nextWeekStart: nextStartStr }
   })
 
-  /** Detect first point where balance goes negative and collect missed commitments until next paycheck. */
+  /**
+   * Detect first point where balance goes negative.
+   *
+   * Uses expenses-before-income ordering per day so that a same-day
+   * paycheck does not mask an intra-day shortfall. Bills often post
+   * before direct deposit in the real world.
+   */
   const shortfall = computed<Shortfall | null>(() => {
     const points = trajectory.value
     if (!points.length) return null
 
-    // Find first day the balance dips below zero.
-    const brokeIdx = points.findIndex(p => p.balance < 0)
+    let balance = currentBalance.value
+    let brokeIdx = -1
+    let brokeBalance = 0
+
+    // Walk each day, apply expenses first, then income.
+    for (let i = 0; i < points.length; i++) {
+      const expenses = points[i].events.filter(e => e.amount < 0)
+      const income = points[i].events.filter(e => e.amount > 0)
+
+      for (const e of expenses) {
+        balance += e.amount
+      }
+
+      if (balance < 0 && brokeIdx < 0) {
+        brokeIdx = i
+        brokeBalance = balance
+      }
+
+      for (const e of income) {
+        balance += e.amount
+      }
+    }
+
     if (brokeIdx < 0) return null
 
-    const brokePoint = points[brokeIdx]
     const missed: { name: string; amount: number; date: string }[] = []
     let recoveryDate: string | null = null
 
     // Collect expenses from the broke date forward until the next paycheck.
     for (let i = brokeIdx; i < points.length; i++) {
-      const point = points[i]
-      if (isPaycheck(point) && i > brokeIdx) {
-        recoveryDate = point.date
+      if (isPaycheck(points[i]) && i > brokeIdx) {
+        recoveryDate = points[i].date
         break
       }
 
-      for (const event of point.events) {
+      for (const event of points[i].events) {
         if (event.amount < 0) {
-          missed.push({ name: event.name, amount: Math.abs(event.amount), date: point.date })
+          missed.push({ name: event.name, amount: Math.abs(event.amount), date: points[i].date })
         }
       }
     }
 
     return {
-      brokeDate: brokePoint.date,
-      brokeBalance: brokePoint.balance,
+      brokeDate: points[brokeIdx].date,
+      brokeBalance,
       missedCommitments: missed,
       recoveryDate,
       totalMissed: missed.reduce((sum, m) => sum + m.amount, 0),
