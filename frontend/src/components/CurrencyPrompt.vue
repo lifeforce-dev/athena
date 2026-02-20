@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="currency-overlay" @click.self="/* no dismiss */">
+    <div class="currency-overlay">
       <div class="currency-modal">
         <h2 class="cm-title">Set Your Currency</h2>
         <p class="cm-desc">
