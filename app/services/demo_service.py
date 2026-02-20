@@ -38,7 +38,6 @@ async def get_or_create_demo_user(db: AsyncSession) -> User:
             discord_id=DEMO_DISCORD_ID,
             discord_username=DEMO_USERNAME,
             display_name=DEMO_DISPLAY_NAME,
-            account_currency="USD",
         )
         db.add(user)
         await db.flush()
