@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { User } from '@/types/auth'
 import { fetchCurrentUser, logout as apiLogout } from '@/api/auth'
 import { ApiError } from '@/api/client'
+import { useCurrencyStore } from '@/stores/currency'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -16,6 +17,8 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     try {
       user.value = await fetchCurrentUser()
+      const currency = useCurrencyStore()
+      currency.initFromUser(user.value.account_currency ?? null)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         user.value = null
@@ -31,6 +34,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     await apiLogout()
     user.value = null
+    checked.value = false
+    const currency = useCurrencyStore()
+    currency.$reset()
   }
 
   return { user, checked, loading, isAuthenticated, checkAuth, logout }

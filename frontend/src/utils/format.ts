@@ -1,18 +1,59 @@
-export const formatCurrency = (value: number): string =>
-  value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
+// -- Currency display state (pushed in by the currency store) ----------------
+// Uses a Vue shallowRef so that template expressions calling formatDollars()
+// or formatCents() automatically re-render when the display currency changes.
+
+import { shallowRef } from 'vue'
+
+export interface CurrencyDisplay {
+  code: 'USD' | 'KRW'
+  rate: number  // 1.0 for base currency, exchange rate otherwise
+}
+
+const _cd = shallowRef<CurrencyDisplay>({ code: 'USD', rate: 1 })
+
+/** Called by the currency store whenever display currency or rate changes. */
+export function setCurrencyDisplay(cd: CurrencyDisplay): void {
+  _cd.value = cd
+}
+
+function convert(value: number): number {
+  const cd = _cd.value
+  return cd.rate === 1 ? value : value * cd.rate
+}
+
+function prefix(): string {
+  return _cd.value.code === 'KRW' ? '\u20A9' : '$'
+}
+
+// -- Money formatting (reads current display currency implicitly) ------------
+
+export const formatCurrency = (value: number): string => {
+  const converted = convert(value)
+  if (_cd.value.code === 'KRW') {
+    return prefix() + Math.round(Math.abs(converted)).toLocaleString()
+  }
+  return converted.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
+}
 
 export const formatSigned = (value: number): string => {
   const sign = value >= 0 ? '+' : '-'
-  return `${sign}${formatCurrency(Math.abs(value))}`
+  return `${sign}${formatDollars(Math.abs(value))}`
 }
 
-/** Rounded whole-dollar display: "$1,234". */
-export const formatDollars = (value: number): string =>
-  '$' + Math.abs(Math.round(value)).toLocaleString()
+/** Rounded whole-unit display: "$1,234" or "\u20A91,650,000". */
+export const formatDollars = (value: number): string => {
+  const converted = convert(Math.abs(Math.round(value)))
+  return prefix() + Math.round(converted).toLocaleString()
+}
 
-/** Two-decimal dollar display: "$1,234.56". */
-export const formatCents = (value: number): string =>
-  '$' + Math.abs(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** Two-decimal display: "$1,234.56". KRW rounds to whole units. */
+export const formatCents = (value: number): string => {
+  const converted = convert(Math.abs(value))
+  if (_cd.value.code === 'KRW') {
+    return prefix() + Math.round(converted).toLocaleString()
+  }
+  return prefix() + converted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 /** Short date display: "Feb 17". */
 export const shortDate = (dateStr: string): string =>

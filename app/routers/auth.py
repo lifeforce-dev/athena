@@ -6,11 +6,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.dependencies import AUTH_COOKIE_NAME, get_current_user
+from app.models.orm import User
 from app.services.auth_service import (
     JWT_TTL_SECONDS,
     build_discord_auth_url,
@@ -107,12 +109,18 @@ async def callback(
 @router.get("/me")
 async def me(
     current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """Return the current authenticated user's info."""
+    user_id = int(current_user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
     return {
         "id": current_user["sub"],
         "discord_id": current_user["discord_id"],
         "username": current_user["username"],
+        "account_currency": user.account_currency if user else None,
     }
 
 

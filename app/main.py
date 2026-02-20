@@ -16,6 +16,7 @@ from app.repositories import gmail_repository
 from app.routers.auth import router as auth_router
 from app.routers.balance import router as balance_router
 from app.routers.commitments import router as commitments_router
+from app.routers.currency import router as currency_router
 from app.routers.demo import router as demo_router
 from app.routers.gmail import router as gmail_router
 from app.routers.notifications import router as notifications_router
@@ -146,6 +147,7 @@ def create_app() -> FastAPI:
     application.include_router(auth_router, prefix='/api')
     application.include_router(balance_router, prefix='/api')
     application.include_router(commitments_router, prefix='/api')
+    application.include_router(currency_router, prefix='/api')
     application.include_router(demo_router, prefix='/api')
     application.include_router(gmail_router, prefix='/api')
     application.include_router(notifications_router, prefix='/api')

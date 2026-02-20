@@ -108,6 +108,7 @@ export interface components {
       id: number
       discord_id: string
       username: string
+      account_currency: string | null
     }
   }
 }

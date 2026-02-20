@@ -13,6 +13,14 @@
       </router-link>
     </div>
     <div class="nav-spacer" />
+    <button
+      class="nav-currency"
+      :class="{ converted: currency.isConverted }"
+      :disabled="currency.rateLoading"
+      @click="currency.toggleDisplay()"
+    >
+      {{ currency.displayCurrency === 'USD' ? '$ USD' : '\u20A9 KRW' }}
+    </button>
     <button class="nav-logout" @click="handleLogout">Logout</button>
   </nav>
 </template>
@@ -20,8 +28,10 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useCurrencyStore } from '@/stores/currency'
 
 const auth = useAuthStore()
+const currency = useCurrencyStore()
 const router = useRouter()
 
 const tabs = [
@@ -96,6 +106,35 @@ async function handleLogout() {
 
 .nav-spacer {
   flex: 1;
+}
+
+.nav-currency {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  background: none;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  margin-right: 4px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-currency:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.nav-currency.converted {
+  color: var(--income);
+  border-color: color-mix(in srgb, var(--income) 30%, transparent);
+}
+
+.nav-currency:disabled {
+  opacity: 0.4;
+  cursor: wait;
 }
 
 .nav-logout {
