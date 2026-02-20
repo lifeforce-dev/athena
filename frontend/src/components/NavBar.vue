@@ -21,6 +21,7 @@
     >
       {{ currency.displayCurrency === 'USD' ? '$ USD' : '\u20A9 KRW' }}
     </button>
+    <span v-if="auth.user" class="nav-user">{{ auth.user.username }}</span>
     <button class="nav-logout" @click="handleLogout">Logout</button>
   </nav>
 </template>
@@ -135,6 +136,13 @@ async function handleLogout() {
 .nav-currency:disabled {
   opacity: 0.4;
   cursor: wait;
+}
+
+.nav-user {
+  font-size: 11px;
+  color: var(--dim);
+  padding: 0 8px;
+  white-space: nowrap;
 }
 
 .nav-logout {

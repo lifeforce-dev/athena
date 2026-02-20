@@ -34,7 +34,9 @@ export const useAuthStore = defineStore('auth', () => {
   async function logout() {
     await apiLogout()
     user.value = null
-    checked.value = false
+    // Keep checked = true so the router guard sees "not authenticated"
+    // immediately instead of re-fetching /auth/me (which triggers a
+    // competing 401 redirect that cancels the navigation).
     const currency = useCurrencyStore()
     currency.$reset()
   }
