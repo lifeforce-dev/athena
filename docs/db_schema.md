@@ -17,7 +17,7 @@ erDiagram
         varchar(128) discord_username
         varchar(128) display_name
         varchar(3) account_currency "nullable, USD or KRW"
-        timestamptz tour_completed_at "nullable, first tour done"
+        text completed_tours "nullable, JSON array of tour names"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -85,7 +85,7 @@ Discord-authenticated application users.
 | `discord_username` | `VARCHAR(128)` | NOT NULL | |
 | `display_name` | `VARCHAR(128)` | | Optional display name |
 | `account_currency` | `VARCHAR(3)` | | `USD` or `KRW`, null until chosen |
-| `tour_completed_at` | `TIMESTAMPTZ` | | Set after first guided tour |
+| `completed_tours` | `TEXT` | | JSON array of completed tour names |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT now() | |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT now() | |
 

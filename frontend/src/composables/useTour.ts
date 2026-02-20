@@ -2,8 +2,9 @@
  * Guided product tours using driver.js.
  *
  * Each major view (Dashboard, Commitments, Simulation) has its own
- * independent tour. Tours auto-trigger for real users on first login
- * (when tour_completed_at is null) and can be explicitly triggered
+ * independent tour. Tours auto-trigger for real users who haven't
+ * completed the specific page tour yet (tracked per-tour via the
+ * completed_tours array on the user). Can also be explicitly triggered
  * via the ?tour=<name> query parameter (used by demo flow).
  */
 import { onMounted, nextTick } from 'vue'
@@ -137,8 +138,8 @@ function runTour(steps: DriveStep[], onComplete?: () => void) {
  *
  * Trigger modes:
  * 1. Explicit: ?tour=<name> query param (used by demo flow).
- * 2. Auto: real user whose tour_completed_at is null visits a page
- *    that has a tour definition and hasn't been shown this session.
+ * 2. Auto: real user who hasn't completed this specific tour yet
+ *    visits a page that has a tour definition.
  */
 export function useTour() {
   const route = useRoute()
@@ -153,8 +154,9 @@ export function useTour() {
     // Skip if already shown this session.
     if (completedThisSession.has(tourName)) return
 
-    // Auto-trigger only fires when the user hasn't completed onboarding.
-    if (!explicitTour && auth.user?.tour_completed_at) return
+    // Auto-trigger only fires when the user hasn't completed this specific tour.
+    const completed = auth.user?.completed_tours ?? []
+    if (!explicitTour && completed.includes(tourName)) return
 
     // Remove the query param so refreshing does not restart the tour.
     if (explicitTour) {
@@ -169,10 +171,10 @@ export function useTour() {
 
     runTour(TOURS[tourName].steps, async () => {
       // Persist completion server-side for real (non-demo) users.
-      if (auth.user && !auth.user.tour_completed_at) {
+      if (auth.user && !completed.includes(tourName)) {
         try {
-          await markTourComplete()
-          auth.user.tour_completed_at = new Date().toISOString()
+          await markTourComplete(tourName)
+          auth.user.completed_tours = [...completed, tourName]
         } catch {
           // Non-critical -- tour still ran, persistence failed silently.
         }

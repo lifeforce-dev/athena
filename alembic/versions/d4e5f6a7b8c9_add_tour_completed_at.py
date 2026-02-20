@@ -1,4 +1,4 @@
-"""Add tour_completed_at column to users.
+"""Add completed_tours column to users.
 
 Revision ID: d4e5f6a7b8c9
 Revises: c3d4e5f6a7b8
@@ -18,8 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("tour_completed_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column("users", sa.Column("completed_tours", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("users", "tour_completed_at")
+    op.drop_column("users", "completed_tours")

@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from datetime import datetime, timezone
+import json
 
 from app.config import Settings, get_settings
 from app.database import get_db
@@ -123,7 +123,7 @@ async def me(
         "discord_id": current_user["discord_id"],
         "username": current_user["username"],
         "account_currency": user.account_currency if user else None,
-        "tour_completed_at": user.tour_completed_at.isoformat() if user and user.tour_completed_at else None,
+        "completed_tours": json.loads(user.completed_tours) if user and user.completed_tours else [],
     }
 
 
@@ -131,8 +131,9 @@ async def me(
 async def mark_tour_complete(
     current_user: Annotated[dict, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    tour_name: str = Query(..., description="Name of the completed tour"),
 ) -> Response:
-    """Mark the guided tour as completed for the current user."""
+    """Mark a specific guided tour as completed for the current user."""
     user_id = int(current_user["sub"])
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -140,8 +141,11 @@ async def mark_tour_complete(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if not user.tour_completed_at:
-        user.tour_completed_at = datetime.now(timezone.utc)
+    completed: list[str] = json.loads(user.completed_tours) if user.completed_tours else []
+
+    if tour_name not in completed:
+        completed.append(tour_name)
+        user.completed_tours = json.dumps(completed)
         await db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

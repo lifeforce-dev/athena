@@ -10,5 +10,12 @@
 			"path": "../../zc_web_editor"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"chat.tools.terminal.autoApprove": {
+			"/^git show --name-status --pretty=fuller 47563f3ce9f8d16fde9902fce73b7f93f4738219 \\| Select-Object -First 120$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
+		}
+	}
 }

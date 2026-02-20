@@ -12,5 +12,6 @@ export const loginRedirect = () => {
 /** Clear the session cookie. */
 export const logout = () => api.post<void>('/auth/logout')
 
-/** Mark the guided tour as completed for the current user. */
-export const markTourComplete = () => api.patch<void>('/auth/me/tour-complete')
+/** Mark a specific guided tour as completed for the current user. */
+export const markTourComplete = (tourName: string) =>
+  api.patch<void>(`/auth/me/tour-complete?tour_name=${encodeURIComponent(tourName)}`)
