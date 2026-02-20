@@ -37,7 +37,7 @@ async def demo_start(
 
     token = create_jwt(user, settings.jwt_secret)
 
-    response = Response(status_code=200)
+    response = Response(status_code=204)
     response.set_cookie(
         key=AUTH_COOKIE_NAME,
         value=token,
