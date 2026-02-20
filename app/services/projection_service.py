@@ -1,30 +1,19 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import date
 from decimal import Decimal
-from json import JSONDecodeError
-from pathlib import Path
 
-from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.post_processing import process_ledger
 from app.core.projection import project_cash_on
-from app.models.domain import CashFlowConfig, CashFlowTemplate, TemplateTag
+from app.models.domain import CashFlowTemplate, TemplateTag
 from app.models.schemas import ProjectionResponse
 from app.repositories import balance_repository, commitment_repository
 from app.repositories.commitment_repository import list_active, to_domain
 
 logger = logging.getLogger(__name__)
-
-
-class ProjectionConfigError(Exception):
-    def __init__(self, status_code: int, detail: str) -> None:
-        super().__init__(detail)
-        self.status_code = status_code
-        self.detail = detail
 
 
 async def _load_from_db(
@@ -52,26 +41,7 @@ async def _load_from_db(
     return initial_balance, templates, has_initial_balance
 
 
-async def _load_from_json(config_path: Path) -> tuple[Decimal, list[CashFlowTemplate]]:
-    """Load projection inputs from the JSON config file."""
-    try:
-        raw = await asyncio.to_thread(config_path.read_text, encoding='utf-8')
-        cfg = CashFlowConfig.from_json(raw)
-    except FileNotFoundError as exc:
-        logger.exception(f'Projection config file not found. config_path={config_path}')
-        raise ProjectionConfigError(status_code=404, detail='Projection config file not found') from exc
-    except JSONDecodeError as exc:
-        logger.exception(f'Projection config is not valid JSON. config_path={config_path}')
-        raise ProjectionConfigError(status_code=422, detail='Projection config is not valid JSON') from exc
-    except ValidationError as exc:
-        logger.exception(f'Projection config does not match schema. config_path={config_path}')
-        raise ProjectionConfigError(status_code=422, detail='Projection config does not match schema') from exc
-
-    return cfg.initial_balance, cfg.templates
-
-
 async def build_projection(
-    config_path: Path,
     as_of: date,
     from_date: date | None,
     db: AsyncSession | None = None,
@@ -90,10 +60,11 @@ async def build_projection(
         initial_balance, templates, has_initial_balance = db_result
         logger.info(f'Projection using DB data. user_id={user_id} templates={len(templates)}')
     else:
-        initial_balance, templates = await _load_from_json(config_path)
-        # JSON config always provides an explicit initial_balance.
-        has_initial_balance = True
-        logger.info(f'Projection using JSON fallback. config_path={config_path}')
+        # User has no commitments yet — return an empty projection.
+        initial_balance = Decimal(0)
+        templates = []
+        has_initial_balance = False
+        logger.info(f'Projection empty — user has no commitments. user_id={user_id}')
 
     if from_date is None:
         from_date = date.today()

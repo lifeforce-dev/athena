@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
@@ -10,7 +9,6 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables.
 
     Set these via env vars or a .env file:
-        ATHENA_CONFIG_PATH            -- path to the JSON config file (required for projection)
         ATHENA_CORS_ORIGINS           -- comma-separated allowed origins
         ATHENA_DATABASE_URL           -- PostgreSQL connection string
         ATHENA_JWT_SECRET             -- secret for signing auth tokens
@@ -25,8 +23,6 @@ class Settings(BaseSettings):
         ATHENA_GOOGLE_PUSH_AUDIENCE   -- OIDC audience for Pub/Sub push verification
     """
 
-    # Projection (file-based, pre-DB fallback)
-    config_path: Path = Path("data.json")
     cors_origins: list[str] = ["http://localhost:5173"]
     debug: bool = False
 

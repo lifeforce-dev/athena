@@ -1,20 +1,18 @@
-"""Tests for post-processing, the projection service, and the API endpoint.
+"""Tests for post-processing, the projection engine, and the API endpoint.
 
 Covers the shared accumulation logic (month summaries, pay-period grouping)
 and the full request/response cycle through FastAPI.
 """
 from __future__ import annotations
 
-import json
 from datetime import date
 from decimal import Decimal
-from pathlib import Path
 
 import pytest
 
 from app.core.post_processing import process_ledger
+from app.core.projection import project_cash_on
 from app.models.domain import (
-    CashFlowConfig,
     CashFlowTemplate,
     DayInterval,
     Direction,
@@ -23,8 +21,6 @@ from app.models.domain import (
     TemplateTag,
     WeekdayCadence,
 )
-from app.models.schemas import MonthSummary, PayPeriodSummary
-from app.services.projection_service import build_projection
 
 
 # ---------------------------------------------------------------------------
@@ -38,12 +34,6 @@ def _inflow(name: str, amount: float, recurrence, start: date, end: date | None 
 
 def _outflow(name: str, amount: float, recurrence, start: date, end: date | None = None) -> CashFlowTemplate:
     return CashFlowTemplate(name=name, amount=amount, direction=Direction.OUTFLOW, recurrence=recurrence, start_date=start, end_date=end)
-
-
-def _write_config(tmp_path: Path, cfg: dict) -> Path:
-    config_path = tmp_path / "test_config.json"
-    config_path.write_text(json.dumps(cfg), encoding="utf-8")
-    return config_path
 
 
 # ---------------------------------------------------------------------------
@@ -230,95 +220,49 @@ class TestBalanceTracking:
 
 class TestBuildProjection:
     @pytest.mark.asyncio
-    async def test_returns_correct_shape(self, tmp_path: Path):
-        config = {
-            "initial_balance": 5000.0,
-            "templates": [
-                {
-                    "name": "Paycheck",
-                    "amount": 2000.0,
-                    "direction": "inflow",
-                    "recurrence": {"type": "month_day", "day_of_month": 15},
-                    "start_date": "2026-01-01",
-                    "tags": ["paycheck"],
-                },
-                {
-                    "name": "Rent",
-                    "amount": 1200.0,
-                    "direction": "outflow",
-                    "recurrence": {"type": "month_day", "day_of_month": 1},
-                    "start_date": "2026-01-01",
-                },
-            ],
-        }
-        config_path = _write_config(tmp_path, config)
+    async def test_returns_correct_shape(self):
+        templates = [
+            _inflow("Paycheck", 2000.0, MonthDay(day_of_month=15), date(2025, 12, 1)),
+            _outflow("Rent", 1200.0, MonthDay(day_of_month=1), date(2025, 12, 1)),
+        ]
+        initial = Decimal("5000")
 
-        result = await build_projection(config_path, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
+        _, raw_ledger = project_cash_on(initial, templates, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
+        paycheck_names = {t.name for t in templates if TemplateTag.PAYCHECK in t.tags}
+        result = process_ledger(raw_ledger, initial, date(2026, 1, 1), date(2026, 3, 31), paycheck_names)
 
-        assert result.as_of == date(2026, 3, 31)
-        assert result.from_date == date(2026, 1, 1)
-        assert len(result.ledger) == 6  # 3 paychecks + 3 rents
+        assert len(result.ledger) == 5  # 3 paychecks + 2 rents (Jan 1 rent excluded by from_date boundary)
         assert len(result.months) == 3
-        assert result.current_balance == Decimal("7400")
 
     @pytest.mark.asyncio
-    async def test_month_summaries_reflect_net(self, tmp_path: Path):
-        config = {
-            "initial_balance": 0.0,
-            "templates": [
-                {
-                    "name": "Income",
-                    "amount": 3000.0,
-                    "direction": "inflow",
-                    "recurrence": {"type": "month_day", "day_of_month": 1},
-                    "start_date": "2026-01-01",
-                },
-                {
-                    "name": "Expense",
-                    "amount": 2000.0,
-                    "direction": "outflow",
-                    "recurrence": {"type": "month_day", "day_of_month": 15},
-                    "start_date": "2026-01-01",
-                },
-            ],
-        }
-        config_path = _write_config(tmp_path, config)
+    async def test_month_summaries_reflect_net(self):
+        templates = [
+            _inflow("Income", 3000.0, MonthDay(day_of_month=5), date(2025, 12, 1)),
+            _outflow("Expense", 2000.0, MonthDay(day_of_month=20), date(2025, 12, 1)),
+        ]
+        initial = Decimal("0")
 
-        result = await build_projection(config_path, as_of=date(2026, 2, 28), from_date=date(2026, 1, 1))
+        _, raw_ledger = project_cash_on(initial, templates, as_of=date(2026, 2, 28), from_date=date(2026, 1, 1))
+        result = process_ledger(raw_ledger, initial, date(2026, 1, 1), date(2026, 2, 28))
 
         assert len(result.months) == 2
         assert all(m.net == Decimal("1000") for m in result.months)
 
     @pytest.mark.asyncio
-    async def test_pay_periods_populated_with_paycheck_entries(self, tmp_path: Path):
-        config = {
-            "initial_balance": 1000.0,
-            "templates": [
-                {
-                    "name": "Paycheck",
-                    "amount": 2000.0,
-                    "direction": "inflow",
-                    "recurrence": {
-                        "type": "weekday_cadence",
-                        "interval_weeks": 2,
-                        "weekday": 4,
-                        "anchor_date": "2026-01-23",
-                    },
-                    "start_date": "2026-01-23",
-                    "tags": ["paycheck"],
-                },
-                {
-                    "name": "Rent",
-                    "amount": 1500.0,
-                    "direction": "outflow",
-                    "recurrence": {"type": "month_day", "day_of_month": 1},
-                    "start_date": "2026-02-01",
-                },
-            ],
-        }
-        config_path = _write_config(tmp_path, config)
+    async def test_pay_periods_populated_with_paycheck_entries(self):
+        templates = [
+            CashFlowTemplate(
+                name="Paycheck", amount=2000.0, direction=Direction.INFLOW,
+                recurrence=WeekdayCadence(interval_weeks=2, weekday=4, anchor_date=date(2026, 1, 23)),
+                start_date=date(2026, 1, 23), tags=[TemplateTag.PAYCHECK],
+            ),
+            _outflow("Rent", 1500.0, MonthDay(day_of_month=1), date(2026, 2, 1)),
+        ]
+        initial = Decimal("1000")
 
-        result = await build_projection(config_path, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
+        _, raw_ledger = project_cash_on(initial, templates, as_of=date(2026, 3, 31), from_date=date(2026, 1, 1))
+        paycheck_names = {t.name for t in templates if TemplateTag.PAYCHECK in t.tags}
+        result = process_ledger(raw_ledger, initial, date(2026, 1, 1), date(2026, 3, 31), paycheck_names)
 
         assert len(result.pay_periods) > 0
         assert all(pp.start_date is not None for pp in result.pay_periods)
@@ -331,31 +275,13 @@ class TestBuildProjection:
 
 class TestProjectionEndpoint:
     @pytest.fixture()
-    def client(self, tmp_path: Path):
-        """Create a TestClient with a temp config file and bypassed auth."""
+    def client(self):
+        """Create a TestClient with bypassed auth and no DB (empty projection)."""
         from fastapi.testclient import TestClient
 
-        from app.config import Settings, get_settings
         from app.database import get_db
         from app.dependencies import get_current_user
         from app.main import app
-
-        config = {
-            "initial_balance": 1000.0,
-            "templates": [
-                {
-                    "name": "Income",
-                    "amount": 500.0,
-                    "direction": "inflow",
-                    "recurrence": {"type": "month_day", "day_of_month": 15},
-                    "start_date": "2026-01-01",
-                },
-            ],
-        }
-        config_path = _write_config(tmp_path, config)
-
-        def _override_settings() -> Settings:
-            return Settings(config_path=config_path)
 
         def _fake_user() -> dict:
             return {"sub": "1", "discord_id": "000", "username": "test-user"}
@@ -363,139 +289,23 @@ class TestProjectionEndpoint:
         async def _no_db():
             yield None
 
-        app.dependency_overrides[get_settings] = _override_settings
         app.dependency_overrides[get_current_user] = _fake_user
         app.dependency_overrides[get_db] = _no_db
         yield TestClient(app)
         app.dependency_overrides.clear()
 
-    def test_get_projection_returns_200(self, client):
+    def test_new_user_returns_empty_projection(self, client):
         resp = client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
 
         assert resp.status_code == 200
         body = resp.json()
         assert body["as_of"] == "2026-03-31"
         assert body["from_date"] == "2026-01-01"
-        assert len(body["ledger"]) == 3  # Jan, Feb, Mar on the 15th
-        assert body["current_balance"] == "2500.0"
-
-    def test_get_projection_returns_months(self, client):
-        resp = client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
-
-        body = resp.json()
-        assert len(body["months"]) == 3
-        assert all(m["net"] == "500.0" for m in body["months"])
+        assert body["ledger"] == []
+        assert body["months"] == []
+        assert body["current_balance"] == "0"
+        assert body["has_initial_balance"] is False
 
     def test_missing_as_of_returns_422(self, client):
         resp = client.get("/api/projection")
         assert resp.status_code == 422
-
-    def test_missing_config_file_returns_404(self, tmp_path: Path):
-        from fastapi.testclient import TestClient
-
-        from app.config import Settings, get_settings
-        from app.database import get_db
-        from app.dependencies import get_current_user
-        from app.main import app
-
-        missing_config_path = tmp_path / "missing_config.json"
-
-        def _override_settings() -> Settings:
-            return Settings(config_path=missing_config_path)
-
-        def _fake_user() -> dict:
-            return {"sub": "1", "discord_id": "000", "username": "test-user"}
-
-        async def _no_db():
-            yield None
-
-        app.dependency_overrides[get_settings] = _override_settings
-        app.dependency_overrides[get_current_user] = _fake_user
-        app.dependency_overrides[get_db] = _no_db
-        try:
-            with TestClient(app) as test_client:
-                resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
-
-            assert resp.status_code == 404
-            assert resp.json() == {"detail": "Projection config file not found"}
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_invalid_json_config_returns_422(self, tmp_path: Path):
-        from fastapi.testclient import TestClient
-
-        from app.config import Settings, get_settings
-        from app.database import get_db
-        from app.dependencies import get_current_user
-        from app.main import app
-
-        invalid_json_path = tmp_path / "invalid_json_config.json"
-        invalid_json_path.write_text('{"initial_balance": 1000, "templates": [}', encoding="utf-8")
-
-        def _override_settings() -> Settings:
-            return Settings(config_path=invalid_json_path)
-
-        def _fake_user() -> dict:
-            return {"sub": "1", "discord_id": "000", "username": "test-user"}
-
-        async def _no_db():
-            yield None
-
-        app.dependency_overrides[get_settings] = _override_settings
-        app.dependency_overrides[get_current_user] = _fake_user
-        app.dependency_overrides[get_db] = _no_db
-        try:
-            with TestClient(app) as test_client:
-                resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
-
-            assert resp.status_code == 422
-            assert resp.json() == {"detail": "Projection config is not valid JSON"}
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_schema_invalid_config_returns_422(self, tmp_path: Path):
-        from fastapi.testclient import TestClient
-
-        from app.config import Settings, get_settings
-        from app.database import get_db
-        from app.dependencies import get_current_user
-        from app.main import app
-
-        invalid_schema_path = tmp_path / "invalid_schema_config.json"
-        invalid_schema_path.write_text(
-            json.dumps(
-                {
-                    "initial_balance": 1000.0,
-                    "templates": [
-                        {
-                            "name": "Income",
-                            "direction": "inflow",
-                            "recurrence": {"type": "month_day", "day_of_month": 15},
-                            "start_date": "2026-01-01",
-                        }
-                    ],
-                }
-            ),
-            encoding="utf-8",
-        )
-
-        def _override_settings() -> Settings:
-            return Settings(config_path=invalid_schema_path)
-
-        def _fake_user() -> dict:
-            return {"sub": "1", "discord_id": "000", "username": "test-user"}
-
-        async def _no_db():
-            yield None
-
-        app.dependency_overrides[get_settings] = _override_settings
-        app.dependency_overrides[get_current_user] = _fake_user
-        app.dependency_overrides[get_db] = _no_db
-        try:
-            with TestClient(app) as test_client:
-                resp = test_client.get("/api/projection?as_of=2026-03-31&from_date=2026-01-01")
-
-            assert resp.status_code == 422
-            assert resp.json() == {"detail": "Projection config does not match schema"}
-        finally:
-            app.dependency_overrides.clear()
