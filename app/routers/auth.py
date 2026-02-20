@@ -118,11 +118,18 @@ async def me(
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 
+    # Reset display_currency to account_currency on every session init.
+    # Display currency is a session-only preference, not persistent.
+    if user and user.display_currency != user.account_currency:
+        user.display_currency = user.account_currency
+        await db.commit()
+
     return {
         "id": current_user["sub"],
         "discord_id": current_user["discord_id"],
         "username": current_user["username"],
         "account_currency": user.account_currency if user else None,
+        "display_currency": user.account_currency if user else None,
         "completed_tours": json.loads(user.completed_tours) if user and user.completed_tours else [],
     }
 

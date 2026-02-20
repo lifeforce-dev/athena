@@ -7,7 +7,16 @@
  * here, every dollar amount in the app is wrong.
  */
 import { describe, it, expect, beforeEach } from 'vitest'
-import { setCurrencyDisplay, formatDollars, formatCents, formatSigned, formatCurrency } from '@/utils/format'
+import {
+  setCurrencyDisplay,
+  formatDollars,
+  formatCents,
+  formatSigned,
+  formatCurrency,
+  toBaseCurrency,
+  toDisplayCurrency,
+  currencySymbol,
+} from '@/utils/format'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -171,5 +180,90 @@ describe('rate edge cases', () => {
     setKrw(1350)
     // 1,000,000 * 1350 = 1,350,000,000
     expect(formatDollars(1000000)).toBe('\u20A91,350,000,000')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// toDisplayCurrency / toBaseCurrency (round-trip conversion)
+// ---------------------------------------------------------------------------
+
+describe('toDisplayCurrency', () => {
+  beforeEach(setUsd)
+
+  it('returns same value when rate is 1 (USD)', () => {
+    expect(toDisplayCurrency(100)).toBe(100)
+  })
+
+  it('multiplies by rate for KRW', () => {
+    setKrw(1350)
+    expect(toDisplayCurrency(100)).toBe(135_000)
+  })
+
+  it('handles zero', () => {
+    setKrw(1350)
+    expect(toDisplayCurrency(0)).toBe(0)
+  })
+})
+
+describe('toBaseCurrency', () => {
+  beforeEach(setUsd)
+
+  it('returns same value when rate is 1 (USD)', () => {
+    expect(toBaseCurrency(500)).toBe(500)
+  })
+
+  it('divides by rate for KRW', () => {
+    setKrw(1350)
+    expect(toBaseCurrency(135_000)).toBeCloseTo(100, 2)
+  })
+
+  it('handles fractional results', () => {
+    setKrw(1350)
+    // 5000 KRW / 1350 ~ 3.7037
+    expect(toBaseCurrency(5000)).toBeCloseTo(3.7037, 3)
+  })
+
+  it('handles zero', () => {
+    setKrw(1350)
+    expect(toBaseCurrency(0)).toBe(0)
+  })
+
+  it('preserves negative sign', () => {
+    setKrw(1350)
+    expect(toBaseCurrency(-135_000)).toBeCloseTo(-100, 2)
+  })
+})
+
+describe('round-trip conversion', () => {
+  it('USD -> display -> base returns original value', () => {
+    setKrw(1350)
+    const original = 250.75
+    const displayed = toDisplayCurrency(original)
+    const restored = toBaseCurrency(displayed)
+    expect(restored).toBeCloseTo(original, 10)
+  })
+
+  it('round-trip preserves sign for negative values', () => {
+    setKrw(1350)
+    const original = -1500
+    const displayed = toDisplayCurrency(original)
+    const restored = toBaseCurrency(displayed)
+    expect(restored).toBeCloseTo(original, 10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// currencySymbol
+// ---------------------------------------------------------------------------
+
+describe('currencySymbol', () => {
+  it('returns $ for USD', () => {
+    setUsd()
+    expect(currencySymbol()).toBe('$')
+  })
+
+  it('returns won sign for KRW', () => {
+    setKrw()
+    expect(currencySymbol()).toBe('\u20A9')
   })
 })

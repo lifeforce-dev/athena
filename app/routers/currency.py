@@ -2,10 +2,8 @@
 from __future__ import annotations
 
 import logging
-import time
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
@@ -14,18 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user_id
 from app.models.orm import User
+from app.services.currency_service import get_rate
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/currency", tags=["currency"])
 
 ALLOWED_CURRENCIES = {"USD", "KRW"}
-
-EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest"
-
-# Simple in-memory cache: (timestamp, rate_dict).
-_rate_cache: dict[str, tuple[float, float]] = {}
-_CACHE_TTL_SECONDS = 3600
 
 
 # -- Models ----------------------------------------------------------------
@@ -44,6 +37,22 @@ class SetCurrencyRequest(BaseModel):
 
 class SetCurrencyResponse(BaseModel):
     account_currency: str
+
+
+class SetDisplayCurrencyRequest(BaseModel):
+    currency: str
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        upper = value.upper()
+        if upper not in ALLOWED_CURRENCIES:
+            raise ValueError(f"Currency must be one of: {', '.join(sorted(ALLOWED_CURRENCIES))}")
+        return upper
+
+
+class SetDisplayCurrencyResponse(BaseModel):
+    display_currency: str
 
 
 class ExchangeRateResponse(BaseModel):
@@ -68,11 +77,35 @@ async def set_account_currency(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     user.account_currency = body.currency
+    # Default display_currency to account_currency on first setup.
+    if user.display_currency is None:
+        user.display_currency = body.currency
     await db.commit()
     await db.refresh(user)
 
     logger.info(f"User {user_id} set account_currency to {body.currency}")
     return SetCurrencyResponse(account_currency=user.account_currency)
+
+
+@router.patch("/display", response_model=SetDisplayCurrencyResponse)
+async def set_display_currency(
+    body: SetDisplayCurrencyRequest,
+    user_id: Annotated[int, Depends(get_current_user_id)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> SetDisplayCurrencyResponse:
+    """Set the user's active display currency (what they type and see in)."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.display_currency = body.currency
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(f"User {user_id} set display_currency to {body.currency}")
+    return SetDisplayCurrencyResponse(display_currency=user.display_currency)
 
 
 @router.get("/rate", response_model=ExchangeRateResponse)
@@ -92,33 +125,13 @@ async def get_exchange_rate(
             detail=f"Target must be a non-USD currency in: {', '.join(sorted(ALLOWED_CURRENCIES - {'USD'}))}",
         )
 
-    now = time.time()
-
-    # Return cached rate if fresh.
-    if target in _rate_cache:
-        cached_time, cached_rate = _rate_cache[target]
-        if now - cached_time < _CACHE_TTL_SECONDS:
-            return ExchangeRateResponse(base="USD", target=target, rate=cached_rate)
-
-    # Fetch from upstream.
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(EXCHANGE_RATE_URL, params={"from": "USD", "to": target})
-            resp.raise_for_status()
-            data = resp.json()
+        rate = await get_rate("USD", target)
     except Exception:
-        logger.exception("Failed to fetch exchange rate from upstream")
+        logger.exception("Failed to fetch exchange rate")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Exchange rate service unavailable",
         )
 
-    rate = data.get("rates", {}).get(target)
-    if rate is None:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Exchange rate not found in upstream response",
-        )
-
-    _rate_cache[target] = (now, float(rate))
-    return ExchangeRateResponse(base="USD", target=target, rate=float(rate))
+    return ExchangeRateResponse(base="USD", target=target, rate=rate)

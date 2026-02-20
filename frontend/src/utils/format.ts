@@ -25,6 +25,22 @@ function prefix(): string {
   return _cd.value.code === 'KRW' ? '\u20A9' : '$'
 }
 
+/** Convert a base-currency (USD) amount to the active display currency. */
+export function toDisplayCurrency(value: number): number {
+  return convert(value)
+}
+
+/** Convert a display-currency amount back to base currency (USD) for storage. */
+export function toBaseCurrency(displayAmount: number): number {
+  const cd = _cd.value
+  return cd.rate === 1 ? displayAmount : displayAmount / cd.rate
+}
+
+/** The symbol for the active display currency ("$" or "\u20A9"). */
+export function currencySymbol(): string {
+  return prefix()
+}
+
 // -- Money formatting (reads current display currency implicitly) ------------
 
 export const formatCurrency = (value: number): string => {

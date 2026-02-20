@@ -1,12 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { setAccountCurrency, fetchExchangeRate } from '@/api/currency'
+import { setAccountCurrency, setDisplayCurrency as apiSetDisplayCurrency, fetchExchangeRate } from '@/api/currency'
 import { setCurrencyDisplay } from '@/utils/format'
 
 export type CurrencyCode = 'USD' | 'KRW'
 
 export const useCurrencyStore = defineStore('currency', () => {
-  /** The currency currently displayed in the UI (session-only, not persisted). */
+  /** The user's real-world currency (what's stored in the DB). */
+  const accountCurrency = ref<CurrencyCode>('USD')
+
+  /** The currency currently displayed in the UI and used for input. */
   const displayCurrency = ref<CurrencyCode>('USD')
 
   /** Whether the user has set account_currency on the server. */
@@ -18,26 +21,38 @@ export const useCurrencyStore = defineStore('currency', () => {
   /** True while we're fetching the exchange rate. */
   const rateLoading = ref(false)
 
-  const isConverted = computed(() => displayCurrency.value !== 'USD')
+  const isConverted = computed(() => displayCurrency.value !== accountCurrency.value)
 
   // Push display state into the format layer whenever it changes.
-  watch([displayCurrency, krwRate], () => {
-    const rate = displayCurrency.value === 'KRW' && krwRate.value != null
-      ? krwRate.value
-      : 1
-    setCurrencyDisplay({ code: displayCurrency.value, rate })
+  // The rate must convert account currency → display currency so that
+  // DB values (stored in account currency) render correctly.
+  watch([accountCurrency, displayCurrency, krwRate], () => {
+    const acct = accountCurrency.value
+    const disp = displayCurrency.value
+
+    let rate = 1
+    if (acct !== disp && krwRate.value != null) {
+      if (acct === 'USD' && disp === 'KRW') {
+        rate = krwRate.value          // USD stored, display KRW: multiply by rate.
+      } else if (acct === 'KRW' && disp === 'USD') {
+        rate = 1 / krwRate.value      // KRW stored, display USD: divide by rate.
+      }
+    }
+    setCurrencyDisplay({ code: disp, rate })
   }, { immediate: true })
 
   /**
    * Initialize from the /me response. If account_currency is null,
    * the prompt should be shown.
    */
-  function initFromUser(accountCurrency: string | null) {
-    if (accountCurrency) {
+  function initFromUser(acctCurrency: string | null, displayCurrencyFromServer?: string | null) {
+    if (acctCurrency) {
       accountCurrencySet.value = true
-      displayCurrency.value = accountCurrency as CurrencyCode
+      accountCurrency.value = acctCurrency as CurrencyCode
+      displayCurrency.value = (displayCurrencyFromServer ?? acctCurrency) as CurrencyCode
     } else {
       accountCurrencySet.value = false
+      accountCurrency.value = 'USD'
       displayCurrency.value = 'USD'
     }
   }
@@ -46,6 +61,7 @@ export const useCurrencyStore = defineStore('currency', () => {
   async function saveAccountCurrency(code: CurrencyCode) {
     await setAccountCurrency(code)
     accountCurrencySet.value = true
+    accountCurrency.value = code
     displayCurrency.value = code
 
     // Keep the auth store's user object in sync.
@@ -53,6 +69,7 @@ export const useCurrencyStore = defineStore('currency', () => {
     const auth = useAuthStore()
     if (auth.user) {
       auth.user.account_currency = code
+      auth.user.display_currency = code
     }
 
     // Pre-fetch the exchange rate if they chose KRW.
@@ -61,22 +78,21 @@ export const useCurrencyStore = defineStore('currency', () => {
     }
   }
 
-  /** Toggle between USD and KRW for display. */
+  /** Toggle between USD and KRW for display. Persisted to backend. */
   async function toggleDisplay() {
-    if (displayCurrency.value === 'USD') {
-      // Switching to KRW -- need the rate.
-      if (krwRate.value === null) {
-        try {
-          await loadRate()
-        } catch {
-          console.error('Failed to fetch exchange rate')
-          return
-        }
+    const newCurrency: CurrencyCode = displayCurrency.value === 'USD' ? 'KRW' : 'USD'
+
+    if (krwRate.value === null) {
+      try {
+        await loadRate()
+      } catch {
+        console.error('Failed to fetch exchange rate')
+        return
       }
-      displayCurrency.value = 'KRW'
-    } else {
-      displayCurrency.value = 'USD'
     }
+
+    displayCurrency.value = newCurrency
+    await apiSetDisplayCurrency(newCurrency)
   }
 
   /** Fetch the exchange rate from the backend. */
@@ -92,18 +108,25 @@ export const useCurrencyStore = defineStore('currency', () => {
   }
 
   /**
-   * Convert a USD amount to the current display currency.
-   * Returns the original value if display is USD or rate is unavailable.
+   * Convert an account-currency amount to the current display currency.
+   * Returns the original value if currencies match or rate is unavailable.
    */
-  function convert(usdAmount: number): number {
-    if (displayCurrency.value === 'USD' || krwRate.value === null) {
-      return usdAmount
+  function convert(amount: number): number {
+    if (accountCurrency.value === displayCurrency.value || krwRate.value === null) {
+      return amount
     }
-    return usdAmount * krwRate.value
+    if (accountCurrency.value === 'USD' && displayCurrency.value === 'KRW') {
+      return amount * krwRate.value
+    }
+    if (accountCurrency.value === 'KRW' && displayCurrency.value === 'USD') {
+      return amount / krwRate.value
+    }
+    return amount
   }
 
   /** Reset on logout. */
   function $reset() {
+    accountCurrency.value = 'USD'
     displayCurrency.value = 'USD'
     accountCurrencySet.value = false
     krwRate.value = null
@@ -111,6 +134,7 @@ export const useCurrencyStore = defineStore('currency', () => {
   }
 
   return {
+    accountCurrency,
     displayCurrency,
     accountCurrencySet,
     krwRate,

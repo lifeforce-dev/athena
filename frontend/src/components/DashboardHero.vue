@@ -65,7 +65,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { parseLocalDate, formatDollars } from '@/utils/format'
+import { parseLocalDate, formatDollars, toDisplayCurrency } from '@/utils/format'
 
 const props = defineProps<{
   currentBalance: number
@@ -87,7 +87,7 @@ const inputRef = ref<HTMLInputElement | null>(null)
 function startEdit() {
   if (editing.value) return
   editing.value = true
-  editValue.value = Math.round(props.currentBalance).toString()
+  editValue.value = Math.round(toDisplayCurrency(props.currentBalance)).toString()
   nextTick(() => {
     inputRef.value?.focus()
     inputRef.value?.select()
@@ -99,7 +99,7 @@ function cancelEdit() {
 }
 
 function saveBalance() {
-  const raw = editValue.value.replace(/[,$\s]/g, '')
+  const raw = editValue.value.replace(/[^0-9.]/g, '')
   const num = parseFloat(raw)
   if (isNaN(num) || num < 0) return
   editing.value = false

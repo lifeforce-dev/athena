@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import get_current_user_id
 from app.models.schemas import ProjectionResponse, ScenarioRequest
+from app.services.currency_service import get_user_currencies, to_account_currency
 from app.services.projection_service import build_projection, build_scenario_projection
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,13 @@ async def run_scenario(
         f'Scenario requested. as_of={body.as_of} from_date={body.from_date} '
         f'excluded={len(body.excluded_ids)} overrides={len(body.amount_overrides)}'
     )
+    # Convert override amounts from display currency to account currency.
+    if body.amount_overrides:
+        info = await get_user_currencies(user_id, db)
+        body.amount_overrides = {
+            cid: await to_account_currency(amt, info)
+            for cid, amt in body.amount_overrides.items()
+        }
     return await build_scenario_projection(
         as_of=body.as_of,
         from_date=body.from_date,

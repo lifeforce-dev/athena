@@ -14,6 +14,7 @@ from app.models.commitment_schemas import (
     CommitmentUpdate,
 )
 from app.services import commitment_service as service
+from app.services.currency_service import get_user_currencies, to_account_currency
 
 router = APIRouter(prefix="/commitments", tags=["commitments"])
 
@@ -35,6 +36,8 @@ async def create_commitment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CommitmentResponse:
     """Create a new commitment."""
+    info = await get_user_currencies(user_id, db)
+    data.amount = await to_account_currency(data.amount, info)
     row = await service.create_commitment(db, user_id, data)
     await db.commit()
     return CommitmentResponse.model_validate(row)
@@ -48,6 +51,9 @@ async def update_commitment(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> CommitmentResponse:
     """Update an existing commitment."""
+    if data.amount is not None:
+        info = await get_user_currencies(user_id, db)
+        data.amount = await to_account_currency(data.amount, info)
     try:
         row = await service.update_commitment(db, commitment_id, user_id, data)
     except ValueError as exc:

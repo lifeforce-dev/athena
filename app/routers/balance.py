@@ -13,6 +13,7 @@ from app.models.balance_schemas import (
     ManualBalanceCreate,
 )
 from app.repositories import balance_repository as repo
+from app.services.currency_service import get_user_currencies, to_account_currency
 
 router = APIRouter(prefix="/balance", tags=["balance"])
 
@@ -47,6 +48,8 @@ async def create_manual_balance(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> BalanceSnapshotResponse:
     """Manually record a balance snapshot."""
+    info = await get_user_currencies(user_id, db)
+    data.balance = await to_account_currency(data.balance, info)
     row = await repo.create_manual(
         db,
         user_id,

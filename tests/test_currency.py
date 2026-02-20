@@ -14,10 +14,12 @@ from app.routers.currency import (
     ALLOWED_CURRENCIES,
     ExchangeRateResponse,
     SetCurrencyRequest,
-    _CACHE_TTL_SECONDS,
-    _rate_cache,
     get_exchange_rate,
     set_account_currency,
+)
+from app.services.currency_service import (
+    _CACHE_TTL_SECONDS,
+    _rate_cache,
 )
 
 
@@ -65,6 +67,7 @@ class TestSetAccountCurrency:
     async def test_sets_currency_on_user(self):
         mock_user = MagicMock()
         mock_user.account_currency = None
+        mock_user.display_currency = None
 
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = mock_user
@@ -76,6 +79,8 @@ class TestSetAccountCurrency:
         response = await set_account_currency(body=body, user_id=1, db=mock_db)
 
         assert mock_user.account_currency == "KRW"
+        # display_currency defaults to account_currency on first setup.
+        assert mock_user.display_currency == "KRW"
         mock_db.commit.assert_awaited_once()
         mock_db.refresh.assert_awaited_once_with(mock_user)
         assert response.account_currency == "KRW"
@@ -136,7 +141,7 @@ class TestGetExchangeRate:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("app.routers.currency.httpx.AsyncClient", return_value=mock_client):
+        with patch("app.services.currency_service.httpx.AsyncClient", return_value=mock_client):
             result = await get_exchange_rate(target="KRW")
 
         assert result.base == "USD"
@@ -146,7 +151,7 @@ class TestGetExchangeRate:
     @pytest.mark.asyncio
     async def test_returns_cached_rate(self):
         """A fresh cached rate should be returned without hitting upstream."""
-        _rate_cache["KRW"] = (time.time(), 1300.0)
+        _rate_cache["USD:KRW"] = (time.time(), 1300.0)
 
         # If this tried to hit the network, it would fail since we don't mock httpx.
         result = await get_exchange_rate(target="KRW")
@@ -158,7 +163,7 @@ class TestGetExchangeRate:
     async def test_stale_cache_refetches(self):
         """An expired cached rate should trigger a fresh upstream fetch."""
         stale_time = time.time() - _CACHE_TTL_SECONDS - 10
-        _rate_cache["KRW"] = (stale_time, 1200.0)
+        _rate_cache["USD:KRW"] = (stale_time, 1200.0)
 
         mock_response = MagicMock()
         mock_response.json.return_value = {"rates": {"KRW": 1350.0}}
@@ -169,12 +174,12 @@ class TestGetExchangeRate:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("app.routers.currency.httpx.AsyncClient", return_value=mock_client):
+        with patch("app.services.currency_service.httpx.AsyncClient", return_value=mock_client):
             result = await get_exchange_rate(target="KRW")
 
         assert result.rate == 1350.0
         # Cache should be updated.
-        assert _rate_cache["KRW"][1] == 1350.0
+        assert _rate_cache["USD:KRW"][1] == 1350.0
 
     @pytest.mark.asyncio
     async def test_upstream_failure_returns_502(self):
@@ -186,7 +191,7 @@ class TestGetExchangeRate:
 
         from fastapi import HTTPException
 
-        with patch("app.routers.currency.httpx.AsyncClient", return_value=mock_client):
+        with patch("app.services.currency_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(HTTPException) as exc_info:
                 await get_exchange_rate(target="KRW")
 
@@ -206,7 +211,7 @@ class TestGetExchangeRate:
 
         from fastapi import HTTPException
 
-        with patch("app.routers.currency.httpx.AsyncClient", return_value=mock_client):
+        with patch("app.services.currency_service.httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(HTTPException) as exc_info:
                 await get_exchange_rate(target="KRW")
 

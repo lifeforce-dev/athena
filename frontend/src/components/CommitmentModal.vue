@@ -11,7 +11,7 @@
 
         <div class="field-row">
           <div class="field">
-            <label>Amount ($)</label>
+            <label>Amount ({{ currencySymbol() }})</label>
             <input v-model.number="form.rawAmount" type="number" step="0.01" placeholder="0.00">
           </div>
           <div class="field">
@@ -67,7 +67,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch, computed } from 'vue'
 import type { CommitmentCreate, Frequency } from '@/types/commitment'
-import { toLocalDateString } from '@/utils/format'
+import { toLocalDateString, toDisplayCurrency, currencySymbol } from '@/utils/format'
 
 const props = defineProps<{
   visible: boolean
@@ -101,7 +101,7 @@ watch(() => props.visible, (isVisible) => {
     const existing = props.editData
     const parsedAmount = Number(existing.amount)
     form.name = existing.name
-    form.rawAmount = Math.abs(parsedAmount)
+    form.rawAmount = toDisplayCurrency(Math.abs(parsedAmount))
     form.type = parsedAmount >= 0 ? 'income' : 'expense'
     form.frequency = existing.frequency as Frequency
     form.dayOfMonth = existing.day_of_month ?? 1

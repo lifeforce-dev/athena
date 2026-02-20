@@ -18,7 +18,10 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       user.value = await fetchCurrentUser()
       const currency = useCurrencyStore()
-      currency.initFromUser(user.value.account_currency ?? null)
+      currency.initFromUser(
+        user.value.account_currency ?? null,
+        user.value.display_currency ?? null,
+      )
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         user.value = null
