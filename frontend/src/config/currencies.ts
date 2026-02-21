@@ -13,6 +13,8 @@ export const CURRENCIES = {
   JPY: { symbol: '\u00A5', name: 'Japanese Yen', decimals: 0, defaultLang: 'ja_JP' },
   EUR: { symbol: '\u20AC', name: 'Euro', decimals: 2, defaultLang: 'en_US' },
   GBP: { symbol: '\u00A3', name: 'British Pound', decimals: 2, defaultLang: 'en_US' },
+  CNY: { symbol: '\u00A5', name: 'Chinese Yuan', decimals: 2, defaultLang: 'zh_CN' },
+  BRL: { symbol: 'R$', name: 'Brazilian Real', decimals: 2, defaultLang: 'pt_BR' },
 } as const
 
 export type CurrencyCode = keyof typeof CURRENCIES

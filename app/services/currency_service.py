@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest"
 
-ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP"}
+ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"}
 
 # In-memory cache: "FROM:TO" -> (timestamp, rate).
 _rate_cache: dict[str, tuple[float, float]] = {}

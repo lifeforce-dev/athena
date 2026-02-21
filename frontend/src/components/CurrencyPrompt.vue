@@ -75,7 +75,7 @@ async function confirm() {
   background: var(--panel);
   border: 1px solid var(--border);
   padding: 32px 36px;
-  max-width: 380px;
+  max-width: 440px;
   width: 100%;
   text-align: center;
 }
@@ -98,18 +98,18 @@ async function confirm() {
 }
 
 .cm-options {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 10px;
   margin-bottom: 24px;
 }
 
 .cm-opt {
-  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 16px 12px;
+  padding: 12px 8px;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--dim);
@@ -128,12 +128,12 @@ async function confirm() {
 }
 
 .cm-opt-symbol {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .cm-opt-label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;

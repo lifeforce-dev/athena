@@ -95,6 +95,27 @@ export const useCurrencyStore = defineStore('currency', () => {
     await apiSetDisplayCurrency(newCurrency)
   }
 
+  /** Set display currency to a specific code (for dropdown selection). */
+  async function setDisplay(code: CurrencyCode) {
+    if (code === displayCurrency.value) return
+
+    if (code !== accountCurrency.value) {
+      const key = `${accountCurrency.value}:${code}`
+
+      if (!rates.value.has(key)) {
+        try {
+          await loadRate(accountCurrency.value, code)
+        } catch {
+          console.error('Failed to fetch exchange rate')
+          return
+        }
+      }
+    }
+
+    displayCurrency.value = code
+    await apiSetDisplayCurrency(code)
+  }
+
   /** Fetch and cache an exchange rate between any two currencies. */
   async function loadRate(base: string, target: string) {
     if (base === target) {
@@ -151,6 +172,7 @@ export const useCurrencyStore = defineStore('currency', () => {
     initFromUser,
     saveAccountCurrency,
     toggleDisplay,
+    setDisplay,
     loadRate,
     convert,
     $reset,

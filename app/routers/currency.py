@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/currency", tags=["currency"])
 
-ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP"}
+ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"}
 
 # Maps currency code to default locale for auto-setting account_language.
 CURRENCY_DEFAULT_LANG: dict[str, str] = {
@@ -27,6 +27,8 @@ CURRENCY_DEFAULT_LANG: dict[str, str] = {
     "JPY": "ja_JP",
     "EUR": "en_US",
     "GBP": "en_US",
+    "CNY": "zh_CN",
+    "BRL": "pt_BR",
 }
 
 

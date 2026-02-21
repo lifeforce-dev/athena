@@ -13,16 +13,33 @@
       </router-link>
     </div>
     <div class="nav-spacer" />
-    <button
-      class="nav-currency"
-      data-tour="currency-toggle"
-      :class="{ converted: currency.isConverted }"
-      :disabled="currency.rateLoading"
-      @click="handleCurrencyToggle"
-    >
-      {{ currencyLabel }}
-    </button>
+    <div class="nav-currency-wrap" data-tour="currency-toggle">
+      <button
+        class="nav-currency"
+        :class="{ converted: currency.isConverted }"
+        :disabled="currency.rateLoading"
+        @click="showCurrencyDropdown = !showCurrencyDropdown"
+      >
+        {{ currencyLabel }}
+        <span class="nav-currency-caret">&#9662;</span>
+      </button>
+      <div v-if="showCurrencyDropdown" class="nav-currency-dropdown">
+        <button
+          v-for="opt in currencyOptions"
+          :key="opt.code"
+          class="nav-currency-item"
+          :class="{ active: opt.code === currency.displayCurrency }"
+          @click="selectCurrency(opt.code)"
+        >
+          <span class="nci-symbol">{{ opt.symbol }}</span>
+          <span class="nci-code">{{ opt.code }}</span>
+        </button>
+      </div>
+    </div>
     <span v-if="auth.user" class="nav-user">{{ auth.user.username }}</span>
+    <button v-if="devMode" class="nav-dev-reset" :disabled="resetting" @click="handleDevReset">
+      {{ resetting ? 'Resetting...' : 'Reset' }}
+    </button>
     <button class="nav-logout" @click="handleLogout">{{ t('nav.logout') }}</button>
   </nav>
 
@@ -35,13 +52,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrencyStore } from '@/stores/currency'
 import { dismissModal } from '@/api/auth'
+import { fetchDevStatus, resetUser } from '@/api/dev'
 import { useI18n } from '@/composables/useI18n'
-import { getCurrencyConfig } from '@/config/currencies'
+import { getCurrencyConfig, CURRENCIES, CURRENCY_CODES, type CurrencyCode } from '@/config/currencies'
 import CurrencyExplainer from '@/components/CurrencyExplainer.vue'
 
 const EXPLAINER_KEY = 'currency-explainer'
@@ -51,6 +69,36 @@ const auth = useAuthStore()
 const currency = useCurrencyStore()
 const router = useRouter()
 const showExplainer = ref(false)
+const showCurrencyDropdown = ref(false)
+const devMode = ref(false)
+const resetting = ref(false)
+
+const currencyOptions = CURRENCY_CODES.map((code) => ({
+  code,
+  symbol: CURRENCIES[code].symbol,
+}))
+
+onMounted(async () => {
+  try {
+    const status = await fetchDevStatus()
+    devMode.value = status.dev_mode
+  } catch {
+    // Not critical -- default to hidden.
+  }
+
+  document.addEventListener('click', onClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', onClickOutside)
+})
+
+function onClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.nav-currency-wrap')) {
+    showCurrencyDropdown.value = false
+  }
+}
 
 const tabs = [
   { to: '/', label: t('nav.dashboard') },
@@ -67,10 +115,11 @@ function hasSeenExplainer(): boolean {
   return (auth.user?.dismissed_modals ?? []).includes(EXPLAINER_KEY)
 }
 
-async function handleCurrencyToggle() {
-  await currency.toggleDisplay()
+async function selectCurrency(code: CurrencyCode) {
+  showCurrencyDropdown.value = false
+  await currency.setDisplay(code)
 
-  // Show explainer once on the first toggle that switches away from account currency.
+  // Show explainer once on the first selection that switches away from account currency.
   if (currency.isConverted && !hasSeenExplainer()) {
     showExplainer.value = true
   }
@@ -93,6 +142,19 @@ async function onExplainerDismiss() {
 async function handleLogout() {
   await auth.logout()
   router.push('/login')
+}
+
+async function handleDevReset() {
+  if (resetting.value) return
+  resetting.value = true
+  try {
+    await resetUser()
+    window.location.reload()
+  } catch (err) {
+    console.error('Dev reset failed:', err)
+  } finally {
+    resetting.value = false
+  }
 }
 </script>
 
@@ -158,6 +220,10 @@ async function handleLogout() {
   flex: 1;
 }
 
+.nav-currency-wrap {
+  position: relative;
+}
+
 .nav-currency {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -170,6 +236,12 @@ async function handleLogout() {
   margin-right: 4px;
   cursor: pointer;
   transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-currency-caret {
+  font-size: 7px;
+  margin-left: 2px;
+  opacity: 0.5;
 }
 
 .nav-currency:hover {
@@ -185,6 +257,56 @@ async function handleLogout() {
 .nav-currency:disabled {
   opacity: 0.4;
   cursor: wait;
+}
+
+.nav-currency-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 6px;
+  min-width: 160px;
+}
+
+.nav-currency-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.nav-currency-item:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.nav-currency-item.active {
+  color: var(--income);
+  border-color: color-mix(in srgb, var(--income) 30%, transparent);
+}
+
+.nci-symbol {
+  font-size: 12px;
+  width: 16px;
+  text-align: center;
+}
+
+.nci-code {
+  letter-spacing: 0.06em;
 }
 
 .nav-user {
@@ -209,5 +331,28 @@ async function handleLogout() {
 
 .nav-logout:hover {
   color: var(--danger);
+}
+
+.nav-dev-reset {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--warning, #e8a735);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--warning, #e8a735) 30%, transparent);
+  padding: 4px 10px;
+  margin-right: 4px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.nav-dev-reset:hover {
+  border-color: var(--warning, #e8a735);
+}
+
+.nav-dev-reset:disabled {
+  opacity: 0.4;
+  cursor: wait;
 }
 </style>
