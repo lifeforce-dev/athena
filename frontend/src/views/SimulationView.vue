@@ -1,7 +1,7 @@
 <template>
   <div class="wrap">
     <!-- ══════════════ SIMULATION RESULTS (above the grid) ══════════════ -->
-    <div v-if="loading" class="empty-state">Running simulation...</div>
+    <div v-if="loading" class="empty-state">{{ t('sim.running') }}</div>
     <div v-else-if="error" class="empty-state" style="color: var(--danger)">{{ error }}</div>
 
     <template v-else-if="hasRun && trajectory.length">
@@ -10,26 +10,26 @@
         <div class="hero-strip">
           <div class="hs-card">
             <div class="hs-val" style="color: var(--bright)">{{ formatDollars(currentBalance) }}</div>
-            <div class="hs-lbl">Current</div>
+            <div class="hs-lbl">{{ t('sim.current') }}</div>
           </div>
           <div class="hs-card">
             <div class="hs-val" :style="{ color: afterBalance >= currentBalance ? 'var(--safe)' : 'var(--danger)' }">
               {{ formatDollars(afterBalance) }}
             </div>
-            <div class="hs-lbl">After Window</div>
+            <div class="hs-lbl">{{ t('sim.after_window') }}</div>
           </div>
           <div class="hs-card">
             <div class="hs-val" style="color: var(--danger)">
               {{ lowestPoint ? formatDollars(lowestPoint.balance) : '-' }}
             </div>
             <div v-if="lowestPoint" class="hs-sub">{{ shortDate(lowestPoint.date) }}</div>
-            <div class="hs-lbl">Lowest Point</div>
+            <div class="hs-lbl">{{ t('sim.lowest_point') }}</div>
           </div>
           <div class="hs-card">
             <div class="hs-val" :style="{ color: avgGainedPerMonth >= 0 ? 'var(--safe)' : 'var(--danger)' }">
               {{ avgGainedPerMonth >= 0 ? '+' : '-' }}{{ formatDollars(avgGainedPerMonth) }}
             </div>
-            <div class="hs-lbl">Avg Gained / Month</div>
+            <div class="hs-lbl">{{ t('sim.avg_gained') }}</div>
           </div>
         </div>
 
@@ -38,8 +38,8 @@
 
         <!-- Monthly breakdown -->
         <div class="sh">
-          <span class="sh-t">Monthly Breakdown</span>
-          <span class="sh-m">{{ monthBreaks.length }} months</span>
+          <span class="sh-t">{{ t('sim.monthly_breakdown') }}</span>
+          <span class="sh-m">{{ t('sim.months_count', { count: monthBreaks.length }) }}</span>
         </div>
         <div class="month-grid">
           <div v-for="month in monthBreaks" :key="month.label" class="mo-card">
@@ -74,8 +74,8 @@
     </template>
 
     <div v-else-if="hasRun" class="empty-state">
-      <h3>No Data</h3>
-      <p>No projection data returned for the selected window. Check your commitments and balance.</p>
+      <h3>{{ t('sim.no_data_title') }}</h3>
+      <p>{{ t('sim.no_data_desc') }}</p>
     </div>
 
     <!-- ══════════════ TWO-PANEL: Rails left, Sticky Summary right ══════════════ -->
@@ -93,16 +93,16 @@
       <!-- RIGHT: Sticky scenario summary -->
       <div class="summary-panel" data-tour="sim-summary">
         <div class="summary-box">
-          <div class="summary-title">Scenario Summary</div>
+          <div class="summary-title">{{ t('sim.summary_title') }}</div>
           <div class="summary-body">
             <!-- Date pickers -->
             <div class="date-row">
               <div class="date-field">
-                <span class="date-label">Start Date</span>
+                <span class="date-label">{{ t('sim.start_date') }}</span>
                 <input type="date" class="date-input" v-model="startDate" />
               </div>
               <div class="date-field">
-                <span class="date-label">End Date</span>
+                <span class="date-label">{{ t('sim.end_date') }}</span>
                 <input type="date" class="date-input" v-model="endDate" />
               </div>
             </div>
@@ -111,17 +111,17 @@
             <div class="s-big" :class="scenarioNet >= 0 ? '' : 'neg'">
               {{ scenarioNet >= 0 ? '+' : '-' }}{{ formatDollars(scenarioNet) }}
             </div>
-            <div class="s-sub">Simulated Net / Month</div>
+            <div class="s-sub">{{ t('sim.net_per_month') }}</div>
 
             <!-- Breakdown -->
             <div class="s-line">
-              <span class="s-line-name">Income</span>
+              <span class="s-line-name">{{ t('sim.income') }}</span>
               <span class="s-line-val" style="color: var(--income)">
                 +{{ formatDollars(scenarioIncome) }}
               </span>
             </div>
             <div class="s-line">
-              <span class="s-line-name">Expenses</span>
+              <span class="s-line-name">{{ t('sim.expenses') }}</span>
               <span class="s-line-val" style="color: var(--danger)">
                 -{{ formatDollars(scenarioExpenses) }}
               </span>
@@ -130,30 +130,30 @@
             <hr class="s-divider" />
 
             <div class="s-line">
-              <span class="s-line-name">Active Items</span>
+              <span class="s-line-name">{{ t('sim.active_items') }}</span>
               <span class="s-line-val" style="color: var(--bright)">
                 {{ commitments.length - disabledCount }} / {{ commitments.length }}
               </span>
             </div>
             <div v-if="savingsFromCuts > 0" class="s-line">
-              <span class="s-line-name">Savings from Cuts</span>
+              <span class="s-line-name">{{ t('sim.savings_from_cuts') }}</span>
               <span class="s-line-val" style="color: var(--safe)">
-                +{{ formatDollars(savingsFromCuts) }}/mo
+                +{{ formatDollars(savingsFromCuts) }}{{ t('commit.per_month') }}
               </span>
             </div>
 
             <div v-if="hasChanges" class="changes-note">
-              <template v-if="disabledCount">{{ disabledCount }} disabled</template>
+              <template v-if="disabledCount">{{ t('sim.disabled_count', { count: disabledCount }) }}</template>
               <template v-if="disabledCount && editedCount">, </template>
-              <template v-if="editedCount">{{ editedCount }} edited</template>
-              <span class="reset-link" @click="resetOverrides">Reset</span>
+              <template v-if="editedCount">{{ t('sim.edited_count', { count: editedCount }) }}</template>
+              <span class="reset-link" @click="resetOverrides">{{ t('sim.reset') }}</span>
             </div>
 
             <button class="run-btn" @click="runSimulation" :disabled="loading">
-              {{ loading ? 'Running...' : 'Run Simulation' }}
+              {{ loading ? t('sim.running_button') : t('sim.run_button') }}
             </button>
 
-            <div class="window-note">{{ dayWindow }} day window</div>
+            <div class="window-note">{{ t('sim.day_window', { count: dayWindow }) }}</div>
           </div>
         </div>
       </div>
@@ -161,8 +161,8 @@
 
     <!-- Pre-run placeholder (only if never run and no results) -->
     <div v-if="!hasRun && !loading" class="empty-state pre-run">
-      <h3>Configure & Run</h3>
-      <p>Toggle commitments, adjust amounts, then click "Run Simulation" to project your cash flow.</p>
+      <h3>{{ t('sim.configure_title') }}</h3>
+      <p>{{ t('sim.configure_desc') }}</p>
     </div>
   </div>
 </template>
@@ -174,7 +174,9 @@ import ScenarioCommitments from '@/components/ScenarioCommitments.vue'
 import { useScenario } from '@/composables/useScenario'
 import { useTour } from '@/composables/useTour'
 import { parseLocalDate, formatDollars } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
 
+const { t } = useI18n()
 useTour()
 
 const {

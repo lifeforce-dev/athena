@@ -130,6 +130,7 @@ async def me(
         "username": current_user["username"],
         "account_currency": user.account_currency if user else None,
         "display_currency": user.account_currency if user else None,
+        "account_language": user.account_language if user else None,
         "completed_tours": json.loads(user.completed_tours) if user and user.completed_tours else [],
         "dismissed_modals": json.loads(user.dismissed_modals) if user and user.dismissed_modals else [],
     }
@@ -179,6 +180,26 @@ async def dismiss_modal(
         dismissed.append(modal_key)
         user.dismissed_modals = json.dumps(dismissed)
         await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/me/language")
+async def set_language(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    language: str = Query(..., description="Locale code, e.g. en_US, ko_KR"),
+) -> Response:
+    """Set the user's preferred UI language."""
+    user_id = int(current_user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.account_language = language
+    await db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

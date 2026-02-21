@@ -4,22 +4,22 @@
       <div class="login-accent" />
       <div class="login-content">
         <div class="login-mark">
-          <span class="login-brand">Athena</span>
-          <span class="login-ver">v1</span>
+          <span class="login-brand">{{ t('login.brand') }}</span>
+          <span class="login-ver">{{ t('login.version') }}</span>
         </div>
         <div class="login-rule" />
-        <p class="login-desc">Cash flow projection<br />and financial awareness.</p>
+        <p class="login-desc">{{ t('login.tagline') }}</p>
         <button class="login-btn" @click="login">
-          <span class="login-btn-label">Sign in with Discord</span>
+          <span class="login-btn-label">{{ t('login.sign_in') }}</span>
           <span class="login-btn-arrow">&rarr;</span>
         </button>
         <button class="demo-btn" @click="startDemo">
-          <span class="demo-btn-label">Try Demo</span>
-          <span class="demo-btn-sub">No account required</span>
+          <span class="demo-btn-label">{{ t('login.demo') }}</span>
+          <span class="demo-btn-sub">{{ t('login.demo_sub') }}</span>
         </button>
         <div class="login-footer">
           <span class="login-foot-dot" />
-          <span class="login-foot-text">Secure session via OAuth 2.0</span>
+          <span class="login-foot-text">{{ t('login.secure') }}</span>
         </div>
       </div>
     </div>
@@ -29,7 +29,9 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { loginRedirect } from '@/api/auth'
+import { useI18n } from '@/composables/useI18n'
 
+const { t } = useI18n()
 const router = useRouter()
 
 function login() {

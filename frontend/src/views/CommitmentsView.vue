@@ -3,40 +3,40 @@
     <nav class="nav-placeholder" />
 
     <div class="wrap">
-      <div class="page-title">Commitments</div>
-      <div class="page-sub">Manage recurring expenses, income, and one-time payments that drive your trajectory.</div>
+      <div class="page-title">{{ t('commit.page_title') }}</div>
+      <div class="page-sub">{{ t('commit.page_desc') }}</div>
 
       <!-- Summary cards -->
       <div class="summary" data-tour="commitments-summary">
         <div class="sum-card">
           <div class="sum-val" style="color: var(--income)">{{ formatDollars(totalMonthlyIncome) }}</div>
-          <div class="sum-lbl">Monthly Income</div>
+          <div class="sum-lbl">{{ t('commit.monthly_income') }}</div>
         </div>
         <div class="sum-card">
           <div class="sum-val" style="color: var(--danger)">{{ formatDollars(totalMonthlyExpenses) }}</div>
-          <div class="sum-lbl">Monthly Expenses</div>
+          <div class="sum-lbl">{{ t('commit.monthly_expenses') }}</div>
         </div>
         <div class="sum-card">
           <div class="sum-val" :style="{ color: netMonthly >= 0 ? 'var(--safe)' : 'var(--danger)' }">
             {{ netMonthly >= 0 ? '+' : '-' }}{{ formatDollars(netMonthly) }}
           </div>
-          <div class="sum-lbl">Net / Month</div>
+          <div class="sum-lbl">{{ t('commit.net_per_month') }}</div>
         </div>
         <div class="sum-card">
           <div class="sum-val" style="color: var(--bright)">{{ commitments.length }}</div>
-          <div class="sum-lbl">Total Items</div>
+          <div class="sum-lbl">{{ t('commit.total_items') }}</div>
         </div>
       </div>
 
       <!-- Add buttons -->
       <div class="add-bar" data-tour="commitments-add">
         <button class="add-btn" @click="openAdd">
-          <span class="plus">+</span> Add Commitment
+          <span class="plus">+</span> {{ t('commit.add') }}
         </button>
       </div>
 
       <!-- Loading / error states -->
-      <div v-if="loading" class="empty-state">Loading commitments...</div>
+      <div v-if="loading" class="empty-state">{{ t('commit.loading') }}</div>
       <div v-else-if="error" class="empty-state" style="color: var(--danger)">{{ error }}</div>
 
       <!-- Grouped commitment list -->
@@ -45,14 +45,14 @@
           <div class="cat-hdr">
             <span class="cat-name">{{ group.label }} ({{ group.items.length }})</span>
             <span class="cat-total" :class="{ pos: group.total > 0 }">
-              {{ group.total > 0 ? '+' : '-' }}{{ formatDollars(group.total) }}/mo
+              {{ group.total > 0 ? '+' : '-' }}{{ formatDollars(group.total) }}{{ t('commit.per_month') }}
             </span>
           </div>
           <div class="col-hdr">
-            <span>Name</span>
-            <span style="text-align: right">Amount</span>
-            <span style="text-align: center">Frequency</span>
-            <span style="text-align: center">Next</span>
+            <span>{{ t('commit.col_name') }}</span>
+            <span style="text-align: right">{{ t('commit.col_amount') }}</span>
+            <span style="text-align: center">{{ t('commit.col_freq') }}</span>
+            <span style="text-align: center">{{ t('commit.col_next') }}</span>
             <span></span>
           </div>
           <div v-for="item in group.items" :key="item.id" class="c-row">
@@ -64,22 +64,22 @@
             </span>
             <span class="c-freq">{{ freqLabel(item.frequency) }}</span>
             <span class="c-next">{{ '-' }}</span>
-            <button class="c-del" @click="handleDelete(item.id)" title="Remove">&times;</button>
+            <button class="c-del" @click="handleDelete(item.id)" :title="t('commit.remove')">&times;</button>
           </div>
         </div>
 
         <!-- One-time payments -->
         <div v-if="oneTimeItems.length" class="cat-box">
           <div class="cat-hdr">
-            <span class="cat-name">One-Time Payments ({{ oneTimeItems.length }})</span>
+            <span class="cat-name">{{ t('commit.one_time_title', { count: oneTimeItems.length }) }}</span>
             <span class="cat-total">
-              {{ formatDollars(oneTimeTotal) }} total
+              {{ t('commit.total', { amount: formatDollars(oneTimeTotal) }) }}
             </span>
           </div>
           <div class="col-hdr ot-hdr">
-            <span>Date</span>
-            <span>Name</span>
-            <span style="text-align: right">Amount</span>
+            <span>{{ t('commit.col_date') }}</span>
+            <span>{{ t('commit.col_name') }}</span>
+            <span style="text-align: right">{{ t('commit.col_amount') }}</span>
             <span></span>
           </div>
           <div v-for="item in oneTimeItems" :key="item.id" class="c-row ot-row">
@@ -110,7 +110,9 @@ import { useCommitments } from '@/composables/useCommitments'
 import { useTour } from '@/composables/useTour'
 import type { CommitmentCreate } from '@/types/commitment'
 import { parseMoney, parseLocalDate, formatDollars, formatCents } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
 
+const { t } = useI18n()
 useTour()
 
 const {
@@ -143,12 +145,12 @@ const editTarget = ref<EditTarget | null>(null)
 
 const freqLabel = (frequency: string) => {
   const labels: Record<string, string> = {
-    monthly: 'Monthly',
-    biweekly: 'Biweekly',
-    weekly: 'Weekly',
-    daily: 'Daily',
-    day_interval: 'Custom',
-    once: 'One-Time',
+    monthly: t('freq.monthly'),
+    biweekly: t('freq.biweekly'),
+    weekly: t('freq.weekly'),
+    daily: t('freq.daily'),
+    day_interval: t('freq.custom'),
+    once: t('freq.once'),
   }
   return labels[frequency] ?? frequency
 }
@@ -181,7 +183,7 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
 
   if (income.length) {
     groups.push({
-      label: 'Income',
+      label: t('commit.group_income'),
       items: income.sort((a, b) => Math.abs(b.parsedAmount) - Math.abs(a.parsedAmount)),
       total: income.reduce((total, commitment) => total + monthlyEquiv(commitment.parsedAmount, commitment.frequency, commitment.interval_days), 0),
     })
@@ -189,7 +191,7 @@ const groupedCommitments = computed<GroupedCategory[]>(() => {
 
   if (expenses.length) {
     groups.push({
-      label: 'Expenses',
+      label: t('commit.group_expenses'),
       items: expenses.sort((a, b) => Math.abs(b.parsedAmount) - Math.abs(a.parsedAmount)),
       total: expenses.reduce((total, commitment) => total + monthlyEquiv(commitment.parsedAmount, commitment.frequency), 0),
     })

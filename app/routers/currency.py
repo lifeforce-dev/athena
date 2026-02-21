@@ -18,7 +18,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/currency", tags=["currency"])
 
-ALLOWED_CURRENCIES = {"USD", "KRW"}
+ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP"}
+
+# Maps currency code to default locale for auto-setting account_language.
+CURRENCY_DEFAULT_LANG: dict[str, str] = {
+    "USD": "en_US",
+    "KRW": "ko_KR",
+    "JPY": "ja_JP",
+    "EUR": "en_US",
+    "GBP": "en_US",
+}
 
 
 # -- Models ----------------------------------------------------------------
@@ -80,6 +89,9 @@ async def set_account_currency(
     # Default display_currency to account_currency on first setup.
     if user.display_currency is None:
         user.display_currency = body.currency
+    # Auto-set language to the currency's default locale on first setup.
+    if user.account_language is None:
+        user.account_language = CURRENCY_DEFAULT_LANG.get(body.currency, "en_US")
     await db.commit()
     await db.refresh(user)
 
@@ -111,22 +123,30 @@ async def set_display_currency(
 @router.get("/rate", response_model=ExchangeRateResponse)
 async def get_exchange_rate(
     target: str = "KRW",
+    base: str = "USD",
 ) -> ExchangeRateResponse:
-    """Fetch the current USD exchange rate for a target currency.
+    """Fetch the current exchange rate between two currencies.
 
     Proxied through the backend to avoid CORS and to cache results
     (1-hour TTL) so we don't hammer the upstream API.
     """
+    base = base.upper()
     target = target.upper()
 
-    if target not in ALLOWED_CURRENCIES or target == "USD":
+    if base not in ALLOWED_CURRENCIES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Target must be a non-USD currency in: {', '.join(sorted(ALLOWED_CURRENCIES - {'USD'}))}",
+            detail=f"Base must be one of: {', '.join(sorted(ALLOWED_CURRENCIES))}",
+        )
+
+    if target not in ALLOWED_CURRENCIES or target == base:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Target must be a different currency in: {', '.join(sorted(ALLOWED_CURRENCIES - {base}))}",
         )
 
     try:
-        rate = await get_rate("USD", target)
+        rate = await get_rate(base, target)
     except Exception:
         logger.exception("Failed to fetch exchange rate")
         raise HTTPException(
@@ -134,4 +154,4 @@ async def get_exchange_rate(
             detail="Exchange rate service unavailable",
         )
 
-    return ExchangeRateResponse(base="USD", target=target, rate=rate)
+    return ExchangeRateResponse(base=base, target=target, rate=rate)

@@ -5,58 +5,58 @@
         <div class="modal-title">{{ title }}</div>
 
         <div class="field">
-          <label>Name</label>
-          <input v-model="form.name" type="text" placeholder="e.g. Netflix, Car Payment">
+          <label>{{ t('modal.name') }}</label>
+          <input v-model="form.name" type="text" :placeholder="t('modal.name_placeholder')">
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label>Amount ({{ currencySymbol() }})</label>
+            <label>{{ t('modal.amount', { symbol: currencySymbol() }) }}</label>
             <input v-model.number="form.rawAmount" type="number" step="0.01" placeholder="0.00">
           </div>
           <div class="field">
-            <label>Type</label>
+            <label>{{ t('modal.type') }}</label>
             <select v-model="form.type">
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
+              <option value="expense">{{ t('modal.type_expense') }}</option>
+              <option value="income">{{ t('modal.type_income') }}</option>
             </select>
           </div>
         </div>
 
         <div class="field-row">
           <div class="field">
-            <label>Frequency</label>
+            <label>{{ t('modal.frequency') }}</label>
             <select v-model="form.frequency">
-              <option value="monthly">Monthly</option>
-              <option value="biweekly">Biweekly</option>
-              <option value="weekly">Weekly</option>
-              <option value="daily">Daily</option>
-              <option value="once">One-Time</option>
+              <option value="monthly">{{ t('freq.monthly') }}</option>
+              <option value="biweekly">{{ t('freq.biweekly') }}</option>
+              <option value="weekly">{{ t('freq.weekly') }}</option>
+              <option value="daily">{{ t('freq.daily') }}</option>
+              <option value="once">{{ t('freq.once') }}</option>
             </select>
           </div>
           <div v-if="form.frequency === 'monthly'" class="field">
-            <label>Day of Month</label>
+            <label>{{ t('modal.day_of_month') }}</label>
             <input v-model.number="form.dayOfMonth" type="number" min="1" max="31" placeholder="1">
           </div>
           <div v-if="form.frequency === 'once'" class="field">
-            <label>Date</label>
+            <label>{{ t('modal.date') }}</label>
             <input v-model="form.oneTimeDate" type="date">
           </div>
           <div v-if="form.frequency === 'biweekly' || form.frequency === 'weekly'" class="field">
-            <label>Starting From</label>
+            <label>{{ t('modal.starting_from') }}</label>
             <input v-model="form.anchorDate" type="date">
           </div>
         </div>
 
         <div v-if="form.frequency !== 'once'" class="field">
-          <label>Start Date</label>
+          <label>{{ t('modal.start_date') }}</label>
           <input v-model="form.startDate" type="date">
         </div>
 
         <div class="modal-actions">
-          <button class="btn btn-cancel" @click="emit('close')">Cancel</button>
+          <button class="btn btn-cancel" @click="emit('close')">{{ t('modal.cancel') }}</button>
           <button class="btn btn-save" @click="handleSave" :disabled="saving">
-            {{ saving ? 'Saving...' : 'Save' }}
+            {{ saving ? t('modal.saving') : t('modal.save') }}
           </button>
         </div>
       </div>
@@ -68,6 +68,7 @@
 import { reactive, ref, watch, computed } from 'vue'
 import type { CommitmentCreate, Frequency } from '@/types/commitment'
 import { toLocalDateString, toDisplayCurrency, currencySymbol } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
 
 const props = defineProps<{
   visible: boolean
@@ -80,6 +81,7 @@ const emit = defineEmits<{
 }>()
 
 const saving = ref(false)
+const { t } = useI18n()
 
 const form = reactive({
   name: '',
@@ -92,7 +94,7 @@ const form = reactive({
   startDate: toLocalDateString(new Date()),
 })
 
-const title = computed(() => props.editData ? 'Edit Commitment' : 'Add Commitment')
+const title = computed(() => props.editData ? t('modal.edit_title') : t('modal.add_title'))
 
 watch(() => props.visible, (isVisible) => {
   if (!isVisible) return

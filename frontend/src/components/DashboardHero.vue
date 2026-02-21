@@ -4,7 +4,7 @@
     <div class="hero-top" data-tour="balance" @click="startEdit">
       <template v-if="!editing">
         <div class="hero-balance">{{ formatDollars(currentBalance) }}</div>
-        <div class="hero-bal-lbl">Current Balance</div>
+        <div class="hero-bal-lbl">{{ t('hero.current_balance') }}</div>
       </template>
       <template v-else>
         <input
@@ -19,8 +19,8 @@
           @blur="cancelEdit"
         />
         <div class="hero-edit-actions">
-          <button class="hero-save" @mousedown.prevent="saveBalance">Save</button>
-          <span class="hero-cancel" @mousedown.prevent="cancelEdit">Esc</span>
+          <button class="hero-save" @mousedown.prevent="saveBalance">{{ t('hero.save') }}</button>
+          <span class="hero-cancel" @mousedown.prevent="cancelEdit">{{ t('hero.esc') }}</span>
         </div>
       </template>
     </div>
@@ -31,16 +31,16 @@
         <div class="gauge-verdict" :class="statusClass">{{ verdict }}</div>
         <div>
           <span class="gauge-days">{{ daysCovered }}</span>
-          <span class="gauge-days-lbl"> days projected</span>
+          <span class="gauge-days-lbl"> {{ t('hero.days_projected', { count: daysCovered }) }}</span>
         </div>
       </div>
       <div class="gauge-track" :style="{ '--gauge-pct': gaugePct + '%' }">
         <div class="gauge-marker" :style="{ left: gaugePct + '%' }" />
       </div>
       <div class="gauge-labels">
-        <span class="gauge-lbl" style="color: var(--danger)">Critical</span>
-        <span class="gauge-lbl" style="color: var(--tight)">Tight</span>
-        <span class="gauge-lbl" style="color: var(--safe)">Comfortable</span>
+        <span class="gauge-lbl" style="color: var(--danger)">{{ t('hero.critical') }}</span>
+        <span class="gauge-lbl" style="color: var(--tight)">{{ t('hero.tight') }}</span>
+        <span class="gauge-lbl" style="color: var(--safe)">{{ t('hero.comfortable') }}</span>
       </div>
     </div>
 
@@ -48,16 +48,16 @@
     <div class="stats-strip">
       <div class="stat-cell">
         <div class="stat-val" :style="{ color: endColor }">{{ formatDollars(endBalance) }}</div>
-        <div class="stat-lbl">After Window</div>
+        <div class="stat-lbl">{{ t('hero.after_window') }}</div>
       </div>
       <div class="stat-cell">
         <div class="stat-val" style="color: var(--danger)">{{ formatDollars(lowestBalance) }}</div>
-        <div class="stat-lbl">Lowest Point</div>
+        <div class="stat-lbl">{{ t('hero.lowest_point') }}</div>
         <div class="stat-sub">{{ lowestDate }}</div>
       </div>
       <div class="stat-cell">
         <div class="stat-val" :style="{ color: netColor }">{{ netLabel }}</div>
-        <div class="stat-lbl">Net Change</div>
+        <div class="stat-lbl">{{ t('hero.net_change') }}</div>
       </div>
     </div>
   </section>
@@ -66,6 +66,7 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
 import { parseLocalDate, formatDollars, toDisplayCurrency } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
 
 const props = defineProps<{
   currentBalance: number
@@ -79,6 +80,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   updateBalance: [balance: number]
 }>()
+
+const { t } = useI18n()
 
 const editing = ref(false)
 const editValue = ref('')
@@ -113,9 +116,9 @@ const statusClass = computed(() => {
 })
 
 const verdict = computed(() => {
-  if (statusClass.value === 'danger') return 'Critical'
-  if (statusClass.value === 'tight') return 'Tight'
-  return 'Comfortable'
+  if (statusClass.value === 'danger') return t('hero.critical')
+  if (statusClass.value === 'tight') return t('hero.tight')
+  return t('hero.comfortable')
 })
 
 const endColor = computed(() =>

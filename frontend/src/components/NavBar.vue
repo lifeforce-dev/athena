@@ -1,6 +1,6 @@
 <template>
   <nav class="nav">
-    <div class="nav-brand">Athena</div>
+    <div class="nav-brand">{{ t('login.brand') }}</div>
     <div class="nav-tabs">
       <router-link
         v-for="tab in tabs"
@@ -20,41 +20,48 @@
       :disabled="currency.rateLoading"
       @click="handleCurrencyToggle"
     >
-      {{ currency.displayCurrency === 'USD' ? '$ USD' : '\u20A9 KRW' }}
+      {{ currencyLabel }}
     </button>
     <span v-if="auth.user" class="nav-user">{{ auth.user.username }}</span>
-    <button class="nav-logout" @click="handleLogout">Logout</button>
+    <button class="nav-logout" @click="handleLogout">{{ t('nav.logout') }}</button>
   </nav>
 
   <CurrencyExplainer
     v-if="showExplainer"
     :account-ccy="currency.accountCurrency"
     :display-ccy="currency.displayCurrency"
-    :rate="currency.krwRate ?? 1"
     @dismiss="onExplainerDismiss"
   />
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrencyStore } from '@/stores/currency'
 import { dismissModal } from '@/api/auth'
+import { useI18n } from '@/composables/useI18n'
+import { getCurrencyConfig } from '@/config/currencies'
 import CurrencyExplainer from '@/components/CurrencyExplainer.vue'
 
 const EXPLAINER_KEY = 'currency-explainer'
 
+const { t } = useI18n()
 const auth = useAuthStore()
 const currency = useCurrencyStore()
 const router = useRouter()
 const showExplainer = ref(false)
 
 const tabs = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/commitments', label: 'Commitments' },
-  { to: '/simulation', label: 'Simulation' },
+  { to: '/', label: t('nav.dashboard') },
+  { to: '/commitments', label: t('nav.commitments') },
+  { to: '/simulation', label: t('nav.simulation') },
 ]
+
+const currencyLabel = computed(() => {
+  const cfg = getCurrencyConfig(currency.displayCurrency)
+  return `${cfg.symbol} ${currency.displayCurrency}`
+})
 
 function hasSeenExplainer(): boolean {
   return (auth.user?.dismissed_modals ?? []).includes(EXPLAINER_KEY)

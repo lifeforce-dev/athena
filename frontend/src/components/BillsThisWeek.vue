@@ -1,7 +1,7 @@
 <template>
   <div class="btw-panel">
     <template v-if="bills.length === 0">
-      <div class="btw-empty">No bills due for the rest of this week</div>
+      <div class="btw-empty">{{ t('bills.empty') }}</div>
     </template>
     <template v-else>
       <div v-for="bill in bills" :key="bill.name + bill.date" class="btw-row">
@@ -10,13 +10,13 @@
         <span class="btw-amt">-{{ formatDollars(bill.amount) }}</span>
       </div>
       <div class="btw-total">
-        <span>Total</span>
+        <span>{{ t('bills.total') }}</span>
         <span>-{{ formatDollars(thisWeekTotal) }}</span>
       </div>
     </template>
 
     <template v-if="nextBills.length > 0">
-      <div class="btw-next-label">Next week -- {{ formatDollars(nextWeekTotal) }} in bills</div>
+      <div class="btw-next-label">{{ t('bills.next_week', { amount: formatDollars(nextWeekTotal) }) }}</div>
       <div v-for="bill in nextBills" :key="bill.name + bill.date" class="btw-row btw-next">
         <span class="btw-day">{{ weekday(bill.date) }}</span>
         <span class="btw-name">{{ bill.name }}</span>
@@ -30,6 +30,9 @@
 import { computed } from 'vue'
 import type { BillEntry } from '@/composables/useExpenseAnalysis'
 import { parseLocalDate, formatDollars } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   bills: BillEntry[]

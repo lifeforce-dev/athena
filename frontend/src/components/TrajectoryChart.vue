@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="sh">
-      <span class="sh-t">Balance Trajectory</span>
+      <span class="sh-t">{{ t('chart.title') }}</span>
       <span class="sh-m">{{ rangeLabel }}</span>
     </div>
     <InfoBar :data="infoBarData" />
@@ -29,6 +29,7 @@ import type { WorstWindow, DailyExpenseEntry } from '@/composables/useExpenseAna
 import type { InfoBarData } from '@/components/InfoBar.vue'
 import InfoBar from '@/components/InfoBar.vue'
 import { parseLocalDate, daysBetween } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
 import {
   type ChartLayout, type HoverState, type HoveredBand,
   buildLayout, buildRangeLabel,
@@ -48,6 +49,8 @@ const props = defineProps<{
   masterExpenseOrder?: string[]
   masterColorMap?: Record<string, string>
 }>()
+
+const { t } = useI18n()
 
 const emit = defineEmits<{
   infoUpdate: [data: InfoBarData | null]

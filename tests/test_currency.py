@@ -29,7 +29,7 @@ from app.services.currency_service import (
 
 
 class TestSetCurrencyRequestValidation:
-    """The request model should accept only USD and KRW, case-insensitive."""
+    """The request model should accept all configured currencies, case-insensitive."""
 
     def test_usd_uppercase(self):
         req = SetCurrencyRequest(currency="USD")
@@ -45,14 +45,14 @@ class TestSetCurrencyRequestValidation:
 
     def test_invalid_currency_rejected(self):
         with pytest.raises(ValueError):
-            SetCurrencyRequest(currency="EUR")
+            SetCurrencyRequest(currency="XYZ")
 
     def test_empty_string_rejected(self):
         with pytest.raises(ValueError):
             SetCurrencyRequest(currency="")
 
     def test_allowed_currencies_complete(self):
-        assert ALLOWED_CURRENCIES == {"USD", "KRW"}
+        assert ALLOWED_CURRENCIES == {"USD", "KRW", "JPY", "EUR", "GBP"}
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ class TestGetExchangeRate:
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_exchange_rate(target="EUR")
+            await get_exchange_rate(target="XYZ")
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio

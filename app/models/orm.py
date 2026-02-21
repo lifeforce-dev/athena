@@ -31,6 +31,7 @@ class User(Base):
     display_name: Mapped[str | None] = mapped_column(String(128))
     account_currency: Mapped[str | None] = mapped_column(String(3))
     display_currency: Mapped[str | None] = mapped_column(String(3))
+    account_language: Mapped[str | None] = mapped_column(String(5))
     completed_tours: Mapped[str | None] = mapped_column(Text)
     dismissed_modals: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(

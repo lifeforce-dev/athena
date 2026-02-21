@@ -1,17 +1,17 @@
 <template>
   <div>
     <div class="sh">
-      <span class="sh-t">Upcoming Events</span>
-      <span class="sh-m">{{ eventCount }} events</span>
+      <span class="sh-t">{{ t('events.title') }}</span>
+      <span class="sh-m">{{ t('events.count', { count: eventCount }) }}</span>
     </div>
 
     <div v-for="group in groupedEvents" :key="group.month" class="ev-box">
       <div class="ev-month">{{ group.month }}</div>
       <div class="ev-hdr">
-        <span>Day</span>
-        <span>Name</span>
-        <span>Amount</span>
-        <span>Balance</span>
+        <span>{{ t('events.col_day') }}</span>
+        <span>{{ t('events.col_name') }}</span>
+        <span>{{ t('events.col_amount') }}</span>
+        <span>{{ t('events.col_balance') }}</span>
       </div>
       <div
         v-for="(ev, idx) in group.events"
@@ -37,6 +37,9 @@
 import { computed } from 'vue'
 import type { ParsedLedgerEntry } from '@/types/projection'
 import { parseLocalDate, formatCents } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   ledger: ParsedLedgerEntry[]

@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 
 EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest"
 
+ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP"}
+
 # In-memory cache: "FROM:TO" -> (timestamp, rate).
 _rate_cache: dict[str, tuple[float, float]] = {}
 _CACHE_TTL_SECONDS = 3600
@@ -86,7 +88,7 @@ async def get_user_currencies(
     row = result.one_or_none()
     account = (row[0] if row and row[0] else "USD")
 
-    if display_override and display_override.upper() in ("USD", "KRW"):
+    if display_override and display_override.upper() in ALLOWED_CURRENCIES:
         display = display_override.upper()
     else:
         display = (row[1] if row and row[1] else account)

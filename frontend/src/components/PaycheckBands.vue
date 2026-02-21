@@ -4,14 +4,14 @@
       <div class="band-title">
         <strong>{{ formatRange(period.start_date, period.end_date) }}</strong>
         <span>
-          Spent {{ formatCurrency(period.spent) }} • Min {{ formatCurrency(period.min_balance) }}
-          <em v-if="period.is_partial">(partial)</em>
+          {{ t('bands.spent', { amount: formatCurrency(period.spent) }) }} • {{ t('bands.min', { amount: formatCurrency(period.min_balance) }) }}
+          <em v-if="period.is_partial">{{ t('bands.partial') }}</em>
         </span>
       </div>
       <div class="band">
-        <span class="stat">Start <strong>{{ formatCurrency(period.start_balance) }}</strong></span>
-        <span class="stat">End <strong>{{ formatCurrency(period.end_balance) }}</strong></span>
-        <span class="stat">Net <strong>{{ formatSigned(period.net) }}</strong></span>
+        <span class="stat">{{ t('bands.start') }} <strong>{{ formatCurrency(period.start_balance) }}</strong></span>
+        <span class="stat">{{ t('bands.end') }} <strong>{{ formatCurrency(period.end_balance) }}</strong></span>
+        <span class="stat">{{ t('bands.net') }} <strong>{{ formatSigned(period.net) }}</strong></span>
       </div>
     </div>
   </section>
@@ -20,6 +20,9 @@
 <script setup lang="ts">
 import type { ParsedPayPeriod } from '@/types/projection'
 import { formatCurrency, formatSigned, parseLocalDate } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 defineProps<{ payPeriods: ParsedPayPeriod[] }>()
 

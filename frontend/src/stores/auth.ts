@@ -4,6 +4,7 @@ import type { User } from '@/types/auth'
 import { fetchCurrentUser, logout as apiLogout } from '@/api/auth'
 import { ApiError } from '@/api/client'
 import { useCurrencyStore } from '@/stores/currency'
+import { useLanguageStore } from '@/stores/language'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
@@ -22,6 +23,8 @@ export const useAuthStore = defineStore('auth', () => {
         user.value.account_currency ?? null,
         user.value.display_currency ?? null,
       )
+      const language = useLanguageStore()
+      language.initFromUser(user.value.account_language ?? null)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         user.value = null

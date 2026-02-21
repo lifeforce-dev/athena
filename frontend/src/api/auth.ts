@@ -19,3 +19,7 @@ export const markTourComplete = (tourName: string) =>
 /** Mark a specific modal as permanently dismissed for the current user. */
 export const dismissModal = (modalKey: string) =>
   api.patch<void>(`/auth/me/dismiss-modal?modal_key=${encodeURIComponent(modalKey)}`)
+
+/** Set the user's preferred UI language. */
+export const setLanguage = (language: string) =>
+  api.patch<void>(`/auth/me/language?language=${encodeURIComponent(language)}`)

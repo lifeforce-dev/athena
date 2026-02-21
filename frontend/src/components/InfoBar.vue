@@ -24,13 +24,16 @@
         <span class="info-col info-amt" :style="{ color: eventAmtColor }">{{ eventAmtStr }}</span>
       </template>
     </template>
-    <span v-else class="info-hint">hover chart to inspect</span>
+    <span v-else class="info-hint">{{ t('chart.hover_hint') }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatDollars } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 export interface InfoBarData {
   date: string
