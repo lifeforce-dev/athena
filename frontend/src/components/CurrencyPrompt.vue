@@ -13,12 +13,35 @@
             :key="opt.code"
             class="cm-opt"
             :class="{ selected: selected === opt.code }"
-            @click="selected = opt.code"
+            @click="selectCurrency(opt.code)"
           >
             <span class="cm-opt-symbol">{{ opt.symbol }}</span>
             <span class="cm-opt-label">{{ opt.label }}</span>
           </button>
         </div>
+
+        <Transition name="cm-info">
+          <div v-if="selected" class="cm-lang-info">
+            <span class="cm-lang-text">{{ t('currency_prompt.lang_info') }}</span>
+            <button class="cm-lang-pick" @click="langOpen = !langOpen">
+              {{ chosenLangLabel }}
+              <span class="cm-lang-caret">&#9662;</span>
+            </button>
+            <Transition name="cm-info">
+              <div v-if="langOpen" class="cm-lang-dropdown">
+                <button
+                  v-for="(label, code) in languageOptions"
+                  :key="code"
+                  class="cm-lang-item"
+                  :class="{ active: chosenLang === code }"
+                  @click="pickLang(code)"
+                >
+                  {{ label }}
+                </button>
+              </div>
+            </Transition>
+          </div>
+        </Transition>
 
         <button class="cm-confirm" :disabled="!selected || saving" @click="confirm">
           {{ saving ? t('currency_prompt.saving') : t('currency_prompt.continue') }}
@@ -29,17 +52,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useCurrencyStore } from '@/stores/currency'
-import { type CurrencyCode, CURRENCIES, CURRENCY_CODES } from '@/config/currencies'
+import { useLanguageStore } from '@/stores/language'
+import { type CurrencyCode, CURRENCIES, CURRENCY_CODES, LANGUAGE_LABELS } from '@/config/currencies'
 import { useI18n } from '@/composables/useI18n'
+import { setLanguage } from '@/api/auth'
 
 const { t } = useI18n()
 const currency = useCurrencyStore()
+const language = useLanguageStore()
 const emit = defineEmits<{ done: [] }>()
 
 const selected = ref<CurrencyCode | null>(null)
 const saving = ref(false)
+const langOpen = ref(false)
+
+// Language override — null means "use the currency's default."
+const langOverride = ref<string | null>(null)
 
 const options = CURRENCY_CODES.map((code) => ({
   code,
@@ -47,11 +77,40 @@ const options = CURRENCY_CODES.map((code) => ({
   label: `${CURRENCIES[code].name} (${code})`,
 }))
 
+const languageOptions = LANGUAGE_LABELS
+
+const defaultLangForCurrency = computed(() =>
+  selected.value ? CURRENCIES[selected.value].defaultLang : 'en_US',
+)
+
+const chosenLang = computed(() => langOverride.value ?? defaultLangForCurrency.value)
+const chosenLangLabel = computed(() => LANGUAGE_LABELS[chosenLang.value] ?? chosenLang.value)
+
+function selectCurrency(code: CurrencyCode) {
+  selected.value = code
+  // Reset language override when switching currencies.
+  langOverride.value = null
+  langOpen.value = false
+}
+
+function pickLang(code: string) {
+  langOverride.value = code === defaultLangForCurrency.value ? null : code
+  langOpen.value = false
+}
+
 async function confirm() {
   if (!selected.value || saving.value) return
   saving.value = true
+
   try {
     await currency.saveAccountCurrency(selected.value)
+
+    // If the user overrode the language, persist it immediately.
+    if (langOverride.value) {
+      await setLanguage(langOverride.value)
+      language.initFromUser(langOverride.value)
+    }
+
     emit('done')
   } finally {
     saving.value = false
@@ -160,5 +219,102 @@ async function confirm() {
 
 .cm-confirm:not(:disabled):hover {
   opacity: 0.85;
+}
+
+/* Language info bar */
+.cm-lang-info {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--dim);
+}
+
+.cm-lang-text {
+  white-space: nowrap;
+}
+
+.cm-lang-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--income);
+  color: var(--income);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s;
+}
+
+.cm-lang-pick:hover {
+  opacity: 0.75;
+}
+
+.cm-lang-caret {
+  font-size: 8px;
+  opacity: 0.6;
+}
+
+.cm-lang-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  min-width: 140px;
+}
+
+.cm-lang-item {
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.cm-lang-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.cm-lang-item.active {
+  color: var(--income);
+  font-weight: 600;
+}
+
+/* Transition for info bar */
+.cm-info-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.cm-info-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.cm-info-enter-from {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.cm-info-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>

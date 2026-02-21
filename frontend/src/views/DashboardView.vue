@@ -78,7 +78,6 @@ import { useI18n } from '@/composables/useI18n'
 import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
 import { useAuthStore } from '@/stores/auth'
-import { useCurrencyStore } from '@/stores/currency'
 
 const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
@@ -86,14 +85,14 @@ const highlightedCause = ref<number | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
 
 const auth = useAuthStore()
-const currencyStore = useCurrencyStore()
 const { t } = useI18n()
 useTour()
 
-// Show onboarding for users who haven't dismissed it and haven't set up their account yet.
+// Show onboarding after currency setup, for users who haven't dismissed it yet.
+// App.vue already gates router-view behind currency setup, so by the time
+// DashboardView mounts the currency prompt is complete.
 const showOnboarding = ref(
-  !currencyStore.accountCurrencySet
-  && !(auth.user?.dismissed_modals ?? []).includes('onboarding_demo')
+  !(auth.user?.dismissed_modals ?? []).includes('onboarding_demo')
 )
 
 function onClickDate(date: string) {

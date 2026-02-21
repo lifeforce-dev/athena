@@ -567,6 +567,10 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'Saving...',
     context: 'Button label while the currency choice is being saved.',
   },
+  'currency_prompt.lang_info': {
+    text: 'Your default language will be set to',
+    context: 'Info text shown below the currency grid. Followed by a clickable language name.',
+  },
 
   // ══════════════════════════════════════════════════════════════════════
   // Currency Explainer (one-time popup)
