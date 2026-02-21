@@ -26,3 +26,18 @@ export const CURRENCY_CODES = Object.keys(CURRENCIES) as CurrencyCode[]
 export function getCurrencyConfig(code: string) {
   return CURRENCIES[code as CurrencyCode] ?? CURRENCIES.USD
 }
+
+/**
+ * Human-readable language names keyed by locale code.
+ * Used in the currency prompt to preview the default language choice.
+ */
+export const LANGUAGE_LABELS: Record<string, string> = {
+  en_US: 'English',
+  ko_KR: 'Korean',
+  ja_JP: 'Japanese',
+  zh_CN: 'Chinese',
+  pt_BR: 'Portuguese',
+}
+
+/** All locale codes that have (or will have) translation support. */
+export const AVAILABLE_LOCALES = Object.keys(LANGUAGE_LABELS)
