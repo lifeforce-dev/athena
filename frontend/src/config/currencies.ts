@@ -1,0 +1,26 @@
+/**
+ * Currency configuration — single source of truth.
+ *
+ * Adding a new currency:
+ *  1. Add an entry here.
+ *  2. Add the code to ALLOWED_CURRENCIES in app/routers/currency.py.
+ *  3. (Optional) Add a matching locale file in src/locales/.
+ */
+
+export const CURRENCIES = {
+  USD: { symbol: '$', name: 'US Dollar', decimals: 2, defaultLang: 'en_US' },
+  KRW: { symbol: '\u20A9', name: 'Korean Won', decimals: 0, defaultLang: 'ko_KR' },
+  JPY: { symbol: '\u00A5', name: 'Japanese Yen', decimals: 0, defaultLang: 'ja_JP' },
+  EUR: { symbol: '\u20AC', name: 'Euro', decimals: 2, defaultLang: 'en_US' },
+  GBP: { symbol: '\u00A3', name: 'British Pound', decimals: 2, defaultLang: 'en_US' },
+} as const
+
+export type CurrencyCode = keyof typeof CURRENCIES
+
+/** All supported currency codes as an array. */
+export const CURRENCY_CODES = Object.keys(CURRENCIES) as CurrencyCode[]
+
+/** Get config for a currency code, or USD as fallback. */
+export function getCurrencyConfig(code: string) {
+  return CURRENCIES[code as CurrencyCode] ?? CURRENCIES.USD
+}

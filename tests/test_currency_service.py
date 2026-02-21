@@ -151,7 +151,7 @@ class TestGetUserCurrencies:
         mock_result.one_or_none.return_value = ("USD", "USD")
         mock_db.execute = AsyncMock(return_value=mock_result)
 
-        info = await get_user_currencies(1, mock_db, display_override="EUR")
+        info = await get_user_currencies(1, mock_db, display_override="XYZ")
         assert info.display == "USD"
         assert not info.needs_conversion
 

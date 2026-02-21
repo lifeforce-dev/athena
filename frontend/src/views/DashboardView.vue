@@ -13,15 +13,15 @@
       />
 
         <div class="sh" data-tour="bills" style="margin-top: 20px">
-          <span class="sh-t">Bills This Week</span>
-          <span class="sh-m">resets {{ nextWeekLabel }}</span>
+          <span class="sh-t">{{ t('dash.bills_this_week') }}</span>
+          <span class="sh-m">{{ t('dash.resets', { date: nextWeekLabel }) }}</span>
         </div>
         <BillsThisWeek
           :bills="billsAnalysis.bills"
           :next-bills="billsAnalysis.nextBills"
         />
 
-      <div v-if="loading" class="loading">Loading projection...</div>
+      <div v-if="loading" class="loading">{{ t('dash.loading') }}</div>
       <div v-else-if="error" class="error-msg">{{ error }}</div>
 
       <template v-else-if="trajectory.length">
@@ -51,8 +51,8 @@
       </template>
 
       <div v-else class="empty">
-        <h3>No projection data</h3>
-        <p>Add commitments to see your cash flow trajectory.</p>
+        <h3>{{ t('dash.no_data_title') }}</h3>
+        <p>{{ t('dash.no_data_desc') }}</p>
       </div>
     </div>
   </div>
@@ -69,6 +69,7 @@ import ShortfallWarning from '@/components/ShortfallWarning.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import { useTour } from '@/composables/useTour'
+import { useI18n } from '@/composables/useI18n'
 import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
 
@@ -77,6 +78,7 @@ const pulseDate = ref<string | null>(null)
 const highlightedCause = ref<number | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
 
+const { t } = useI18n()
 useTour()
 
 function onClickDate(date: string) {

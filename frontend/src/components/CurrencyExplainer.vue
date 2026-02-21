@@ -5,23 +5,18 @@
         <div class="explainer-modal">
           <div class="explainer-header">
             <span class="explainer-icon">&#8644;</span>
-            <h2 class="explainer-title">Display Currency</h2>
+            <h2 class="explainer-title">{{ t('explainer.title') }}</h2>
           </div>
 
           <p class="explainer-desc">
-            Your account stores all amounts in
-            <strong class="hl-account">{{ accountLabel }}</strong>.
-            When you toggle to
-            <strong class="hl-display">{{ displayLabel }}</strong>,
-            values are converted at the current exchange rate.
-            Small rounding differences are normal.
+            {{ t('explainer.body', { accountCurrency: accountLabel, displayCurrency: displayLabel }) }}
           </p>
 
           <!-- Animated round-trip graphic -->
           <div class="roundtrip" :class="{ animate: animating }">
             <!-- Step 1: user enters display amount -->
             <div class="rt-step rt-input">
-              <span class="rt-label">You enter</span>
+              <span class="rt-label">{{ t('explainer.you_enter') }}</span>
               <span class="rt-value rt-display-val">{{ displaySymbol }}{{ formatNum(displayAmount) }}</span>
             </div>
 
@@ -30,12 +25,12 @@
               <div class="rt-arrow-track">
                 <div class="rt-arrow-fill rt-fill-1" />
               </div>
-              <span class="rt-arrow-label">stored as</span>
+              <span class="rt-arrow-label">{{ t('explainer.stored_as') }}</span>
             </div>
 
             <!-- Step 2: stored in account currency -->
             <div class="rt-step rt-stored">
-              <span class="rt-label">Saved</span>
+              <span class="rt-label">{{ t('explainer.saved') }}</span>
               <span class="rt-value rt-account-val">{{ accountSymbol }}{{ formatNum(accountAmount) }}</span>
             </div>
 
@@ -44,20 +39,20 @@
               <div class="rt-arrow-track">
                 <div class="rt-arrow-fill rt-fill-2" />
               </div>
-              <span class="rt-arrow-label">displayed as</span>
+              <span class="rt-arrow-label">{{ t('explainer.displayed_as') }}</span>
             </div>
 
             <!-- Step 3: converted back for display -->
             <div class="rt-step rt-result">
-              <span class="rt-label">You see</span>
+              <span class="rt-label">{{ t('explainer.you_see') }}</span>
               <span class="rt-value rt-display-val">{{ displaySymbol }}{{ formatNum(resultAmount) }}</span>
               <span v-if="delta !== 0" class="rt-delta">
-                {{ delta > 0 ? '+' : '' }}{{ formatNum(delta) }} difference
+                {{ t('explainer.difference', { delta: (delta > 0 ? '+' : '') + formatNum(delta) }) }}
               </span>
             </div>
           </div>
 
-          <button class="explainer-dismiss" @click="dismiss">Got it</button>
+          <button class="explainer-dismiss" @click="dismiss">{{ t('explainer.dismiss') }}</button>
         </div>
       </div>
     </Transition>
@@ -67,38 +62,52 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useCurrencyStore } from '@/stores/currency'
+import { useI18n } from '@/composables/useI18n'
+import { getCurrencyConfig } from '@/config/currencies'
 
-const props = defineProps<{ accountCcy: string; displayCcy: string; rate: number }>()
+const props = defineProps<{ accountCcy: string; displayCcy: string }>()
 const emit = defineEmits<{ dismiss: [] }>()
 
+const { t } = useI18n()
 const currency = useCurrencyStore()
 const visible = ref(false)
 const animating = ref(false)
 
-const isAccountUsd = computed(() => props.accountCcy === 'USD')
+const acctCfg = computed(() => getCurrencyConfig(props.accountCcy))
+const dispCfg = computed(() => getCurrencyConfig(props.displayCcy))
 
-const accountLabel = computed(() => isAccountUsd.value ? 'USD ($)' : 'KRW (Won)')
-const displayLabel = computed(() => isAccountUsd.value ? 'KRW (Won)' : 'USD ($)')
-const accountSymbol = computed(() => isAccountUsd.value ? '$' : '\u20A9')
-const displaySymbol = computed(() => isAccountUsd.value ? '\u20A9' : '$')
+const accountLabel = computed(() => `${props.accountCcy} (${acctCfg.value.symbol})`)
+const displayLabel = computed(() => `${props.displayCcy} (${dispCfg.value.symbol})`)
+const accountSymbol = computed(() => acctCfg.value.symbol)
+const displaySymbol = computed(() => dispCfg.value.symbol)
 
-// Example amounts that show a visible rounding artifact.
-const displayAmount = computed(() => isAccountUsd.value ? 100000 : 100)
+/** Get the live rate from the store (account -> display). */
+const liveRate = computed(() => {
+  const key = `${props.accountCcy}:${props.displayCcy}`
+  return currency.rates.get(key) ?? 1
+})
+
+// Example amounts: use 100000 for zero-decimal currencies, 100 otherwise.
+const displayAmount = computed(() => dispCfg.value.decimals === 0 ? 100000 : 100)
 const accountAmount = computed(() => {
-  if (isAccountUsd.value) {
-    // 100,000 KRW -> USD at 1/rate.
-    return Math.round((displayAmount.value / props.rate) * 100) / 100
+  // Display amount -> account currency (divide by live rate).
+  const raw = displayAmount.value / liveRate.value
+
+  if (acctCfg.value.decimals === 0) {
+    return Math.round(raw)
   }
-  // $100 -> KRW at rate.
-  return Math.round(displayAmount.value * props.rate)
+
+  return Math.round(raw * 100) / 100
 })
 const resultAmount = computed(() => {
-  if (isAccountUsd.value) {
-    // USD back to KRW.
-    return Math.round(accountAmount.value * props.rate)
+  // Account amount -> back to display currency (multiply by live rate).
+  const raw = accountAmount.value * liveRate.value
+
+  if (dispCfg.value.decimals === 0) {
+    return Math.round(raw)
   }
-  // KRW back to USD.
-  return Math.round((accountAmount.value / props.rate) * 100) / 100
+
+  return Math.round(raw * 100) / 100
 })
 const delta = computed(() => resultAmount.value - displayAmount.value)
 

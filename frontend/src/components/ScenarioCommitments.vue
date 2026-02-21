@@ -3,8 +3,8 @@
     <!-- Income -->
     <div v-if="incomeItems.length">
       <div class="sec-hdr">
-        <span class="sec-title">Income ({{ incomeItems.length }})</span>
-        <span class="sec-total income">{{ formatSigned(scenarioIncome) }}/mo</span>
+        <span class="sec-title">{{ t('scenario.income', { count: incomeItems.length }) }}</span>
+        <span class="sec-total income">{{ formatSigned(scenarioIncome) }}{{ t('commit.per_month') }}</span>
       </div>
       <div class="rail-list">
         <div
@@ -37,8 +37,8 @@
     <!-- Expenses -->
     <div v-if="expenseItems.length">
       <div class="sec-hdr">
-        <span class="sec-title">Expenses ({{ expenseItems.length }})</span>
-        <span class="sec-total expense">{{ formatSigned(scenarioExpenses) }}/mo</span>
+        <span class="sec-title">{{ t('scenario.expenses', { count: expenseItems.length }) }}</span>
+        <span class="sec-total expense">{{ formatSigned(scenarioExpenses) }}{{ t('commit.per_month') }}</span>
       </div>
       <div class="rail-list">
         <div
@@ -71,7 +71,7 @@
     <!-- One-time -->
     <div v-if="oneTimeItems.length">
       <div class="sec-hdr">
-        <span class="sec-title">One-Time ({{ oneTimeItems.length }})</span>
+        <span class="sec-title">{{ t('scenario.one_time', { count: oneTimeItems.length }) }}</span>
         <span class="sec-total dim">{{ formatSigned(oneTimeTotal) }}</span>
       </div>
       <div class="rail-list">
@@ -87,7 +87,7 @@
           </div>
           <div class="rail-info">
             <span class="rail-name">{{ item.name }}</span>
-            <span class="rail-freq once">{{ item.one_time_date ?? 'once' }}</span>
+            <span class="rail-freq once">{{ item.one_time_date ?? t('common.once') }}</span>
           </div>
           <div class="rail-amt" :class="parseMoney(item.amount) >= 0 ? 'pos' : 'neg'">
             <input
@@ -109,6 +109,9 @@ import { computed } from 'vue'
 import type { CommitmentResponse } from '@/types/commitment'
 import type { ScenarioOverride } from '@/composables/useScenario'
 import { parseMoney, formatDollars } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   commitments: CommitmentResponse[]

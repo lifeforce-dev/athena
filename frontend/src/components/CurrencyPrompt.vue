@@ -2,9 +2,9 @@
   <Teleport to="body">
     <div class="currency-overlay">
       <div class="currency-modal">
-        <h2 class="cm-title">Set Your Currency</h2>
+        <h2 class="cm-title">{{ t('currency_prompt.title') }}</h2>
         <p class="cm-desc">
-          Choose your account currency. All amounts will be stored and displayed in this currency.
+          {{ t('currency_prompt.desc') }}
         </p>
 
         <div class="cm-options">
@@ -21,7 +21,7 @@
         </div>
 
         <button class="cm-confirm" :disabled="!selected || saving" @click="confirm">
-          {{ saving ? 'Saving...' : 'Continue' }}
+          {{ saving ? t('currency_prompt.saving') : t('currency_prompt.continue') }}
         </button>
       </div>
     </div>
@@ -30,18 +30,22 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useCurrencyStore, type CurrencyCode } from '@/stores/currency'
+import { useCurrencyStore } from '@/stores/currency'
+import { type CurrencyCode, CURRENCIES, CURRENCY_CODES } from '@/config/currencies'
+import { useI18n } from '@/composables/useI18n'
 
+const { t } = useI18n()
 const currency = useCurrencyStore()
 const emit = defineEmits<{ done: [] }>()
 
 const selected = ref<CurrencyCode | null>(null)
 const saving = ref(false)
 
-const options = [
-  { code: 'USD' as CurrencyCode, symbol: '$', label: 'US Dollar (USD)' },
-  { code: 'KRW' as CurrencyCode, symbol: '\u20A9', label: 'Korean Won (KRW)' },
-]
+const options = CURRENCY_CODES.map((code) => ({
+  code,
+  symbol: CURRENCIES[code].symbol,
+  label: `${CURRENCIES[code].name} (${code})`,
+}))
 
 async function confirm() {
   if (!selected.value || saving.value) return

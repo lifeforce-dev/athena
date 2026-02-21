@@ -13,101 +13,44 @@ import { driver, type DriveStep } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { useAuthStore } from '@/stores/auth'
 import { markTourComplete } from '@/api/auth'
+import { useI18n } from '@/composables/useI18n'
 
-// ── Tour step definitions ──
+// ── Tour step builders (resolved at runtime for i18n) ──
 
-const DASHBOARD_STEPS: DriveStep[] = [
-  {
-    element: '[data-tour="balance"]',
-    popover: {
-      title: 'Your Balance at a Glance',
-      description: 'This is your real bank balance. Tap it anytime to update -- everything recalculates instantly.',
-    },
-  },
-  {
-    element: '[data-tour="gauge"]',
-    popover: {
-      title: 'Financial Health Shield',
-      description: 'Green means you are cruising. Yellow means things are tight. Red means action needed. This gauge looks 90 days ahead so you are never surprised.',
-    },
-  },
-  {
-    element: '[data-tour="bills"]',
-    popover: {
-      title: 'Bills Coming Up',
-      description: 'See exactly what is due this week and next. No more scrambling to remember which bills hit when.',
-    },
-  },
-  {
-    element: '[data-tour="trajectory"]',
-    popover: {
-      title: 'Your Cash Trajectory',
-      description: 'A day-by-day map of your money for the next 90 days. Hover any point to see exactly what happens and when. The dips show you where to watch out.',
-    },
-  },
-  {
-    element: '[data-tour="cause-panel"]',
-    popover: {
-      title: 'What Is Eating Your Cash',
-      description: 'This breaks down your tightest pay period. See which expenses hit hardest so you know where to cut if things get tight.',
-    },
-  },
-  {
-    element: '[data-tour="currency-toggle"]',
-    popover: {
-      title: 'Switch Currencies',
-      description: 'Living abroad or just curious? Toggle between USD and KRW with live exchange rates. Every number in the app converts instantly.',
-    },
-  },
-]
+type T = (key: string, params?: Record<string, string | number>) => string
 
-const COMMITMENTS_STEPS: DriveStep[] = [
-  {
-    element: '[data-tour="commitments-summary"]',
-    popover: {
-      title: 'Your Monthly Snapshot',
-      description: 'Income vs. expenses at a glance. This is the heartbeat of your finances -- one look tells you if you are gaining or losing ground each month.',
-    },
-  },
-  {
-    element: '[data-tour="commitments-add"]',
-    popover: {
-      title: 'Add Anything',
-      description: 'Rent, subscriptions, paychecks, one-time purchases -- add them all here. The more Athena knows, the more accurate your projections get.',
-    },
-  },
-  {
-    element: '[data-tour="commitments-group"]',
-    popover: {
-      title: 'Organized by Category',
-      description: 'Your commitments are grouped automatically. Click any amount to edit it. Spot a subscription you forgot about? This is where it lives.',
-    },
-  },
-]
+function dashboardSteps(t: T): DriveStep[] {
+  return [
+    { element: '[data-tour="balance"]', popover: { title: t('tour.balance_title'), description: t('tour.balance_desc') } },
+    { element: '[data-tour="gauge"]', popover: { title: t('tour.gauge_title'), description: t('tour.gauge_desc') } },
+    { element: '[data-tour="bills"]', popover: { title: t('tour.bills_title'), description: t('tour.bills_desc') } },
+    { element: '[data-tour="trajectory"]', popover: { title: t('tour.trajectory_title'), description: t('tour.trajectory_desc') } },
+    { element: '[data-tour="cause-panel"]', popover: { title: t('tour.cause_title'), description: t('tour.cause_desc') } },
+    { element: '[data-tour="currency-toggle"]', popover: { title: t('tour.currency_title'), description: t('tour.currency_desc') } },
+  ]
+}
 
-const SIMULATION_STEPS: DriveStep[] = [
-  {
-    element: '[data-tour="sim-grid"]',
-    popover: {
-      title: 'What-If Playground',
-      description: 'This is where Athena gets powerful. Toggle any bill on or off, adjust amounts, and instantly see how it changes your financial future.',
-    },
-  },
-  {
-    element: '[data-tour="sim-summary"]',
-    popover: {
-      title: 'Instant Impact',
-      description: 'Every change you make updates this panel in real time. See your simulated net per month and hit Run to visualize the full trajectory.',
-    },
-  },
-]
+function commitmentsSteps(t: T): DriveStep[] {
+  return [
+    { element: '[data-tour="commitments-summary"]', popover: { title: t('tour.snapshot_title'), description: t('tour.snapshot_desc') } },
+    { element: '[data-tour="commitments-add"]', popover: { title: t('tour.add_title'), description: t('tour.add_desc') } },
+    { element: '[data-tour="commitments-group"]', popover: { title: t('tour.organized_title'), description: t('tour.organized_desc') } },
+  ]
+}
 
-// ── Tour registry (name -> route -> steps) ──
+function simulationSteps(t: T): DriveStep[] {
+  return [
+    { element: '[data-tour="sim-grid"]', popover: { title: t('tour.whatif_title'), description: t('tour.whatif_desc') } },
+    { element: '[data-tour="sim-summary"]', popover: { title: t('tour.impact_title'), description: t('tour.impact_desc') } },
+  ]
+}
 
-const TOURS: Record<string, { route: string; steps: DriveStep[] }> = {
-  dashboard: { route: '/', steps: DASHBOARD_STEPS },
-  commitments: { route: '/commitments', steps: COMMITMENTS_STEPS },
-  simulation: { route: '/simulation', steps: SIMULATION_STEPS },
+// ── Tour registry (name -> route -> step builder) ──
+
+const TOURS: Record<string, { route: string; steps: (t: T) => DriveStep[] }> = {
+  dashboard: { route: '/', steps: dashboardSteps },
+  commitments: { route: '/commitments', steps: commitmentsSteps },
+  simulation: { route: '/simulation', steps: simulationSteps },
 }
 
 /** Reverse lookup: route path -> tour name. */
@@ -145,6 +88,7 @@ export function useTour() {
   const route = useRoute()
   const router = useRouter()
   const auth = useAuthStore()
+  const { t } = useI18n()
 
   onMounted(async () => {
     const explicitTour = route.query.tour as string | undefined
@@ -169,7 +113,7 @@ export function useTour() {
 
     completedThisSession.add(tourName)
 
-    runTour(TOURS[tourName].steps, async () => {
+    runTour(TOURS[tourName].steps(t), async () => {
       // Persist completion server-side for real (non-demo) users.
       if (auth.user && !completed.includes(tourName)) {
         try {

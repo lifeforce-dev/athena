@@ -110,6 +110,7 @@ export interface components {
       username: string
       account_currency: string | null
       display_currency: string | null
+      account_language: string | null
       completed_tours: string[]
       dismissed_modals: string[]
     }

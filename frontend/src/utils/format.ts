@@ -3,9 +3,10 @@
 // or formatCents() automatically re-render when the display currency changes.
 
 import { shallowRef } from 'vue'
+import { getCurrencyConfig } from '@/config/currencies'
 
 export interface CurrencyDisplay {
-  code: 'USD' | 'KRW'
+  code: string
   rate: number  // 1.0 for base currency, exchange rate otherwise
 }
 
@@ -22,21 +23,25 @@ function convert(value: number): number {
 }
 
 function prefix(): string {
-  return _cd.value.code === 'KRW' ? '\u20A9' : '$'
+  return getCurrencyConfig(_cd.value.code).symbol
 }
 
-/** Convert a base-currency (USD) amount to the active display currency. */
+function decimals(): number {
+  return getCurrencyConfig(_cd.value.code).decimals
+}
+
+/** Convert a base-currency amount to the active display currency. */
 export function toDisplayCurrency(value: number): number {
   return convert(value)
 }
 
-/** Convert a display-currency amount back to base currency (USD) for storage. */
+/** Convert a display-currency amount back to base currency for storage. */
 export function toBaseCurrency(displayAmount: number): number {
   const cd = _cd.value
   return cd.rate === 1 ? displayAmount : displayAmount / cd.rate
 }
 
-/** The symbol for the active display currency ("$" or "\u20A9"). */
+/** The symbol for the active display currency. */
 export function currencySymbol(): string {
   return prefix()
 }
@@ -45,10 +50,17 @@ export function currencySymbol(): string {
 
 export const formatCurrency = (value: number): string => {
   const converted = convert(value)
-  if (_cd.value.code === 'KRW') {
+  const dec = decimals()
+
+  if (dec === 0) {
     return prefix() + Math.round(Math.abs(converted)).toLocaleString()
   }
-  return converted.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
+
+  return converted.toLocaleString('en-US', {
+    style: 'currency',
+    currency: _cd.value.code,
+    maximumFractionDigits: dec,
+  })
 }
 
 export const formatSigned = (value: number): string => {
@@ -56,19 +68,22 @@ export const formatSigned = (value: number): string => {
   return `${sign}${formatDollars(Math.abs(value))}`
 }
 
-/** Rounded whole-unit display: "$1,234" or "\u20A91,650,000". */
+/** Rounded whole-unit display: "$1,234" or "Won1,650,000". */
 export const formatDollars = (value: number): string => {
   const converted = convert(Math.abs(Math.round(value)))
   return prefix() + Math.round(converted).toLocaleString()
 }
 
-/** Two-decimal display: "$1,234.56". KRW rounds to whole units. */
+/** Decimal display: "$1,234.56". Zero-decimal currencies round to whole units. */
 export const formatCents = (value: number): string => {
   const converted = convert(Math.abs(value))
-  if (_cd.value.code === 'KRW') {
+  const dec = decimals()
+
+  if (dec === 0) {
     return prefix() + Math.round(converted).toLocaleString()
   }
-  return prefix() + converted.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  return prefix() + converted.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
 
 /** Short date display: "Feb 17". */

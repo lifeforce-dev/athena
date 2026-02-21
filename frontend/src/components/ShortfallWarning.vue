@@ -4,12 +4,12 @@
       <span class="shortfall-icon">!</span>
       <div class="shortfall-headline">
         <span class="shortfall-title">
-          Balance goes negative {{ shortDate(shortfall.brokeDate) }}
+          {{ t('shortfall.goes_negative', { date: shortDate(shortfall.brokeDate) }) }}
         </span>
         <span class="shortfall-sub">
-          Projected {{ formatDollars(shortfall.brokeBalance) }} shortfall
+          {{ t('shortfall.projected', { amount: formatDollars(shortfall.brokeBalance) }) }}
           <template v-if="shortfall.recoveryDate">
-            — next paycheck {{ shortDate(shortfall.recoveryDate) }}
+            {{ t('shortfall.recovery', { date: shortDate(shortfall.recoveryDate) }) }}
           </template>
         </span>
       </div>
@@ -28,8 +28,8 @@
     </div>
 
     <div class="shortfall-footer">
-      <span>{{ shortfall.missedCommitments.length }} commitment{{ shortfall.missedCommitments.length === 1 ? '' : 's' }} at risk</span>
-      <span class="shortfall-total">-{{ formatDollars(shortfall.totalMissed) }} total</span>
+      <span>{{ t('shortfall.at_risk', { count: shortfall.missedCommitments.length }) }}</span>
+      <span class="shortfall-total">{{ t('shortfall.total', { amount: formatDollars(shortfall.totalMissed) }) }}</span>
     </div>
   </div>
 </template>
@@ -37,6 +37,9 @@
 <script setup lang="ts">
 import type { Shortfall } from '@/composables/useExpenseAnalysis'
 import { formatDollars, shortDate } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 defineProps<{
   shortfall: Shortfall | null

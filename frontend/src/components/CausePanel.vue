@@ -1,9 +1,9 @@
 <template>
   <div v-if="worstWindow" class="cause-panel">
     <div class="cause-header">
-      <div class="cause-title">Your tightest pay period</div>
+      <div class="cause-title">{{ t('cause.title') }}</div>
       <div class="cause-window">
-        {{ windowRange }} | {{ formatDollars(worstWindow.totalExpenses) }} total
+        {{ windowRange }} | {{ t('cause.total', { amount: formatDollars(worstWindow.totalExpenses) }) }}
       </div>
     </div>
 
@@ -52,6 +52,9 @@ import { ref, computed } from 'vue'
 import type { WorstWindow } from '@/composables/useExpenseAnalysis'
 import { CAUSE_COLORS } from '@/composables/useExpenseAnalysis'
 import { parseLocalDate, formatDollars } from '@/utils/format'
+import { useI18n } from '@/composables/useI18n'
+
+const { t } = useI18n()
 
 const props = defineProps<{
   worstWindow: WorstWindow | null
@@ -73,7 +76,8 @@ const shortDate = (dateStr: string) =>
 
 const windowRange = computed(() => {
   if (!props.worstWindow) return ''
-  return `Tightest window: ${shortDate(props.worstWindow.startDate)} - ${shortDate(props.worstWindow.endDate)}`
+  const range = `${shortDate(props.worstWindow.startDate)} - ${shortDate(props.worstWindow.endDate)}`
+  return t('cause.window_range', { range })
 })
 
 function segWidth(amount: number) {
