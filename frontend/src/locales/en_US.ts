@@ -707,6 +707,34 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'once',
     context: 'Fallback label for one-time items when no specific date is available.',
   },
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Onboarding Overlay
+  // ══════════════════════════════════════════════════════════════════════
+  'onboarding.title': {
+    text: 'Welcome',
+    context: 'Title of the onboarding overlay shown to first-time users.',
+  },
+  'onboarding.desc': {
+    text: 'Athena projects your cash flow using your real recurring bills, income, and spending. See exactly when money gets tight before it happens.',
+    context: 'Description on the onboarding overlay explaining what Athena does.',
+  },
+  'onboarding.demo_label': {
+    text: 'Try the Demo',
+    context: 'Button label for starting demo mode with sample data.',
+  },
+  'onboarding.demo_hint': {
+    text: 'Explore with pre-loaded sample bills and income.',
+    context: 'Secondary text explaining what the demo button does.',
+  },
+  'onboarding.setup_label': {
+    text: 'Set Up My Account',
+    context: 'Button label for proceeding to real account setup.',
+  },
+  'onboarding.setup_hint': {
+    text: 'Choose your currency and start adding your own data.',
+    context: 'Secondary text explaining what the setup button does.',
+  },
 }
 
 export default en_US

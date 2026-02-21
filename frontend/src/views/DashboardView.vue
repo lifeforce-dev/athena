@@ -1,5 +1,9 @@
 <template>
   <div>
+    <OnboardingOverlay
+      v-if="showOnboarding"
+      @dismiss="showOnboarding = false"
+    />
     <div class="wrap">
       <DashboardHero
         v-if="!loading && trajectory.length"
@@ -66,20 +70,31 @@ import EventList from '@/components/EventList.vue'
 import CausePanel from '@/components/CausePanel.vue'
 import BillsThisWeek from '@/components/BillsThisWeek.vue'
 import ShortfallWarning from '@/components/ShortfallWarning.vue'
+import OnboardingOverlay from '@/components/OnboardingOverlay.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import { useTour } from '@/composables/useTour'
 import { useI18n } from '@/composables/useI18n'
 import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
+import { useAuthStore } from '@/stores/auth'
+import { useCurrencyStore } from '@/stores/currency'
 
 const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
 const highlightedCause = ref<number | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
 
+const auth = useAuthStore()
+const currencyStore = useCurrencyStore()
 const { t } = useI18n()
 useTour()
+
+// Show onboarding for users who haven't dismissed it and haven't set up their account yet.
+const showOnboarding = ref(
+  !currencyStore.accountCurrencySet
+  && !(auth.user?.dismissed_modals ?? []).includes('onboarding_demo')
+)
 
 function onClickDate(date: string) {
   pulseDate.value = null

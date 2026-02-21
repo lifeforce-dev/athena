@@ -25,6 +25,7 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = ["http://localhost:5173"]
     debug: bool = False
+    dev_mode: bool = False
 
     # Database
     database_url: str | None = None

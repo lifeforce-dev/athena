@@ -52,7 +52,7 @@ class TestSetCurrencyRequestValidation:
             SetCurrencyRequest(currency="")
 
     def test_allowed_currencies_complete(self):
-        assert ALLOWED_CURRENCIES == {"USD", "KRW", "JPY", "EUR", "GBP"}
+        assert ALLOWED_CURRENCIES == {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"}
 
 
 # ---------------------------------------------------------------------------
