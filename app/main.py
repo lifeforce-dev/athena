@@ -4,8 +4,9 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from importlib.metadata import entry_points
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
@@ -154,11 +155,35 @@ def create_app() -> FastAPI:
     application.include_router(projection_router, prefix='/api')
     application.include_router(transactions_router, prefix='/api')
 
+    # Discover and register plugin routers (e.g. athena-dev-tools).
+    _register_plugins(application)
+
     @application.get('/health')
     async def health_check() -> dict[str, str]:
         return {'status': 'ok'}
 
     return application
+
+
+def _register_plugins(application: FastAPI) -> None:
+    """Load routers from installed packages that declare athena.plugins entry-points.
+
+    Each entry-point must be a callable returning ``list[APIRouter]``.
+    Packages that are not installed are simply absent -- no code, no routes.
+    """
+    discovered = entry_points(group="athena.plugins")
+
+    for ep in discovered:
+        try:
+            get_routers = ep.load()
+            routers: list[APIRouter] = get_routers()
+
+            for plugin_router in routers:
+                application.include_router(plugin_router, prefix='/api')
+
+            logger.info(f"Plugin '{ep.name}' registered {len(routers)} router(s)")
+        except Exception:
+            logger.exception(f"Failed to load plugin '{ep.name}'")
 
 
 app = create_app()
