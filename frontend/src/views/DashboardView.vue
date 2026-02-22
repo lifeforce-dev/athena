@@ -1,9 +1,5 @@
 <template>
   <div>
-    <OnboardingOverlay
-      v-if="showOnboarding"
-      @dismiss="showOnboarding = false"
-    />
     <div class="wrap">
       <DashboardHero
         v-if="!loading && trajectory.length"
@@ -70,30 +66,30 @@ import EventList from '@/components/EventList.vue'
 import CausePanel from '@/components/CausePanel.vue'
 import BillsThisWeek from '@/components/BillsThisWeek.vue'
 import ShortfallWarning from '@/components/ShortfallWarning.vue'
-import OnboardingOverlay from '@/components/OnboardingOverlay.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
-import { useTour } from '@/composables/useTour'
+import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import { useI18n } from '@/composables/useI18n'
 import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
-import { useAuthStore } from '@/stores/auth'
-
 const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
 const highlightedCause = ref<number | null>(null)
 const chartRef = ref<InstanceType<typeof TrajectoryChart> | null>(null)
 
-const auth = useAuthStore()
 const { t } = useI18n()
-useTour()
 
-// Show onboarding after currency setup, for users who haven't dismissed it yet.
-// App.vue already gates router-view behind currency setup, so by the time
-// DashboardView mounts the currency prompt is complete.
-const showOnboarding = ref(
-  !(auth.user?.dismissed_modals ?? []).includes('onboarding_demo')
-)
+useTabOnboarding({
+  name: 'dashboard',
+  steps: (t) => [
+    { element: '[data-tour="balance"]', popover: { title: t('tour.balance_title'), description: t('tour.balance_desc') } },
+    { element: '[data-tour="gauge"]', popover: { title: t('tour.gauge_title'), description: t('tour.gauge_desc') } },
+    { element: '[data-tour="bills"]', popover: { title: t('tour.bills_title'), description: t('tour.bills_desc') } },
+    { element: '[data-tour="trajectory"]', popover: { title: t('tour.trajectory_title'), description: t('tour.trajectory_desc') } },
+    { element: '[data-tour="cause-panel"]', popover: { title: t('tour.cause_title'), description: t('tour.cause_desc') } },
+    { element: '[data-tour="currency-toggle"]', popover: { title: t('tour.currency_title'), description: t('tour.currency_desc') } },
+  ],
+})
 
 function onClickDate(date: string) {
   pulseDate.value = null

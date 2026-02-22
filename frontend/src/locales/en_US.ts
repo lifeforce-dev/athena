@@ -613,6 +613,39 @@ const en_US: Record<string, LocaleEntry> = {
   },
 
   // ══════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════
+  // First-Time Experience (FTE)
+  // ══════════════════════════════════════════════════════════════════════
+  'fte.welcome_title': {
+    text: 'Welcome to Athena',
+    context: 'Heading on the FTE welcome screen shown before the first tour starts.',
+  },
+  'fte.welcome_desc': {
+    text: 'We will walk you through each section with sample data so you can see how everything works.',
+    context: 'Description on the FTE welcome screen.',
+  },
+  'fte.welcome_hint': {
+    text: 'Click the glowing Dashboard tab above to begin.',
+    context: 'Hint text nudging the user to click the glowing tab.',
+  },
+  'fte.skip_tour': {
+    text: 'Skip Tour',
+    context: 'Button label in the NavBar to skip the entire FTE.',
+  },
+  'fte.complete_title': {
+    text: 'You are all set!',
+    context: 'Heading on the completion dialog shown after all tours finish.',
+  },
+  'fte.complete_desc': {
+    text: 'Time to set up your real data and take control of your finances.',
+    context: 'Description on the FTE completion dialog.',
+  },
+  'fte.complete_button': {
+    text: 'Go to Dashboard',
+    context: 'Button label on the completion dialog to finish FTE and load real data.',
+  },
+
+  // ══════════════════════════════════════════════════════════════════════
   // Guided Tours
   // ══════════════════════════════════════════════════════════════════════
   'tour.balance_title': {

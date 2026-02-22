@@ -33,10 +33,10 @@ export function getCurrencyConfig(code: string) {
  */
 export const LANGUAGE_LABELS: Record<string, string> = {
   en_US: 'English',
-  ko_KR: 'Korean',
-  ja_JP: 'Japanese',
-  zh_CN: 'Chinese',
-  pt_BR: 'Portuguese',
+  ko_KR: '\ud55c\uad6d\uc5b4',
+  ja_JP: '\u65e5\u672c\u8a9e',
+  zh_CN: '\u4e2d\u6587',
+  pt_BR: 'Portugu\u00eas',
 }
 
 /** All locale codes that have (or will have) translation support. */

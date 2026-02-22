@@ -1,6 +1,8 @@
 import { ref, computed, onMounted } from 'vue'
 import type { CommitmentResponse } from '@/types/commitment'
 import { fetchCommitments } from '@/api/commitments'
+import { fetchDemoCommitments } from '@/api/demo-data'
+import { demoTourActive } from '@/stores/demoTour'
 import { fetchScenarioProjection, type ScenarioRequest } from '@/api/projection'
 import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString, parseLocalDate, parseMoney } from '@/utils/format'
@@ -35,7 +37,9 @@ export function useScenario() {
     commitmentsLoading.value = true
     commitmentsError.value = null
     try {
-      commitments.value = await fetchCommitments()
+      commitments.value = demoTourActive.value
+        ? await fetchDemoCommitments()
+        : await fetchCommitments()
       // Initialize overrides for any new commitments.
       for (const commitment of commitments.value) {
         if (!overrides.value.has(commitment.id)) {
@@ -49,7 +53,14 @@ export function useScenario() {
     }
   }
 
-  onMounted(loadCommitments)
+  onMounted(async () => {
+    await loadCommitments()
+
+    // During FTE, auto-run the simulation so the chart is visible for the tour.
+    if (demoTourActive.value) {
+      await runSimulation()
+    }
+  })
 
   // ── Toggle & edit helpers ──
 

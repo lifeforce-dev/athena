@@ -172,12 +172,19 @@ import { computed } from 'vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import ScenarioCommitments from '@/components/ScenarioCommitments.vue'
 import { useScenario } from '@/composables/useScenario'
-import { useTour } from '@/composables/useTour'
+import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import { parseLocalDate, formatDollars } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
-useTour()
+
+useTabOnboarding({
+  name: 'simulation',
+  steps: (t) => [
+    { element: '[data-tour="sim-grid"]', popover: { title: t('tour.whatif_title'), description: t('tour.whatif_desc') } },
+    { element: '[data-tour="sim-summary"]', popover: { title: t('tour.impact_title'), description: t('tour.impact_desc') } },
+  ],
+})
 
 const {
   commitments,

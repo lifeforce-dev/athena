@@ -1,13 +1,21 @@
 <template>
-  <nav class="nav">
+  <nav class="nav" :class="{ 'nav-between': fteBetweenTours }">
     <div class="nav-brand">{{ t('login.brand') }}</div>
     <div class="nav-tabs">
+      <button v-if="fteActive" class="nt-skip" @click="handleSkipTour">
+        {{ t('fte.skip_tour') }}
+      </button>
       <router-link
         v-for="tab in tabs"
         :key="tab.to"
-        :to="tab.to"
+        :to="isTabUnlocked(tab.name) ? tab.to : ''"
         class="nt"
-        active-class="active"
+        :class="{
+          active: isCurrentRoute(tab.to),
+          'nt-disabled': !isTabUnlocked(tab.name),
+          'nt-glow': isTabGlowing(tab.name),
+        }"
+        @click.prevent="handleTabClick(tab, $event)"
       >
         {{ tab.label }}
       </router-link>
@@ -53,14 +61,25 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useCurrencyStore } from '@/stores/currency'
-import { dismissModal } from '@/api/auth'
+import { dismissModal, markTourComplete } from '@/api/auth'
 import { fetchDevStatus, resetUser } from '@/api/dev'
 import { useI18n } from '@/composables/useI18n'
 import { getCurrencyConfig, CURRENCIES, CURRENCY_CODES, type CurrencyCode } from '@/config/currencies'
 import CurrencyExplainer from '@/components/CurrencyExplainer.vue'
+import {
+  fteActive,
+  fteStarted,
+  FTE_STEPS,
+  isTabUnlocked,
+  isTabGlowing,
+  fteBetweenTours,
+  endFte,
+} from '@/stores/fte'
+import { demoTourActive } from '@/stores/demoTour'
+import { activeDriver, resetTourSessionCache } from '@/composables/useTabOnboarding'
 
 const EXPLAINER_KEY = 'currency-explainer'
 
@@ -68,6 +87,7 @@ const { t } = useI18n()
 const auth = useAuthStore()
 const currency = useCurrencyStore()
 const router = useRouter()
+const route = useRoute()
 const showExplainer = ref(false)
 const showCurrencyDropdown = ref(false)
 const devMode = ref(false)
@@ -101,10 +121,52 @@ function onClickOutside(event: MouseEvent) {
 }
 
 const tabs = [
-  { to: '/', label: t('nav.dashboard') },
-  { to: '/commitments', label: t('nav.commitments') },
-  { to: '/simulation', label: t('nav.simulation') },
+  { to: '/', name: 'dashboard', label: t('nav.dashboard') },
+  { to: '/commitments', name: 'commitments', label: t('nav.commitments') },
+  { to: '/simulation', name: 'simulation', label: t('nav.simulation') },
 ]
+
+function isCurrentRoute(path: string): boolean {
+  return route.path === path
+}
+
+function handleTabClick(tab: { to: string; name: string }, event: MouseEvent) {
+  if (!isTabUnlocked(tab.name)) {
+    event.preventDefault()
+    return
+  }
+
+  // During FTE, clicking the first glowing tab marks FTE as started.
+  if (fteActive.value && !fteStarted.value) {
+    fteStarted.value = true
+  }
+}
+
+async function handleSkipTour() {
+  // Destroy active driver.js tour if running.
+  if (activeDriver) {
+    activeDriver.destroy()
+  }
+
+  // Persist all remaining tours as completed so FTE never re-triggers.
+  for (const step of FTE_STEPS) {
+    const completed = auth.user?.completed_tours ?? []
+    if (!completed.includes(step)) {
+      try {
+        await markTourComplete(step)
+        if (auth.user) {
+          auth.user.completed_tours = [...(auth.user.completed_tours ?? []), step]
+        }
+      } catch {
+        // Non-critical.
+      }
+    }
+  }
+
+  endFte()
+  demoTourActive.value = false
+  window.location.replace('/')
+}
 
 const currencyLabel = computed(() => {
   const cfg = getCurrencyConfig(currency.displayCurrency)
@@ -148,8 +210,22 @@ async function handleDevReset() {
   if (resetting.value) return
   resetting.value = true
   try {
+    if (activeDriver) activeDriver.destroy()
+    endFte()
+    demoTourActive.value = false
+    resetTourSessionCache()
     await resetUser()
-    window.location.reload()
+
+    // Mirror server reset on client to avoid stale-data race on slow DBs.
+    if (auth.user) {
+      auth.user.completed_tours = []
+      auth.user.dismissed_modals = []
+      auth.user.account_currency = null
+      auth.user.display_currency = null
+      auth.user.account_language = null
+    }
+    currency.$reset()
+    router.replace('/')
   } catch (err) {
     console.error('Dev reset failed:', err)
   } finally {
@@ -168,6 +244,16 @@ async function handleDevReset() {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+/* Between-tours: dim the entire nav, glowing tab + skip pop above. */
+.nav-between::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 1;
+  pointer-events: none;
 }
 
 .nav-brand {
@@ -214,6 +300,47 @@ async function handleDevReset() {
   margin: 4px auto 0;
   border-radius: 50%;
   background: var(--income);
+}
+
+.nt-disabled {
+  opacity: 0.25;
+  pointer-events: none;
+  cursor: default;
+}
+
+.nt-glow {
+  color: var(--safe) !important;
+  animation: nte-pulse 2s ease-in-out infinite;
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes nte-pulse {
+  0%, 100% { text-shadow: 0 0 4px transparent; }
+  50% { text-shadow: 0 0 12px var(--safe); }
+}
+
+.nt-skip {
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  margin-right: 8px;
+  align-self: center;
+  transition: color 0.2s, border-color 0.2s;
+  position: relative;
+  z-index: 2;
+}
+
+.nt-skip:hover {
+  color: var(--text);
+  border-color: var(--text);
 }
 
 .nav-spacer {

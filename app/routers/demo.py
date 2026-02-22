@@ -31,9 +31,11 @@ async def demo_start(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
     """Create or reset the demo user and issue a session cookie."""
+    logger.info("[TourDebug][demo_start] POST /api/auth/demo-start")
     user = await get_or_create_demo_user(db)
     await reset_demo_data(db, user.id)
     await db.commit()
+    logger.info("[TourDebug][demo_start] demo user prepared user_id=%s", user.id)
 
     token = create_jwt(user, settings.jwt_secret)
 
@@ -47,4 +49,5 @@ async def demo_start(
         samesite="lax",
         path="/",
     )
+    logger.info("[TourDebug][demo_start] session cookie issued secure=%s", settings.secure_cookies)
     return response

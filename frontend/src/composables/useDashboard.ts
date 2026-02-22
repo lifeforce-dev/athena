@@ -2,6 +2,8 @@ import { computed, ref, onMounted } from 'vue'
 import { useProjection } from './useProjection'
 import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString } from '@/utils/format'
+import { fetchDemoProjection } from '@/api/demo-data'
+import { demoTourActive } from '@/stores/demoTour'
 
 export type { TrajectoryPoint } from '@/utils/trajectory'
 
@@ -14,7 +16,33 @@ export function useDashboard() {
 
   const projection = useProjection()
 
-  function refresh() {
+  async function refresh() {
+    console.info('[TourDebug][useDashboard] Refresh started', {
+      demoTourActive: demoTourActive.value,
+      fromDate: fromDate.value,
+      asOf: asOf.value,
+    })
+
+    // During a guided tour, load demo data so the dashboard has content.
+    if (demoTourActive.value) {
+      projection.loading.value = true
+      projection.error.value = null
+      try {
+        projection.data.value = await fetchDemoProjection()
+        console.info('[TourDebug][useDashboard] Loaded demo projection', {
+          ledgerCount: projection.data.value.ledger.length,
+          monthCount: projection.data.value.months.length,
+          currentBalance: projection.data.value.current_balance,
+        })
+        return
+      } catch (err) {
+        console.error('[useDashboard] Demo data fetch failed:', err)
+      } finally {
+        projection.loading.value = false
+      }
+    }
+
+    console.info('[TourDebug][useDashboard] Loading real projection endpoint')
     return projection.load(asOf.value, fromDate.value)
   }
 
