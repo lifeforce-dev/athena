@@ -107,13 +107,21 @@
 import { ref, computed } from 'vue'
 import CommitmentModal from '@/components/CommitmentModal.vue'
 import { useCommitments } from '@/composables/useCommitments'
-import { useTour } from '@/composables/useTour'
+import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import type { CommitmentCreate } from '@/types/commitment'
 import { parseMoney, parseLocalDate, formatDollars, formatCents } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
-useTour()
+
+useTabOnboarding({
+  name: 'commitments',
+  steps: (t) => [
+    { element: '[data-tour="commitments-summary"]', popover: { title: t('tour.snapshot_title'), description: t('tour.snapshot_desc') } },
+    { element: '[data-tour="commitments-add"]', popover: { title: t('tour.add_title'), description: t('tour.add_desc') } },
+    { element: '[data-tour="commitments-group"]', popover: { title: t('tour.organized_title'), description: t('tour.organized_desc') } },
+  ],
+})
 
 const {
   commitments,

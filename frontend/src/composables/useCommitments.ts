@@ -6,6 +6,8 @@ import {
   updateCommitment as apiUpdate,
   deleteCommitment as apiDelete,
 } from '@/api/commitments'
+import { fetchDemoCommitments } from '@/api/demo-data'
+import { demoTourActive } from '@/stores/demoTour'
 import { parseMoney } from '@/utils/format'
 
 export function useCommitments() {
@@ -17,7 +19,9 @@ export function useCommitments() {
     loading.value = true
     error.value = null
     try {
-      commitments.value = await fetchCommitments()
+      commitments.value = demoTourActive.value
+        ? await fetchDemoCommitments()
+        : await fetchCommitments()
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
     } finally {

@@ -23,23 +23,25 @@
         <Transition name="cm-info">
           <div v-if="selected" class="cm-lang-info">
             <span class="cm-lang-text">{{ t('currency_prompt.lang_info') }}</span>
-            <button class="cm-lang-pick" @click="langOpen = !langOpen">
-              {{ chosenLangLabel }}
-              <span class="cm-lang-caret">&#9662;</span>
-            </button>
-            <Transition name="cm-info">
-              <div v-if="langOpen" class="cm-lang-dropdown">
-                <button
-                  v-for="(label, code) in languageOptions"
-                  :key="code"
-                  class="cm-lang-item"
-                  :class="{ active: chosenLang === code }"
-                  @click="pickLang(code)"
-                >
-                  {{ label }}
-                </button>
-              </div>
-            </Transition>
+            <span class="cm-lang-anchor">
+              <button class="cm-lang-pick" @click="langOpen = !langOpen">
+                {{ chosenLangLabel }}
+                <span class="cm-lang-caret">&#9662;</span>
+              </button>
+              <Transition name="cm-info">
+                <div v-if="langOpen" class="cm-lang-dropdown">
+                  <button
+                    v-for="(label, code) in languageOptions"
+                    :key="code"
+                    class="cm-lang-item"
+                    :class="{ active: chosenLang === code }"
+                    @click="pickLang(code)"
+                  >
+                    {{ label }}
+                  </button>
+                </div>
+              </Transition>
+            </span>
           </div>
         </Transition>
 
@@ -55,6 +57,7 @@
 import { ref, computed } from 'vue'
 import { useCurrencyStore } from '@/stores/currency'
 import { useLanguageStore } from '@/stores/language'
+import { demoTourActive } from '@/stores/demoTour'
 import { type CurrencyCode, CURRENCIES, CURRENCY_CODES, LANGUAGE_LABELS } from '@/config/currencies'
 import { useI18n } from '@/composables/useI18n'
 import { setLanguage } from '@/api/auth'
@@ -102,16 +105,42 @@ async function confirm() {
   if (!selected.value || saving.value) return
   saving.value = true
 
+  console.info('[TourDebug][CurrencyPrompt] Confirm clicked', {
+    selectedCurrency: selected.value,
+    hasLanguageOverride: !!langOverride.value,
+    languageOverride: langOverride.value,
+  })
+
+  // Set BEFORE the await -- saveAccountCurrency flips accountCurrencySet,
+  // which triggers Vue reactivity to mount DashboardView.  If demoTourActive
+  // is not already true at that point, the dashboard loads real (empty) data.
+  demoTourActive.value = true
+
+  // Inject an opaque cover so the dashboard never flashes while the
+  // CurrencyPrompt unmounts and the splash overlay takes over.
+  const cover = document.createElement('div')
+  cover.id = 'demo-tour-cover'
+  cover.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--bg,#06080C);'
+  document.body.appendChild(cover)
+
   try {
     await currency.saveAccountCurrency(selected.value)
 
     // If the user overrode the language, persist it immediately.
     if (langOverride.value) {
+      console.info('[TourDebug][CurrencyPrompt] Persisting language override', {
+        language: langOverride.value,
+      })
       await setLanguage(langOverride.value)
       language.initFromUser(langOverride.value)
     }
 
+    console.info('[TourDebug][CurrencyPrompt] Currency flow complete, emitting done')
     emit('done')
+  } catch (err) {
+    // Save failed — roll back the optimistic flag so real data loads normally.
+    demoTourActive.value = false
+    console.error('[CurrencyPrompt] Save failed, rolled back demoTourActive', err)
   } finally {
     saving.value = false
   }
@@ -223,7 +252,6 @@ async function confirm() {
 
 /* Language info bar */
 .cm-lang-info {
-  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -264,14 +292,18 @@ async function confirm() {
   opacity: 0.6;
 }
 
+.cm-lang-anchor {
+  position: relative;
+}
+
 .cm-lang-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  margin-top: 4px;
-  background: var(--panel);
+  background: var(--bg);
   border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   z-index: 10;
   display: flex;
   flex-direction: column;

@@ -30,19 +30,22 @@
 
 .athena-tour-popover .driver-popover-prev-btn,
 .athena-tour-popover .driver-popover-next-btn {
-  background: transparent;
-  border: 1px solid rgba(167, 139, 250, 0.2);
-  color: var(--income);
-  font-size: 11px;
-  font-weight: 700;
-  padding: 4px 12px;
-  text-shadow: none;
+  background: transparent !important;
+  border: 1px solid rgba(167, 139, 250, 0.2) !important;
+  color: var(--income) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 4px 12px !important;
+  text-shadow: none !important;
+  border-radius: 3px !important;
 }
 
 .athena-tour-popover .driver-popover-prev-btn:hover,
-.athena-tour-popover .driver-popover-next-btn:hover {
-  background: rgba(167, 139, 250, 0.08);
-  border-color: rgba(167, 139, 250, 0.35);
+.athena-tour-popover .driver-popover-next-btn:hover,
+.athena-tour-popover .driver-popover-prev-btn:focus,
+.athena-tour-popover .driver-popover-next-btn:focus {
+  background: rgba(167, 139, 250, 0.08) !important;
+  border-color: rgba(167, 139, 250, 0.35) !important;
 }
 
 .athena-tour-popover .driver-popover-close-btn {
@@ -53,9 +56,21 @@
   color: var(--bright);
 }
 
-.athena-tour-popover .driver-popover-arrow-side-left .driver-popover-arrow,
-.athena-tour-popover .driver-popover-arrow-side-right .driver-popover-arrow,
-.athena-tour-popover .driver-popover-arrow-side-top .driver-popover-arrow,
-.athena-tour-popover .driver-popover-arrow-side-bottom .driver-popover-arrow {
-  border-color: var(--panel) !important;
+/* Arrow: driver.js uses `border: 5px solid #fff` on the arrow element.
+   Each side-class makes 3 borders transparent, leaving the visible one.
+   Override only the visible border per direction to match our panel. */
+.athena-tour-popover .driver-popover-arrow-side-left {
+  border-left-color: var(--panel) !important;
+}
+
+.athena-tour-popover .driver-popover-arrow-side-right {
+  border-right-color: var(--panel) !important;
+}
+
+.athena-tour-popover .driver-popover-arrow-side-top {
+  border-top-color: var(--panel) !important;
+}
+
+.athena-tour-popover .driver-popover-arrow-side-bottom {
+  border-bottom-color: var(--panel) !important;
 }

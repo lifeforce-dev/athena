@@ -21,21 +21,32 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api/client'
+import { demoTourActive } from '@/stores/demoTour'
 
 const router = useRouter()
 const auth = useAuthStore()
 const error = ref('')
 
 onMounted(async () => {
+  console.info('[TourDebug][DemoView] Starting demo session bootstrap')
   try {
     await api.post('/auth/demo-start')
+    console.info('[TourDebug][DemoView] /auth/demo-start succeeded')
 
     // Force auth store to re-check (clear cached state).
     auth.checked = false
     await auth.checkAuth()
+    console.info('[TourDebug][DemoView] Auth revalidated after demo-start', {
+      checked: auth.checked,
+      isAuthenticated: auth.isAuthenticated,
+      user: auth.user?.username,
+    })
 
-    router.replace({ name: 'dashboard', query: { tour: 'dashboard' } })
+    // Signal that demo data should be loaded before navigating.
+    demoTourActive.value = true
+    router.replace({ name: 'dashboard' })
   } catch (err) {
+    console.error('[TourDebug][DemoView] Demo bootstrap failed', err)
     error.value = err instanceof Error ? err.message : 'Failed to start demo'
   }
 })
