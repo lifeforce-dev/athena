@@ -136,6 +136,16 @@ def create_app() -> FastAPI:
             "ATHENA_GOOGLE_PUSH_AUDIENCE must be set when Gmail integration is enabled."
         )
 
+    if settings.teller_app_id:
+        if not settings.teller_certificate_b64:
+            raise RuntimeError(
+                "ATHENA_TELLER_CERTIFICATE_B64 required when Teller is enabled."
+            )
+        if not settings.teller_encryption_key:
+            raise RuntimeError(
+                "ATHENA_TELLER_ENCRYPTION_KEY required when Teller is enabled."
+            )
+
     application = FastAPI(title='Athena - Cash Projection API', version='0.1.0', lifespan=lifespan)
 
     application.add_middleware(

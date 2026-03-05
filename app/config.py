@@ -21,6 +21,12 @@ class Settings(BaseSettings):
         ATHENA_GOOGLE_REFRESH_TOKEN   -- Gmail API refresh token (offline access)
         ATHENA_GOOGLE_PROJECT_ID      -- GCP project ID (for Pub/Sub topic)
         ATHENA_GOOGLE_PUSH_AUDIENCE   -- OIDC audience for Pub/Sub push verification
+        ATHENA_TELLER_APP_ID          -- Teller application ID
+        ATHENA_TELLER_ENVIRONMENT     -- sandbox | development | production
+        ATHENA_TELLER_WEBHOOK_SECRET  -- HMAC signing secret for webhook verification
+        ATHENA_TELLER_ENCRYPTION_KEY  -- Fernet key for encrypting access tokens
+        ATHENA_TELLER_CERTIFICATE_B64 -- base64-encoded mTLS client certificate
+        ATHENA_TELLER_PRIVATE_KEY_B64 -- base64-encoded mTLS private key
     """
 
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -42,6 +48,14 @@ class Settings(BaseSettings):
     google_refresh_token: str = ""
     google_project_id: str = ""
     google_push_audience: str = ""
+
+    # Teller bank integration
+    teller_app_id: str = ""
+    teller_environment: str = "sandbox"
+    teller_webhook_secret: str = ""
+    teller_encryption_key: str = ""
+    teller_certificate_b64: str = ""
+    teller_private_key_b64: str = ""
 
     @property
     def secure_cookies(self) -> bool:
