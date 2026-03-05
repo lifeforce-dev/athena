@@ -65,6 +65,32 @@ async def create_from_gmail(
     return result.rowcount > 0  # type: ignore[union-attr]
 
 
+async def create_from_teller(
+    db: AsyncSession,
+    user_id: int,
+    balance: Decimal,
+    observed_at: datetime,
+    account_label: str | None = None,
+) -> BalanceSnapshot:
+    """Insert a Teller-sourced balance snapshot.
+
+    Unlike Gmail snapshots, Teller balances have no natural dedup key.
+    Each sync creates a new row. A previous snapshot at the exact same
+    observed_at is unlikely but harmless.
+    """
+    snapshot = BalanceSnapshot(
+        user_id=user_id,
+        balance=balance,
+        observed_at=observed_at,
+        source="teller",
+        account_label=account_label,
+    )
+    db.add(snapshot)
+    await db.flush()
+    await db.refresh(snapshot)
+    return snapshot
+
+
 async def create_manual(
     db: AsyncSession,
     user_id: int,
