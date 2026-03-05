@@ -23,6 +23,32 @@ EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest"
 
 ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"}
 
+
+class CurrencyConversionError(Exception):
+    """Raised when currency conversion fails."""
+
+    _base: str
+    _target: str
+    _reason: str
+
+    def __init__(self, base: str, target: str, reason: str) -> None:
+        self._base = base
+        self._target = target
+        self._reason = reason
+        super().__init__(f"Cannot convert {base} -> {target}: {reason}")
+
+    @property
+    def base(self) -> str:
+        return self._base
+
+    @property
+    def target(self) -> str:
+        return self._target
+
+    @property
+    def reason(self) -> str:
+        return self._reason
+
 # In-memory cache: "FROM:TO" -> (timestamp, rate).
 _rate_cache: dict[str, tuple[float, float]] = {}
 _CACHE_TTL_SECONDS = 3600
@@ -51,10 +77,30 @@ async def get_rate(base: str, target: str) -> float:
 
     rate = data.get("rates", {}).get(target)
     if rate is None:
-        raise ValueError(f"Exchange rate not found for {base} -> {target}")
+        raise CurrencyConversionError(base, target, "rate not found in API response")
 
     _rate_cache[key] = (now, float(rate))
     return float(rate)
+
+
+async def get_rate_with_fallback(base: str, target: str) -> float:
+    """Like get_rate(), but returns a stale cached rate if the API is unreachable.
+
+    The daily balance sync refreshes rates regularly. If the API is down during a
+    webhook or enrollment, a slightly stale rate (up to ~24h old) is acceptable
+    because the daily balance sync will reconcile with a fresh rate anyway.
+    """
+    try:
+        return await get_rate(base, target)
+    except (httpx.HTTPError, CurrencyConversionError) as exc:
+        key = f"{base.upper()}:{target.upper()}"
+        if key in _rate_cache:
+            logger.warning("Rate API down, using stale cached rate for %s", key)
+            _, stale_rate = _rate_cache[key]
+            return stale_rate
+        raise CurrencyConversionError(
+            base, target, f"API unreachable and no cached rate available ({exc})"
+        ) from exc
 
 
 class UserCurrencyInfo:
