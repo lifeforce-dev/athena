@@ -16,6 +16,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -117,7 +118,7 @@ class BalanceSnapshot(Base):
 
 
 class Transaction(Base):
-    """Debit card usage notifications from bank emails."""
+    """Debit card usage notifications from bank emails and Teller webhooks."""
 
     __tablename__ = "transactions"
 
@@ -131,6 +132,11 @@ class Transaction(Base):
     purchase_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     gmail_message_id: Mapped[str | None] = mapped_column(String(64))
 
+    # Teller-specific columns (nullable for backcompat with existing gmail-sourced rows).
+    source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="gmail")
+    teller_transaction_id: Mapped[str | None] = mapped_column(String(128))
+    category: Mapped[str | None] = mapped_column(String(128))
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -140,6 +146,7 @@ class Transaction(Base):
     # as distinct in UNIQUE constraints.
     __table_args__ = (
         UniqueConstraint("user_id", "gmail_message_id", name="uq_transaction_user_gmail"),
+        UniqueConstraint("user_id", "teller_transaction_id", name="uq_transaction_user_teller"),
         Index("idx_transactions_user_date", "user_id", "purchase_date"),
     )
 
@@ -162,4 +169,53 @@ class GmailSubscription(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class TellerEnrollment(Base):
+    """Tracks a user's Teller bank enrollment and connection status.
+
+    Single active enrollment per user, enforced by a partial unique index.
+    Disconnected/error rows are preserved for history.
+    """
+
+    __tablename__ = "teller_enrollments"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    enrollment_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    institution_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    # Fernet-encrypted access token. Decrypted only when making API calls.
+    access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
+
+    # The single checking account we track (populated by Phase 2 background sync).
+    account_id: Mapped[str | None] = mapped_column(String(128))
+    account_name: Mapped[str | None] = mapped_column(String(255))
+    account_currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="USD")
+
+    # syncing | active | disconnected | error
+    status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="syncing")
+
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_teller_enrollment_user", "user_id"),
+        # Partial unique index: only one active/syncing enrollment per user.
+        # Disconnected/error rows don't block re-enrollment.
+        Index(
+            "uq_teller_user_active",
+            "user_id",
+            unique=True,
+            postgresql_where=text("status IN ('active', 'syncing')"),
+        ),
     )
