@@ -71,15 +71,15 @@ async def _sync_teller_balances(
             except (InvalidOperation, ValueError):
                 raw_balance = Decimal("0.00")
 
+            # Single DB session for currency lookup + balance write + sync timestamp.
             async with factory() as db:
                 user_currency = await get_user_account_currency(enrollment.user_id, db)
 
-            converted_balance = await convert_amount(
-                raw_balance, enrollment.account_currency, user_currency
-            )
+                converted_balance = await convert_amount(
+                    raw_balance, enrollment.account_currency, user_currency
+                )
 
-            now = datetime.now(UTC)
-            async with factory() as db:
+                now = datetime.now(UTC)
                 await balance_repository.create_from_teller(
                     db,
                     user_id=enrollment.user_id,
@@ -122,6 +122,26 @@ async def _periodic_teller_sync(
             logger.exception("Error in periodic Teller balance sync")
 
 
+async def _reconcile_stale_enrollments(
+    factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Transition SYNCING enrollments to ERROR on startup.
+
+    If the process crashed between committing SYNCING and the background
+    task completing, these rows are stranded. There is no in-process task
+    to finish the sync, so we mark them ERROR so the user can retry.
+    """
+    from app.repositories import teller_repository
+
+    async with factory() as db:
+        count = await teller_repository.reconcile_stale_syncing(db)
+        await db.commit()
+    if count:
+        logger.warning(
+            "Recovered %d enrollment(s) stranded in SYNCING → marked ERROR", count
+        )
+
+
 # -- Application lifecycle -------------------------------------------------
 
 
@@ -141,6 +161,10 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.teller_sync_tasks = {}  # dict[int, asyncio.Task] keyed by enrollment ID
         logger.info("Database engine initialized")
 
+        # Recover enrollments stranded in SYNCING by a previous crash.
+        factory = application.state.db_session_factory
+        await _reconcile_stale_enrollments(factory)
+
         if settings.teller_app_id and settings.teller_certificate_b64:
             from app.common.encryption import decode_cert_to_tempfile
 
@@ -152,7 +176,6 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             )
             logger.info("Teller mTLS certificates decoded to temp files")
 
-            factory = application.state.db_session_factory
             teller_sync_task = asyncio.create_task(
                 _periodic_teller_sync(
                     factory,
@@ -222,6 +245,11 @@ def create_app() -> FastAPI:
         if not settings.teller_webhook_secret:
             raise RuntimeError(
                 "ATHENA_TELLER_WEBHOOK_SECRET required when Teller is enabled."
+            )
+        if not settings.teller_token_signing_key:
+            logger.warning(
+                "ATHENA_TELLER_TOKEN_SIGNING_KEY is not set — enrollment "
+                "signature verification is DISABLED. Set it for production use."
             )
 
     application = FastAPI(title='Athena - Cash Projection API', version='0.1.0', lifespan=lifespan)

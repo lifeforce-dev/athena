@@ -15,6 +15,10 @@ export function enrollTeller(data: TellerEnrollRequest) {
   return api.post<TellerEnrollResponse>('/teller/enroll', data)
 }
 
+export function getTellerAccounts() {
+  return api.get<TellerEnrollResponse>('/teller/accounts')
+}
+
 export function selectTellerAccount(data: TellerSelectAccountRequest) {
   return api.post<TellerStatusResponse>('/teller/select-account', data)
 }
