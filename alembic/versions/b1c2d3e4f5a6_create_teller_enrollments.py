@@ -37,7 +37,7 @@ def upgrade() -> None:
         sa.Column("account_id", sa.String(128), nullable=True),
         sa.Column("account_name", sa.String(255), nullable=True),
         sa.Column("account_currency", sa.String(3), nullable=False, server_default="USD"),
-        sa.Column("status", sa.String(32), nullable=False, server_default="syncing"),
+        sa.Column("status", sa.String(32), nullable=False, server_default="awaiting_account"),
         sa.Column("last_synced_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "created_at",
@@ -55,10 +55,10 @@ def upgrade() -> None:
 
     op.create_index("idx_teller_enrollment_user", "teller_enrollments", ["user_id"])
 
-    # Partial unique index: only one active/syncing enrollment per user.
+    # Partial unique index: only one active enrollment per user.
     op.execute(
         "CREATE UNIQUE INDEX uq_teller_user_active ON teller_enrollments (user_id) "
-        "WHERE status IN ('active', 'syncing')"
+        "WHERE status IN ('awaiting_account', 'active', 'syncing')"
     )
 
     # -- Modify: transactions --

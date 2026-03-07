@@ -21,6 +21,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.teller_constants import CONNECTED_STATUSES, TellerStatus
 
 
 class User(Base):
@@ -196,8 +197,9 @@ class TellerEnrollment(Base):
     account_name: Mapped[str | None] = mapped_column(String(255))
     account_currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="USD")
 
-    # syncing | active | disconnected | error
-    status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="syncing")
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default=TellerStatus.AWAITING_ACCOUNT
+    )
 
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
@@ -210,12 +212,14 @@ class TellerEnrollment(Base):
 
     __table_args__ = (
         Index("idx_teller_enrollment_user", "user_id"),
-        # Partial unique index: only one active/syncing enrollment per user.
+        # Partial unique index: only one active enrollment per user.
         # Disconnected/error rows don't block re-enrollment.
         Index(
             "uq_teller_user_active",
             "user_id",
             unique=True,
-            postgresql_where=text("status IN ('active', 'syncing')"),
+            postgresql_where=text(
+                f"status IN ({', '.join(repr(str(s)) for s in CONNECTED_STATUSES)})"
+            ),
         ),
     )

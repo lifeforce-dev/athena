@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from importlib.metadata import entry_points
@@ -23,6 +24,7 @@ from app.routers.demo_data import router as demo_data_router
 from app.routers.gmail import router as gmail_router
 from app.routers.notifications import router as notifications_router
 from app.routers.projection import router as projection_router
+from app.routers.teller import router as teller_router
 from app.routers.transactions import router as transactions_router
 from app.services.gmail_service import (
     parse_watch_expiry,
@@ -74,25 +76,120 @@ async def _periodic_renewal_loop(
             logger.exception("Error in periodic Gmail watch renewal")
 
 
+# -- Teller daily balance sync --------------------------------------------
+
+
+async def _sync_teller_balances(
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    cert_path: str,
+    key_path: str,
+) -> None:
+    """Fetch and store latest balance for all active Teller enrollments.
+
+    Runs once per daily cycle. Each enrollment is handled independently so
+    a single failure does not block the rest.
+    """
+    from datetime import datetime, timezone
+    from decimal import Decimal, InvalidOperation
+
+    from app.common.encryption import decrypt_token
+    from app.repositories import balance_repository, teller_repository
+    from app.services.currency_service import convert_amount, get_user_account_currency
+    from app.services.teller_service import (
+        TellerApiError,
+        build_teller_client,
+        fetch_balances,
+    )
+
+    async with factory() as db:
+        enrollments = await teller_repository.get_all_active(db)
+
+    for enrollment in enrollments:
+        try:
+            token = decrypt_token(
+                enrollment.access_token_encrypted, settings.teller_encryption_key
+            )
+
+            async with build_teller_client(cert_path, key_path, token) as client:
+                balance_data = await fetch_balances(client, enrollment.account_id)  # type: ignore[arg-type]
+
+            try:
+                raw_balance = Decimal(balance_data.available).quantize(Decimal("0.01"))
+            except (InvalidOperation, ValueError):
+                raw_balance = Decimal("0.00")
+
+            async with factory() as db:
+                user_currency = await get_user_account_currency(enrollment.user_id, db)
+
+            converted_balance = await convert_amount(
+                raw_balance, enrollment.account_currency, user_currency
+            )
+
+            now = datetime.now(timezone.utc)
+            async with factory() as db:
+                await balance_repository.create_from_teller(
+                    db,
+                    user_id=enrollment.user_id,
+                    balance=converted_balance,
+                    observed_at=now,
+                    account_label=enrollment.account_name,
+                )
+                await teller_repository.update_last_synced(db, enrollment.id)
+                await db.commit()
+
+            logger.info("Daily sync complete for enrollment %s", enrollment.id)
+
+        except TellerApiError as exc:
+            logger.warning(
+                "Teller API error during daily sync (enrollment %s): %s",
+                enrollment.id,
+                exc.detail,
+            )
+            if exc.status_code in (401, 403):
+                async with factory() as db:
+                    await teller_repository.mark_disconnected(db, enrollment.id)
+                    await db.commit()
+
+        except Exception:
+            logger.exception("Daily sync failed for enrollment %s", enrollment.id)
+
+
+async def _periodic_teller_sync(
+    factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    cert_path: str,
+    key_path: str,
+) -> None:
+    """Background loop: sync Teller balances every 24 hours."""
+    while True:
+        await asyncio.sleep(24 * 3600)
+        try:
+            await _sync_teller_balances(factory, settings, cert_path, key_path)
+        except Exception:
+            logger.exception("Error in periodic Teller balance sync")
+
+
 # -- Application lifecycle -------------------------------------------------
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-    """Initialize logging, database, and Gmail watch at startup."""
+    """Initialize logging, database, Gmail watch, and Teller sync at startup."""
     setup_logging()
 
     settings = get_settings()
 
     engine = None
     renewal_task = None
+    teller_sync_task = None
 
     if settings.database_url:
         engine = build_engine(settings.database_url)
         application.state.db_session_factory = build_session_factory(engine)
+        application.state.teller_sync_tasks = {}  # dict[int, asyncio.Task] keyed by enrollment ID
         logger.info("Database engine initialized")
 
-        # Renew Gmail watch on startup if credentials are configured.
         if settings.google_refresh_token:
             factory = application.state.db_session_factory
             try:
@@ -104,6 +201,27 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
                 _periodic_renewal_loop(factory, settings)
             )
 
+        if settings.teller_app_id and settings.teller_certificate_b64:
+            from app.common.encryption import decode_cert_to_tempfile
+
+            application.state.teller_cert_path = decode_cert_to_tempfile(
+                settings.teller_certificate_b64
+            )
+            application.state.teller_key_path = decode_cert_to_tempfile(
+                settings.teller_private_key_b64
+            )
+            logger.info("Teller mTLS certificates decoded to temp files")
+
+            factory = application.state.db_session_factory
+            teller_sync_task = asyncio.create_task(
+                _periodic_teller_sync(
+                    factory,
+                    settings,
+                    application.state.teller_cert_path,
+                    application.state.teller_key_path,
+                )
+            )
+
     logger.info("Athena API initialized")
     yield
 
@@ -111,6 +229,28 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         renewal_task.cancel()
         with suppress(asyncio.CancelledError):
             await renewal_task
+
+    if teller_sync_task is not None:
+        teller_sync_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await teller_sync_task
+
+    # Cancel any in-flight per-enrollment sync tasks.
+    sync_tasks: dict[int, asyncio.Task[None]] = getattr(
+        application.state, "teller_sync_tasks", {}
+    )
+    for task in sync_tasks.values():
+        task.cancel()
+    for task in sync_tasks.values():
+        with suppress(asyncio.CancelledError):
+            await task
+
+    for attr in ("teller_cert_path", "teller_key_path"):
+        path = getattr(application.state, attr, None)
+        if path:
+            with suppress(OSError):
+                os.unlink(path)
+                logger.info("Removed temp cert file: %s", attr)
 
     if engine is not None:
         await engine.dispose()
@@ -141,9 +281,17 @@ def create_app() -> FastAPI:
             raise RuntimeError(
                 "ATHENA_TELLER_CERTIFICATE_B64 required when Teller is enabled."
             )
+        if not settings.teller_private_key_b64:
+            raise RuntimeError(
+                "ATHENA_TELLER_PRIVATE_KEY_B64 required when Teller is enabled."
+            )
         if not settings.teller_encryption_key:
             raise RuntimeError(
                 "ATHENA_TELLER_ENCRYPTION_KEY required when Teller is enabled."
+            )
+        if not settings.teller_webhook_secret:
+            raise RuntimeError(
+                "ATHENA_TELLER_WEBHOOK_SECRET required when Teller is enabled."
             )
 
     application = FastAPI(title='Athena - Cash Projection API', version='0.1.0', lifespan=lifespan)
@@ -165,6 +313,7 @@ def create_app() -> FastAPI:
     application.include_router(gmail_router, prefix='/api')
     application.include_router(notifications_router, prefix='/api')
     application.include_router(projection_router, prefix='/api')
+    application.include_router(teller_router, prefix='/api')
     application.include_router(transactions_router, prefix='/api')
 
     # Discover and register plugin routers (e.g. athena-dev-tools).

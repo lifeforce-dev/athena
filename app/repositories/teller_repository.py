@@ -2,11 +2,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.orm import TellerEnrollment
+from app.models.teller_constants import CONNECTED_STATUSES, LIVE_STATUSES, TellerStatus
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
 
 
 async def create_enrollment(
@@ -44,12 +49,12 @@ async def get_active_enrollment(
     db: AsyncSession,
     user_id: int,
 ) -> TellerEnrollment | None:
-    """Return the single active or syncing enrollment for a user."""
+    """Return the single active, syncing, or awaiting-account enrollment for a user."""
     result = await db.execute(
         select(TellerEnrollment)
         .where(
             TellerEnrollment.user_id == user_id,
-            TellerEnrollment.status.in_(["active", "syncing"]),
+            TellerEnrollment.status.in_(list(CONNECTED_STATUSES)),
         )
         .limit(1)
     )
@@ -67,7 +72,7 @@ async def get_enrollment_by_account(
     result = await db.execute(
         select(TellerEnrollment).where(
             TellerEnrollment.account_id == account_id,
-            TellerEnrollment.status.in_(["active", "syncing"]),
+            TellerEnrollment.status.in_(list(LIVE_STATUSES)),
         )
     )
     return result.scalar_one_or_none()
@@ -92,7 +97,7 @@ async def get_enrollment_by_enrollment_id(
 async def get_all_active(db: AsyncSession) -> list[TellerEnrollment]:
     """Return all enrollments with status 'active' (for daily sync)."""
     result = await db.execute(
-        select(TellerEnrollment).where(TellerEnrollment.status == "active")
+        select(TellerEnrollment).where(TellerEnrollment.status == TellerStatus.ACTIVE)
     )
     return list(result.scalars().all())
 
@@ -102,12 +107,35 @@ async def update_status(
     enrollment_id: int,
     status: str,
 ) -> None:
-    """Set the enrollment status (active, disconnected, error)."""
+    """Set the enrollment status unconditionally."""
     await db.execute(
         update(TellerEnrollment)
         .where(TellerEnrollment.id == enrollment_id)
         .values(status=status, updated_at=datetime.now(timezone.utc))
     )
+
+
+async def transition_status(
+    db: AsyncSession,
+    enrollment_id: int,
+    from_status: str,
+    to_status: str,
+) -> bool:
+    """Atomic compare-and-swap status transition.
+
+    Only updates the row if it is currently in ``from_status``.
+    Returns True on success, False if the status was already changed
+    by a concurrent request (e.g., disconnect during sync).
+    """
+    result: CursorResult = await db.execute(  # type: ignore[assignment]
+        update(TellerEnrollment)
+        .where(
+            TellerEnrollment.id == enrollment_id,
+            TellerEnrollment.status == from_status,
+        )
+        .values(status=to_status, updated_at=datetime.now(timezone.utc))
+    )
+    return result.rowcount > 0
 
 
 async def update_account_details(
@@ -148,4 +176,4 @@ async def mark_disconnected(
     enrollment_id: int,
 ) -> None:
     """Mark an enrollment as disconnected (token revoked or user action)."""
-    await update_status(db, enrollment_id, "disconnected")
+    await update_status(db, enrollment_id, TellerStatus.DISCONNECTED)
