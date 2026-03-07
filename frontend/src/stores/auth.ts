@@ -24,7 +24,10 @@ export const useAuthStore = defineStore('auth', () => {
         user.value.display_currency ?? null,
       )
       const language = useLanguageStore()
-      language.initFromUser(user.value.account_language ?? null)
+      language.initFromUser(
+        user.value.account_language ?? null,
+        user.value.account_currency ?? null,
+      )
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         user.value = null
