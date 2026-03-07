@@ -30,6 +30,7 @@ from app.routers.teller import (
     _SyncContext,
     disconnect,
     enroll,
+    get_nonce,
     get_status,
     select_account,
     webhook,
@@ -49,6 +50,9 @@ def _fake_settings(**overrides: object) -> MagicMock:
     settings = MagicMock()
     settings.teller_encryption_key = overrides.get("encryption_key", FAKE_ENCRYPTION_KEY)
     settings.teller_webhook_secret = overrides.get("webhook_secret", WEBHOOK_SECRET)
+    settings.teller_token_signing_key = overrides.get("token_signing_key", "")
+    settings.teller_environment = overrides.get("environment", "sandbox")
+    settings.jwt_secret = overrides.get("jwt_secret", "test_jwt_secret")
     return settings
 
 
@@ -143,6 +147,24 @@ class TestGetStatus:
 
         assert result.is_connected is True
         assert result.status == TellerStatus.SYNCING
+
+
+# ---------------------------------------------------------------------------
+# GET /teller/nonce
+# ---------------------------------------------------------------------------
+
+
+class TestGetNonce:
+    """GET /nonce returns a cryptographic nonce + HMAC."""
+
+    @pytest.mark.asyncio
+    async def test_nonce_response_has_required_fields(self):
+        settings = _fake_settings()
+
+        result = await get_nonce(user_id=42, settings=settings)
+
+        assert len(result.nonce) > 20
+        assert len(result.nonce_mac) == 64
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +307,124 @@ class TestEnroll:
             )
 
         assert exc_info.value.status_code == 502
+
+    @pytest.mark.asyncio
+    async def test_enroll_rejects_missing_nonce_when_signing_enabled(self):
+        """When token_signing_key is set, nonce + nonce_mac are required."""
+        mock_db = AsyncMock()
+        mock_request = MagicMock()
+        body = TellerEnrollRequest(
+            access_token="test_token",
+            enrollment_id="enr_1",
+            institution="Test Bank",
+        )
+        settings = _fake_settings(token_signing_key="fake_key_b64")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await enroll(body=body, user_id=42, db=mock_db,
+                         request=mock_request, settings=settings)
+
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_enroll_rejects_bad_nonce_mac(self):
+        """When nonce_mac doesn't verify, enrollment is rejected."""
+        mock_db = AsyncMock()
+        mock_request = MagicMock()
+        body = TellerEnrollRequest(
+            access_token="test_token",
+            enrollment_id="enr_1",
+            institution="Test Bank",
+            nonce="some_nonce",
+            nonce_mac="wrong_mac",
+        )
+        settings = _fake_settings(token_signing_key="fake_key_b64")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await enroll(body=body, user_id=42, db=mock_db,
+                         request=mock_request, settings=settings)
+
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    @patch("app.routers.teller.verify_token_signatures", return_value=False)
+    @patch("app.routers.teller.verify_nonce_mac", return_value=True)
+    async def test_enroll_rejects_bad_signature(
+        self,
+        mock_verify_nonce: MagicMock,
+        mock_verify_sig: MagicMock,
+    ):
+        """When Ed25519 signature verification fails, enrollment is rejected."""
+        mock_db = AsyncMock()
+        mock_request = MagicMock()
+        body = TellerEnrollRequest(
+            access_token="test_token",
+            enrollment_id="enr_1",
+            institution="Test Bank",
+            signatures=["bad_signature"],
+            teller_user_id="usr_1",
+            nonce="n1",
+            nonce_mac="valid_mac",
+        )
+        settings = _fake_settings(token_signing_key="fake_key_b64")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await enroll(body=body, user_id=42, db=mock_db,
+                         request=mock_request, settings=settings)
+
+        assert exc_info.value.status_code == 403
+
+    @pytest.mark.asyncio
+    @patch("app.routers.teller.fetch_accounts")
+    @patch("app.routers.teller.build_teller_client")
+    @patch("app.routers.teller.encrypt_token", return_value="encrypted_token")
+    @patch("app.routers.teller.teller_repository")
+    @patch("app.routers.teller.verify_token_signatures", return_value=True)
+    @patch("app.routers.teller.verify_nonce_mac", return_value=True)
+    async def test_enroll_succeeds_with_valid_signature(
+        self,
+        mock_verify_nonce: MagicMock,
+        mock_verify_sig: MagicMock,
+        mock_repo: MagicMock,
+        mock_encrypt: MagicMock,
+        mock_build_client: MagicMock,
+        mock_fetch_accounts: MagicMock,
+    ):
+        """Full enroll succeeds when signing key is set and signature is valid."""
+        mock_db = AsyncMock()
+        mock_request = MagicMock()
+        mock_request.app.state.teller_cert_path = "/tmp/cert.pem"
+        mock_request.app.state.teller_key_path = "/tmp/key.pem"
+
+        new_enrollment = _fake_enrollment(
+            status=TellerStatus.AWAITING_ACCOUNT, account_id=None,
+        )
+        mock_repo.get_active_enrollment = AsyncMock(return_value=None)
+        mock_repo.create_enrollment = AsyncMock(return_value=new_enrollment)
+
+        mock_client = AsyncMock()
+        mock_build_client.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_build_client.return_value.__aexit__ = AsyncMock(return_value=False)
+        mock_fetch_accounts.return_value = [_fake_teller_account()]
+
+        body = TellerEnrollRequest(
+            access_token="test_token",
+            enrollment_id="enr_signed",
+            institution="Test Bank",
+            signatures=["valid_sig_b64"],
+            teller_user_id="usr_1",
+            nonce="n1",
+            nonce_mac="valid_mac",
+        )
+        settings = _fake_settings(token_signing_key="AAAA")
+
+        result = await enroll(
+            body=body, user_id=42, db=mock_db,
+            request=mock_request, settings=settings,
+        )
+
+        assert result.status == TellerStatus.AWAITING_ACCOUNT
+        mock_verify_sig.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

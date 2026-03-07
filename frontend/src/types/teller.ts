@@ -12,6 +12,14 @@ export interface TellerEnrollRequest {
   access_token: string
   enrollment_id: string
   institution: string
+  /** Ed25519 signatures from Teller Connect enrollment callback. */
+  signatures: string[]
+  /** Teller's user.id from the enrollment callback. */
+  teller_user_id: string
+  /** Server-generated nonce passed to Teller Connect. */
+  nonce: string
+  /** HMAC of the nonce for stateless server-side verification. */
+  nonce_mac: string
 }
 
 /** POST /api/teller/select-account request body. */
@@ -43,4 +51,10 @@ export interface TellerStatusResponse {
   account_name: string | null
   last_synced_at: string | null
   status: TellerStatusValue
+}
+
+/** Response from GET /api/teller/nonce. */
+export interface TellerNonceResponse {
+  nonce: string
+  nonce_mac: string
 }

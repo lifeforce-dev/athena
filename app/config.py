@@ -22,6 +22,7 @@ class Settings(BaseSettings):
         ATHENA_TELLER_ENCRYPTION_KEY  -- Fernet key for encrypting access tokens
         ATHENA_TELLER_CERTIFICATE_B64 -- base64-encoded mTLS client certificate
         ATHENA_TELLER_PRIVATE_KEY_B64 -- base64-encoded mTLS private key
+        ATHENA_TELLER_TOKEN_SIGNING_KEY -- Ed25519 public key (base64) for enrollment verification
     """
 
     cors_origins: list[str] = ["http://localhost:5173"]
@@ -44,6 +45,7 @@ class Settings(BaseSettings):
     teller_encryption_key: str = ""
     teller_certificate_b64: str = ""
     teller_private_key_b64: str = ""
+    teller_token_signing_key: str = ""
 
     @property
     def secure_cookies(self) -> bool:
