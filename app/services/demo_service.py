@@ -8,7 +8,7 @@ a couple subscriptions worth questioning.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from sqlalchemy import delete, select
@@ -57,7 +57,7 @@ async def reset_demo_data(db: AsyncSession, user_id: int) -> None:
     db.add(BalanceSnapshot(
         user_id=user_id,
         balance=DEMO_BALANCE,
-        observed_at=datetime.now(timezone.utc),
+        observed_at=datetime.now(UTC),
         source="manual",
         account_label="checking",
     ))

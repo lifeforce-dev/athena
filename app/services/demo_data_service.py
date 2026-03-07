@@ -7,7 +7,7 @@ typed response objects that the demo endpoints can serialize directly.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from app.core.post_processing import process_ledger
 from app.core.projection import project_cash_on
@@ -59,7 +59,7 @@ def _spec_to_template(spec: dict, today: date) -> CashFlowTemplate:
 
 def _spec_to_commitment_response(spec: dict, idx: int) -> CommitmentResponse:
     """Convert a raw seed spec dict into a CommitmentResponse."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return CommitmentResponse(
         id=idx + 1,
         name=spec["name"],

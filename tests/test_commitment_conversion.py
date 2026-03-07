@@ -10,6 +10,8 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import MagicMock
 
+# Access the private function through the module for testing.
+import app.repositories.commitment_repository as _repo
 from app.models.domain import (
     DayInterval,
     Direction,
@@ -20,8 +22,6 @@ from app.models.domain import (
 )
 from app.repositories.commitment_repository import to_domain
 
-# Access the private function through the module for testing.
-import app.repositories.commitment_repository as _repo
 _build_recurrence = _repo._build_recurrence  # type: ignore[attr-defined]
 
 

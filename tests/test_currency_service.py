@@ -19,7 +19,6 @@ from app.services.currency_service import (
     to_account_currency,
 )
 
-
 # ---------------------------------------------------------------------------
 # to_account_currency
 # ---------------------------------------------------------------------------
@@ -317,8 +316,9 @@ class TestIntakeConversion:
             mock_db = AsyncMock()
             mock_build.return_value = MagicMock()
 
-            from app.models.schemas import ScenarioRequest
             from datetime import date
+
+            from app.models.schemas import ScenarioRequest
             data = ScenarioRequest(
                 as_of=date(2026, 2, 19),
                 amount_overrides={10: Decimal("100.00"), 20: Decimal("50.00")},

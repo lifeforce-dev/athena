@@ -2,78 +2,30 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from datetime import UTC
 from importlib.metadata import entry_points
+from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.common.logging import setup_logging
 from app.config import Settings, get_settings
 from app.database import build_engine, build_session_factory
-from app.repositories import gmail_repository
 from app.routers.auth import router as auth_router
 from app.routers.balance import router as balance_router
 from app.routers.commitments import router as commitments_router
 from app.routers.currency import router as currency_router
 from app.routers.demo import router as demo_router
 from app.routers.demo_data import router as demo_data_router
-from app.routers.gmail import router as gmail_router
-from app.routers.notifications import router as notifications_router
 from app.routers.projection import router as projection_router
 from app.routers.teller import router as teller_router
 from app.routers.transactions import router as transactions_router
-from app.services.gmail_service import (
-    parse_watch_expiry,
-    register_watch,
-    watch_needs_renewal,
-)
 
 logger = logging.getLogger(__name__)
-
-
-# -- Gmail watch renewal ---------------------------------------------------
-
-
-async def _maybe_renew_gmail_watch(
-    factory: async_sessionmaker[AsyncSession], settings: Settings
-) -> None:
-    """Renew any Gmail watches expiring within 24 hours.
-
-    Single-user system: iterates all rows (typically one). If multi-user
-    support is added, filter by the configured Gmail address or add
-    per-user credential storage.
-    """
-    async with factory() as db:
-        subs = await gmail_repository.get_all(db)
-        for sub in subs:
-            if not watch_needs_renewal(sub.watch_expiry):
-                continue
-
-            logger.info(f"Renewing Gmail watch for {sub.gmail_address}")
-            try:
-                response = await register_watch(settings)
-                sub.history_id = str(response["historyId"])
-                sub.watch_expiry = parse_watch_expiry(response["expiration"])
-                await db.commit()
-                logger.info(f"Gmail watch renewed, expires {sub.watch_expiry}")
-            except Exception:
-                logger.exception("Gmail watch renewal failed")
-
-
-async def _periodic_renewal_loop(
-    factory: async_sessionmaker[AsyncSession], settings: Settings
-) -> None:
-    """Background task that checks and renews Gmail watches every 6 hours."""
-    while True:
-        await asyncio.sleep(6 * 3600)
-        try:
-            await _maybe_renew_gmail_watch(factory, settings)
-        except Exception:
-            logger.exception("Error in periodic Gmail watch renewal")
 
 
 # -- Teller daily balance sync --------------------------------------------
@@ -90,7 +42,7 @@ async def _sync_teller_balances(
     Runs once per daily cycle. Each enrollment is handled independently so
     a single failure does not block the rest.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
     from decimal import Decimal, InvalidOperation
 
     from app.common.encryption import decrypt_token
@@ -126,7 +78,7 @@ async def _sync_teller_balances(
                 raw_balance, enrollment.account_currency, user_currency
             )
 
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             async with factory() as db:
                 await balance_repository.create_from_teller(
                     db,
@@ -175,13 +127,12 @@ async def _periodic_teller_sync(
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-    """Initialize logging, database, Gmail watch, and Teller sync at startup."""
+    """Initialize logging, database, and Teller sync at startup."""
     setup_logging()
 
     settings = get_settings()
 
     engine = None
-    renewal_task = None
     teller_sync_task = None
 
     if settings.database_url:
@@ -189,17 +140,6 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.db_session_factory = build_session_factory(engine)
         application.state.teller_sync_tasks = {}  # dict[int, asyncio.Task] keyed by enrollment ID
         logger.info("Database engine initialized")
-
-        if settings.google_refresh_token:
-            factory = application.state.db_session_factory
-            try:
-                await _maybe_renew_gmail_watch(factory, settings)
-            except Exception:
-                logger.exception("Gmail watch renewal on startup failed")
-
-            renewal_task = asyncio.create_task(
-                _periodic_renewal_loop(factory, settings)
-            )
 
         if settings.teller_app_id and settings.teller_certificate_b64:
             from app.common.encryption import decode_cert_to_tempfile
@@ -225,11 +165,6 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     logger.info("Athena API initialized")
     yield
 
-    if renewal_task is not None:
-        renewal_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await renewal_task
-
     if teller_sync_task is not None:
         teller_sync_task.cancel()
         with suppress(asyncio.CancelledError):
@@ -249,7 +184,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         path = getattr(application.state, attr, None)
         if path:
             with suppress(OSError):
-                os.unlink(path)
+                Path(path).unlink()
                 logger.info("Removed temp cert file: %s", attr)
 
     if engine is not None:
@@ -269,11 +204,6 @@ def create_app() -> FastAPI:
     if "*" in settings.cors_origins:
         raise RuntimeError(
             "CORS origins must not contain '*' when allow_credentials is enabled."
-        )
-
-    if settings.google_refresh_token and not settings.google_push_audience:
-        raise RuntimeError(
-            "ATHENA_GOOGLE_PUSH_AUDIENCE must be set when Gmail integration is enabled."
         )
 
     if settings.teller_app_id:
@@ -310,8 +240,6 @@ def create_app() -> FastAPI:
     application.include_router(currency_router, prefix='/api')
     application.include_router(demo_router, prefix='/api')
     application.include_router(demo_data_router, prefix='/api')
-    application.include_router(gmail_router, prefix='/api')
-    application.include_router(notifications_router, prefix='/api')
     application.include_router(projection_router, prefix='/api')
     application.include_router(teller_router, prefix='/api')
     application.include_router(transactions_router, prefix='/api')

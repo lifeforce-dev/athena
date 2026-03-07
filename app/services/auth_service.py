@@ -6,7 +6,7 @@ import hmac
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import jwt
@@ -89,7 +89,7 @@ async def upsert_user(db: AsyncSession, discord_user: dict) -> User:
     else:
         user.discord_username = username
         user.display_name = display_name
-        user.updated_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(UTC)
 
     await db.commit()
     await db.refresh(user)

@@ -16,11 +16,6 @@ class Settings(BaseSettings):
         ATHENA_DISCORD_CLIENT_SECRET  -- Discord OAuth2 application client secret
         ATHENA_DISCORD_REDIRECT_URI   -- OAuth2 callback URL
         ATHENA_FRONTEND_URL           -- frontend origin for post-login redirect
-        ATHENA_GOOGLE_CLIENT_ID       -- Google OAuth2 client ID (Gmail API)
-        ATHENA_GOOGLE_CLIENT_SECRET   -- Google OAuth2 client secret
-        ATHENA_GOOGLE_REFRESH_TOKEN   -- Gmail API refresh token (offline access)
-        ATHENA_GOOGLE_PROJECT_ID      -- GCP project ID (for Pub/Sub topic)
-        ATHENA_GOOGLE_PUSH_AUDIENCE   -- OIDC audience for Pub/Sub push verification
         ATHENA_TELLER_APP_ID          -- Teller application ID
         ATHENA_TELLER_ENVIRONMENT     -- sandbox | development | production
         ATHENA_TELLER_WEBHOOK_SECRET  -- HMAC signing secret for webhook verification
@@ -41,13 +36,6 @@ class Settings(BaseSettings):
     discord_client_secret: str = ""
     discord_redirect_uri: str = ""
     frontend_url: str = "http://localhost:5173"
-
-    # Gmail / Google Pub/Sub
-    google_client_id: str = ""
-    google_client_secret: str = ""
-    google_refresh_token: str = ""
-    google_project_id: str = ""
-    google_push_audience: str = ""
 
     # Teller bank integration
     teller_app_id: str = ""

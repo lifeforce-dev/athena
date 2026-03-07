@@ -36,35 +36,6 @@ async def list_history(
     return list(result.scalars().all())
 
 
-async def create_from_gmail(
-    db: AsyncSession,
-    user_id: int,
-    balance: Decimal,
-    observed_at: datetime,
-    gmail_message_id: str,
-    account_label: str | None = None,
-) -> bool:
-    """Insert a Gmail-sourced balance snapshot, skipping duplicates.
-
-    Uses INSERT ... ON CONFLICT DO NOTHING against the unique constraint
-    on (user_id, gmail_message_id) for idempotency on Pub/Sub retries.
-    Returns True if a row was actually inserted, False if skipped.
-    """
-    from sqlalchemy.dialects.postgresql import insert
-
-    stmt = insert(BalanceSnapshot).values(
-        user_id=user_id,
-        balance=balance,
-        observed_at=observed_at,
-        source="gmail",
-        gmail_message_id=gmail_message_id,
-        account_label=account_label,
-    )
-    stmt = stmt.on_conflict_do_nothing(constraint="uq_balance_user_gmail")
-    result = await db.execute(stmt)
-    return result.rowcount > 0  # type: ignore[union-attr]
-
-
 async def create_from_teller(
     db: AsyncSession,
     user_id: int,

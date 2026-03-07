@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +51,7 @@ async def list_active(db: AsyncSession, user_id: int) -> list[Commitment]:
             Commitment.frequency == "once",
             Commitment.one_time_date < today,
         )
-        .values(is_active=False, updated_at=datetime.now(timezone.utc))
+        .values(is_active=False, updated_at=datetime.now(UTC))
     )
 
     result = await db.execute(
@@ -104,7 +104,7 @@ async def soft_delete(db: AsyncSession, commitment_id: int, user_id: int) -> boo
     result = await db.execute(
         update(Commitment)
         .where(Commitment.id == commitment_id, Commitment.user_id == user_id)
-        .values(is_active=False, updated_at=datetime.now(timezone.utc))
+        .values(is_active=False, updated_at=datetime.now(UTC))
     )
 
     # CursorResult has rowcount at runtime; type stubs are incomplete.

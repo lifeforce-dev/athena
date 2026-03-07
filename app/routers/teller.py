@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
@@ -20,6 +20,7 @@ from app.common.encryption import decrypt_token, encrypt_token
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.dependencies import get_current_user_id
+from app.models.teller_constants import TellerStatus
 from app.models.teller_schemas import (
     TellerAccountOption,
     TellerEnrollRequest,
@@ -28,7 +29,6 @@ from app.models.teller_schemas import (
     TellerStatusResponse,
 )
 from app.repositories import balance_repository, teller_repository, transaction_repository
-from app.models.teller_constants import TellerStatus
 from app.services.currency_service import convert_amount, get_user_account_currency
 from app.services.teller_service import (
     TellerApiError,
@@ -405,9 +405,9 @@ async def _handle_transactions_processed(
 
         date_str = txn.get("date", "")
         try:
-            purchase_date = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
+            purchase_date = datetime.fromisoformat(date_str).replace(tzinfo=UTC)
         except (ValueError, TypeError):
-            purchase_date = datetime.now(timezone.utc)
+            purchase_date = datetime.now(UTC)
 
         await transaction_repository.create_from_teller(
             db,
@@ -451,7 +451,7 @@ async def _initial_sync(ctx: _SyncContext) -> None:
     try:
         async with build_teller_client(ctx.cert_path, ctx.key_path, ctx.access_token) as client:
             balance_data = await fetch_balances(client, ctx.account_id)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             try:
                 raw_balance = Decimal(balance_data.available).quantize(Decimal("0.01"))
@@ -486,7 +486,7 @@ async def _initial_sync(ctx: _SyncContext) -> None:
 
                 try:
                     purchase_date = datetime.fromisoformat(txn.date).replace(
-                        tzinfo=timezone.utc
+                        tzinfo=UTC
                     )
                 except (ValueError, TypeError):
                     purchase_date = now

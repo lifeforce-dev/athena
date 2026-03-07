@@ -1,7 +1,7 @@
 """Data access layer for Teller enrollments."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update
@@ -111,7 +111,7 @@ async def update_status(
     await db.execute(
         update(TellerEnrollment)
         .where(TellerEnrollment.id == enrollment_id)
-        .values(status=status, updated_at=datetime.now(timezone.utc))
+        .values(status=status, updated_at=datetime.now(UTC))
     )
 
 
@@ -133,7 +133,7 @@ async def transition_status(
             TellerEnrollment.id == enrollment_id,
             TellerEnrollment.status == from_status,
         )
-        .values(status=to_status, updated_at=datetime.now(timezone.utc))
+        .values(status=to_status, updated_at=datetime.now(UTC))
     )
     return result.rowcount > 0
 
@@ -153,7 +153,7 @@ async def update_account_details(
             account_id=account_id,
             account_name=account_name,
             account_currency=account_currency,
-            updated_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(UTC),
         )
     )
 
@@ -163,7 +163,7 @@ async def update_last_synced(
     enrollment_id: int,
 ) -> None:
     """Stamp the last_synced_at timestamp after a successful sync."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     await db.execute(
         update(TellerEnrollment)
         .where(TellerEnrollment.id == enrollment_id)

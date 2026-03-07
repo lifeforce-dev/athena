@@ -7,7 +7,6 @@ from app.models.commitment_schemas import CommitmentCreate, CommitmentUpdate
 from app.models.orm import Commitment
 from app.repositories import commitment_repository as repo
 
-
 # Frequency -> required field(s) mapping for merged-state validation.
 _FREQUENCY_REQUIRED_FIELDS: dict[str, list[str]] = {
     "daily": ["anchor_date"],
