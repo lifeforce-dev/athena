@@ -8,10 +8,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 
-import pytest
-
 from app.services.teller_service import TellerApiError, verify_webhook_signature
-
 
 # ---------------------------------------------------------------------------
 # Webhook signature verification

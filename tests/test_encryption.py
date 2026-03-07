@@ -6,7 +6,7 @@ and the temp-file cert decoder.
 from __future__ import annotations
 
 import base64
-import os
+from pathlib import Path
 
 import pytest
 from cryptography.fernet import InvalidToken
@@ -17,7 +17,6 @@ from app.common.encryption import (
     encrypt_token,
     generate_fernet_key,
 )
-
 
 # ---------------------------------------------------------------------------
 # Key generation
@@ -78,7 +77,7 @@ class TestEncryptDecryptRoundTrip:
         ciphertext = encrypt_token("secret", self.KEY)
         tampered = ciphertext[:-4] + "XXXX"
 
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidToken):
             decrypt_token(tampered, self.KEY)
 
 
@@ -94,31 +93,29 @@ class TestDecodeCertToTempfile:
 
     def test_creates_pem_file(self):
         b64 = base64.b64encode(self.SAMPLE_CERT_CONTENT).decode()
-        path = decode_cert_to_tempfile(b64)
+        path = Path(decode_cert_to_tempfile(b64))
 
         try:
-            assert os.path.isfile(path)
-            assert path.endswith(".pem")
+            assert path.is_file()
+            assert path.suffix == ".pem"
         finally:
-            os.unlink(path)
+            path.unlink()
 
     def test_file_contains_decoded_content(self):
         b64 = base64.b64encode(self.SAMPLE_CERT_CONTENT).decode()
-        path = decode_cert_to_tempfile(b64)
+        path = Path(decode_cert_to_tempfile(b64))
 
         try:
-            with open(path, "rb") as f:
-                assert f.read() == self.SAMPLE_CERT_CONTENT
+            assert path.read_bytes() == self.SAMPLE_CERT_CONTENT
         finally:
-            os.unlink(path)
+            path.unlink()
 
     def test_empty_content(self):
         b64 = base64.b64encode(b"").decode()
-        path = decode_cert_to_tempfile(b64)
+        path = Path(decode_cert_to_tempfile(b64))
 
         try:
-            assert os.path.isfile(path)
-            with open(path, "rb") as f:
-                assert f.read() == b""
+            assert path.is_file()
+            assert path.read_bytes() == b""
         finally:
-            os.unlink(path)
+            path.unlink()
