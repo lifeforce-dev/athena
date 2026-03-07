@@ -1,6 +1,7 @@
 """Discord OAuth2 authentication endpoints."""
 from __future__ import annotations
 
+import json
 import logging
 from typing import Annotated
 
@@ -8,8 +9,6 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, 
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import json
 
 from app.config import Settings, get_settings
 from app.database import get_db

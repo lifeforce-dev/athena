@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 
-
 _LOG_FORMAT = '%(levelname)s %(asctime)s [%(module)s] %(message)s (%(pathname)s:%(lineno)d)'
 _DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 _initialized: bool = False

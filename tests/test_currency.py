@@ -12,7 +12,6 @@ import pytest
 
 from app.routers.currency import (
     ALLOWED_CURRENCIES,
-    ExchangeRateResponse,
     SetCurrencyRequest,
     get_exchange_rate,
     set_account_currency,
@@ -21,7 +20,6 @@ from app.services.currency_service import (
     _CACHE_TTL_SECONDS,
     _rate_cache,
 )
-
 
 # ---------------------------------------------------------------------------
 # Pydantic validation
@@ -52,7 +50,7 @@ class TestSetCurrencyRequestValidation:
             SetCurrencyRequest(currency="")
 
     def test_allowed_currencies_complete(self):
-        assert ALLOWED_CURRENCIES == {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"}
+        assert {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"} == ALLOWED_CURRENCIES
 
 
 # ---------------------------------------------------------------------------
