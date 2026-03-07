@@ -2,9 +2,14 @@ import { api } from './client'
 import type {
   TellerEnrollRequest,
   TellerEnrollResponse,
+  TellerNonceResponse,
   TellerSelectAccountRequest,
   TellerStatusResponse,
 } from '@/types/teller'
+
+export function getTellerNonce() {
+  return api.get<TellerNonceResponse>('/teller/nonce')
+}
 
 export function enrollTeller(data: TellerEnrollRequest) {
   return api.post<TellerEnrollResponse>('/teller/enroll', data)

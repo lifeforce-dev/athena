@@ -25,6 +25,7 @@ from app.models.teller_schemas import (
     TellerAccountOption,
     TellerEnrollRequest,
     TellerEnrollResponse,
+    TellerNonceResponse,
     TellerSelectAccountRequest,
     TellerStatusResponse,
 )
@@ -37,12 +38,35 @@ from app.services.teller_service import (
     fetch_accounts,
     fetch_balances,
     fetch_transactions,
+    generate_enrollment_nonce,
+    verify_nonce_mac,
+    verify_token_signatures,
     verify_webhook_signature,
 )
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/teller", tags=["teller"])
+
+
+# ---------------------------------------------------------------------------
+# GET /teller/nonce
+# ---------------------------------------------------------------------------
+
+
+@router.get("/nonce")
+async def get_nonce(
+    user_id: Annotated[int, Depends(get_current_user_id)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> TellerNonceResponse:
+    """Generate a cryptographic nonce for Teller Connect token signing.
+
+    The frontend fetches this before opening TellerConnect and passes the
+    nonce to the SDK.  On enrollment, the nonce + HMAC are sent back for
+    stateless verification.
+    """
+    nonce, mac = generate_enrollment_nonce(settings.jwt_secret)
+    return TellerNonceResponse(nonce=nonce, nonce_mac=mac)
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +83,33 @@ async def enroll(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TellerEnrollResponse:
     """Store a new Teller enrollment and return available accounts."""
+    # -- Token signing verification (skip if key not configured) --------
+    signing_key = settings.teller_token_signing_key
+    if signing_key:
+        if not body.nonce or not body.nonce_mac:
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Token signing verification requires nonce and nonce_mac.",
+            )
+        if not verify_nonce_mac(body.nonce, body.nonce_mac, settings.jwt_secret):
+            raise HTTPException(
+                status.HTTP_400_BAD_REQUEST,
+                "Invalid or expired enrollment nonce.",
+            )
+        if not verify_token_signatures(
+            access_token=body.access_token,
+            nonce=body.nonce,
+            teller_user_id=body.teller_user_id,
+            enrollment_id=body.enrollment_id,
+            environment=settings.teller_environment,
+            signatures=body.signatures,
+            public_key_b64=signing_key,
+        ):
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                "Enrollment signature verification failed.",
+            )
+
     existing = await teller_repository.get_active_enrollment(db, user_id)
     if existing is not None:
         await teller_repository.mark_disconnected(db, existing.id)

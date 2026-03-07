@@ -62,6 +62,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useTellerStore } from '@/stores/teller'
+import { getTellerNonce } from '@/api/teller'
 
 const TELLER_APP_ID = import.meta.env.VITE_TELLER_APP_ID ?? ''
 const TELLER_ENVIRONMENT = import.meta.env.VITE_TELLER_ENVIRONMENT ?? 'sandbox'
@@ -72,6 +73,10 @@ const selectedAccountId = ref<string | null>(null)
 const showErrorModal = ref(false)
 const showFlowModal = ref(false)
 const flowError = ref<string | null>(null)
+
+/** Cached nonce + HMAC for the current Teller Connect session. */
+let currentNonce = ''
+let currentNonceMac = ''
 
 const emit = defineEmits<{
   connected: []
@@ -112,6 +117,17 @@ async function open() {
     return
   }
 
+  // Fetch a server-generated nonce for token signing verification.
+  try {
+    const nonceRes = await getTellerNonce()
+    currentNonce = nonceRes.nonce
+    currentNonceMac = nonceRes.nonce_mac
+  } catch (err) {
+    console.error('Failed to fetch enrollment nonce:', err)
+    showErrorModal.value = true
+    return
+  }
+
   const win = window as any
   if (!win.TellerConnect) {
     console.error('TellerConnect global not found after script loaded')
@@ -123,6 +139,7 @@ async function open() {
     applicationId: TELLER_APP_ID,
     environment: TELLER_ENVIRONMENT,
     selectAccount: 'disabled',
+    nonce: currentNonce,
     onSuccess: async (enrollment: any) => {
       showFlowModal.value = true
       try {
@@ -130,6 +147,10 @@ async function open() {
           access_token: enrollment.accessToken,
           enrollment_id: enrollment.enrollment.id,
           institution: enrollment.enrollment.institution.name,
+          signatures: enrollment.signatures ?? [],
+          teller_user_id: enrollment.user?.id ?? '',
+          nonce: currentNonce,
+          nonce_mac: currentNonceMac,
         })
       } catch {
         flowError.value = teller.error ?? 'Something went wrong connecting your bank.'

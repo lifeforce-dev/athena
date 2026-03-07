@@ -20,12 +20,24 @@ class TellerEnrollRequest(BaseModel):
     access_token: str
     enrollment_id: str
     institution: str
+    # Token signing verification fields (required when signing key is configured).
+    signatures: list[str] = []
+    teller_user_id: str = ""
+    nonce: str = ""
+    nonce_mac: str = ""
 
 
 class TellerSelectAccountRequest(BaseModel):
     """Payload sent by the frontend when the user picks a bank account."""
 
     account_id: str
+
+
+class TellerNonceResponse(BaseModel):
+    """Server-generated nonce for Teller Connect token signing verification."""
+
+    nonce: str
+    nonce_mac: str
 
 
 # ---------------------------------------------------------------------------
