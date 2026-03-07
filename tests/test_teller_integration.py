@@ -9,7 +9,7 @@ import asyncio
 import hashlib
 import hmac
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -19,18 +19,15 @@ from fastapi import HTTPException
 from app.models.teller_constants import TellerStatus
 from app.models.teller_schemas import (
     TellerAccount,
-    TellerAccountOption,
-    TellerBalance,
     TellerEnrollRequest,
     TellerInstitution,
     TellerSelectAccountRequest,
-    TellerTransaction,
 )
 from app.routers.teller import (
-    _SyncContext,
     _handle_enrollment_disconnected,
     _handle_transactions_processed,
     _initial_sync,
+    _SyncContext,
     disconnect,
     enroll,
     get_status,
@@ -38,7 +35,6 @@ from app.routers.teller import (
     webhook,
 )
 from app.services.teller_service import TellerApiError
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -857,7 +853,7 @@ class TestWebhookTransactionsProcessed:
         assert call_kwargs["merchant"] == "Coffee Shop"
         assert call_kwargs["category"] == "food_and_drink"
         assert call_kwargs["amount"] == Decimal("25.50")
-        assert call_kwargs["purchase_date"] == datetime(2026, 3, 1, tzinfo=timezone.utc)
+        assert call_kwargs["purchase_date"] == datetime(2026, 3, 1, tzinfo=UTC)
 
     @pytest.mark.asyncio
     @patch("app.routers.teller.teller_repository")
