@@ -29,7 +29,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { BillEntry } from '@/composables/useExpenseAnalysis'
-import { parseLocalDate, formatDollars } from '@/utils/format'
+import { parseLocalDate, formatDollars, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -40,7 +40,7 @@ const props = defineProps<{
 }>()
 
 const weekday = (dateStr: string) =>
-  parseLocalDate(dateStr).toLocaleDateString('en-US', { weekday: 'short' })
+  parseLocalDate(dateStr).toLocaleDateString(getDateLocale(), { weekday: 'short' })
 
 const thisWeekTotal = computed(() =>
   props.bills.reduce((total, bill) => total + bill.amount, 0)

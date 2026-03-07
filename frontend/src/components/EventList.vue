@@ -36,7 +36,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ParsedLedgerEntry } from '@/types/projection'
-import { parseLocalDate, formatCents } from '@/utils/format'
+import { parseLocalDate, formatCents, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -63,7 +63,7 @@ interface MonthGroup {
 }
 
 const shortDay = (dateStr: string) =>
-  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  parseLocalDate(dateStr).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 
 const eventCount = computed(() => props.ledger.length)
 
@@ -72,7 +72,7 @@ const groupedEvents = computed<MonthGroup[]>(() => {
 
   for (const entry of props.ledger) {
     const parsed = parseLocalDate(entry.date)
-    const monthKey = parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const monthKey = parsed.toLocaleDateString(getDateLocale(), { month: 'long', year: 'numeric' })
 
     if (!groups.has(monthKey)) {
       groups.set(monthKey, [])

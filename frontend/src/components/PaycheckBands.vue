@@ -19,7 +19,7 @@
 
 <script setup lang="ts">
 import type { ParsedPayPeriod } from '@/types/projection'
-import { formatCurrency, formatSigned, parseLocalDate } from '@/utils/format'
+import { formatCurrency, formatSigned, parseLocalDate, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -27,8 +27,8 @@ const { t } = useI18n()
 defineProps<{ payPeriods: ParsedPayPeriod[] }>()
 
 const formatRange = (start: string, end: string) => {
-  const startLabel = parseLocalDate(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const endLabel = parseLocalDate(end).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const startLabel = parseLocalDate(start).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
+  const endLabel = parseLocalDate(end).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
   return `${startLabel} \u2192 ${endLabel}`
 }
 </script>

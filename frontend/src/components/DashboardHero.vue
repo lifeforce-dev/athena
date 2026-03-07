@@ -62,7 +62,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { parseLocalDate, formatDollars, toDisplayCurrency } from '@/utils/format'
+import { parseLocalDate, formatDollars, toDisplayCurrency, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const props = defineProps<{
@@ -135,7 +135,7 @@ const netLabel = computed(() => {
 
 const lowestDate = computed(() => {
   if (!props.lowestDate) return ''
-  return parseLocalDate(props.lowestDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return parseLocalDate(props.lowestDate).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 })
 
 /** Gauge fill: maps lowest projected balance to a financial comfort scale.

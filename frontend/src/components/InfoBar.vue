@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatDollars } from '@/utils/format'
+import { formatDollars, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -71,7 +71,7 @@ const gridCols = computed(() => {
 const dateStr = computed(() => {
   if (!props.data) return ''
   const parsed = new Date(props.data.date + 'T12:00:00')
-  const cal = parsed.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const cal = parsed.toLocaleDateString(getDateLocale(), { weekday: 'short', month: 'short', day: 'numeric' })
   return `${cal} | +${props.data.dayOffset}d`
 })
 
@@ -90,7 +90,7 @@ const billDateStr = computed(() => {
   const band = props.data?.band
   if (!band) return ''
   const parsed = new Date(band.occurrenceDate + 'T12:00:00')
-  const cal = parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const cal = parsed.toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
   return `${cal} | +${band.occurrenceDayOffset}d`
 })
 

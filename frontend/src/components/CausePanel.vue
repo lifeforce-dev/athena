@@ -51,7 +51,7 @@
 import { ref, computed } from 'vue'
 import type { WorstWindow } from '@/composables/useExpenseAnalysis'
 import { CAUSE_COLORS } from '@/composables/useExpenseAnalysis'
-import { parseLocalDate, formatDollars } from '@/utils/format'
+import { parseLocalDate, formatDollars, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -72,7 +72,7 @@ function onHighlight(idx: number | null) {
 }
 
 const shortDate = (dateStr: string) =>
-  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  parseLocalDate(dateStr).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 
 const windowRange = computed(() => {
   if (!props.worstWindow) return ''
