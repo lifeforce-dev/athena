@@ -274,6 +274,10 @@ const ko_KR: Record<string, string> = {
   'settings.currency_converting': '변환 중...',
   'settings.saved': '저장됨',
   'settings.language_refresh': '새 언어를 완전히 적용하려면 페이지를 새로고침하십시오.',
+  'settings.replay_tour': '가이드 둘러보기',
+  'settings.replay_tour_desc': '앱의 각 섹션을 소개하는 가이드 둘러보기를 다시 확인하십시오.',
+  'settings.replay_tour_btn': '둘러보기 다시 보기',
+  'settings.replay_tour_refresh': '둘러보기를 시작하려면 페이지를 새로고침하십시오.',
 }
 
 export default ko_KR

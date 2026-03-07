@@ -16,6 +16,9 @@ export const logout = () => api.post<void>('/auth/logout')
 export const markTourComplete = (tourName: string) =>
   api.patch<void>(`/auth/me/tour-complete?tour_name=${encodeURIComponent(tourName)}`)
 
+/** Clear all completed tours so the guided walkthrough replays on next visit. */
+export const resetTours = () => api.post<void>('/auth/me/reset-tours')
+
 /** Mark a specific modal as permanently dismissed for the current user. */
 export const dismissModal = (modalKey: string) =>
   api.patch<void>(`/auth/me/dismiss-modal?modal_key=${encodeURIComponent(modalKey)}`)

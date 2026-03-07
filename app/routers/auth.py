@@ -159,6 +159,25 @@ async def mark_tour_complete(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/me/reset-tours")
+async def reset_tours(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    """Clear all completed tours so the guided walkthrough replays on next visit."""
+    user_id = int(current_user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.completed_tours = json.dumps([])
+    await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.patch("/me/dismiss-modal")
 async def dismiss_modal(
     current_user: Annotated[dict, Depends(get_current_user)],

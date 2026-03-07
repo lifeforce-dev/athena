@@ -48,6 +48,30 @@
             </div>
           </div>
 
+          <!-- Replay Guided Tour -->
+          <div class="sp-section">
+            <label class="sp-label">{{ t('settings.replay_tour') }}</label>
+            <p class="sp-desc">{{ t('settings.replay_tour_desc') }}</p>
+            <div class="sp-tour-row">
+              <button
+                class="sp-change-btn"
+                :disabled="resettingTour"
+                @click="handleResetTour"
+              >
+                {{ resettingTour ? '...' : t('settings.replay_tour_btn') }}
+              </button>
+              <Transition name="sp-fade">
+                <span v-if="tourReset" class="sp-saved">{{ t('settings.saved') }}</span>
+              </Transition>
+            </div>
+            <Transition name="sp-fade">
+              <p v-if="showTourRefreshHint" class="sp-refresh-hint">
+                {{ t('settings.replay_tour_refresh') }}
+                <button class="sp-refresh-btn" @click="reloadPage">&#x21bb;</button>
+              </p>
+            </Transition>
+          </div>
+
           <!-- Currency Change Confirmation -->
           <Transition name="sp-fade">
             <div v-if="showCurrencyChange" class="sp-currency-change">
@@ -103,6 +127,8 @@ import { useLanguageStore } from '@/stores/language'
 import { useCurrencyStore } from '@/stores/currency'
 import { useAuthStore } from '@/stores/auth'
 import { changeAccountCurrency } from '@/api/currency'
+import { resetTours } from '@/api/auth'
+import { resetTourSessionCache } from '@/composables/useTabOnboarding'
 import {
   CURRENCIES,
   CURRENCY_CODES,
@@ -127,6 +153,11 @@ const langSaved = ref(false)
 const showRefreshHint = ref(false)
 let langSaveTimeout: ReturnType<typeof setTimeout> | undefined
 
+const resettingTour = ref(false)
+const tourReset = ref(false)
+const showTourRefreshHint = ref(false)
+let tourResetTimeout: ReturnType<typeof setTimeout> | undefined
+
 const showCurrencyChange = ref(false)
 const newCurrency = ref<CurrencyCode | null>(null)
 const converting = ref(false)
@@ -138,6 +169,26 @@ const currencyOptions = CURRENCY_CODES.map((code) => ({
 
 function reloadPage() {
   location.reload()
+}
+
+async function handleResetTour() {
+  if (resettingTour.value) return
+  resettingTour.value = true
+  try {
+    await resetTours()
+    resetTourSessionCache()
+    if (auth.user) {
+      auth.user.completed_tours = []
+    }
+    tourReset.value = true
+    showTourRefreshHint.value = true
+    clearTimeout(tourResetTimeout)
+    tourResetTimeout = setTimeout(() => { tourReset.value = false }, 2000)
+  } catch (err) {
+    console.error('Tour reset failed:', err)
+  } finally {
+    resettingTour.value = false
+  }
 }
 
 async function onLanguageChange(event: Event) {
@@ -324,6 +375,13 @@ async function confirmCurrencyChange() {
 .sp-refresh-btn:hover {
   background: var(--panel);
   border-color: var(--income);
+}
+
+.sp-tour-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .sp-currency-row {

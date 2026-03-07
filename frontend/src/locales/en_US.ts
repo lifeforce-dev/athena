@@ -840,6 +840,22 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'Refresh the page to fully apply the new language.',
     context: 'Hint shown after changing display language, informing the user a page refresh is needed for all elements (dates, charts) to update.',
   },
+  'settings.replay_tour': {
+    text: 'Guided Tour',
+    context: 'Label for the section in account settings that lets users replay the onboarding walkthrough.',
+  },
+  'settings.replay_tour_desc': {
+    text: 'Re-watch the guided walkthrough that introduces each section of the app.',
+    context: 'Help text explaining what the replay tour button does.',
+  },
+  'settings.replay_tour_btn': {
+    text: 'Replay Tour',
+    context: 'Button label to reset and replay the onboarding guided tour.',
+  },
+  'settings.replay_tour_refresh': {
+    text: 'Refresh the page to start the tour.',
+    context: 'Hint shown after resetting the tour, telling the user to refresh so the walkthrough begins.',
+  },
 }
 
 export default en_US
