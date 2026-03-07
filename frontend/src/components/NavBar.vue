@@ -21,6 +21,29 @@
       </router-link>
     </div>
     <div class="nav-spacer" />
+    <div class="nav-bank-wrap">
+      <button
+        class="nav-bank"
+        :class="{
+          connected: teller.isConnected,
+          syncing: teller.isSyncing,
+          error: teller.hasError,
+        }"
+        :disabled="teller.loading"
+        @click="handleBankClick"
+      >
+        <span v-if="teller.isConnected || teller.hasError" class="nav-bank-dot" />
+        <template v-if="teller.isSyncing || teller.loading">Syncing...</template>
+        <template v-else-if="teller.isConnected">{{ teller.institutionName }}</template>
+        <template v-else-if="teller.hasError">Connection Error</template>
+        <template v-else>Connect Bank</template>
+      </button>
+      <div v-if="showBankDropdown" class="nav-bank-dropdown">
+        <button class="nav-bank-item" @click="handleReconnect">Reconnect</button>
+        <button class="nav-bank-item nav-bank-disconnect" @click="handleDisconnect">Disconnect</button>
+      </div>
+    </div>
+    <TellerConnect ref="tellerConnectRef" @connected="onBankConnected" @cancelled="onBankCancelled" />
     <div class="nav-currency-wrap" data-tour="currency-toggle">
       <button
         class="nav-currency"
@@ -69,6 +92,8 @@ import { fetchDevStatus, resetUser } from '@/api/dev'
 import { useI18n } from '@/composables/useI18n'
 import { getCurrencyConfig, CURRENCIES, CURRENCY_CODES, type CurrencyCode } from '@/config/currencies'
 import CurrencyExplainer from '@/components/CurrencyExplainer.vue'
+import TellerConnect from '@/components/TellerConnect.vue'
+import { useTellerStore } from '@/stores/teller'
 import {
   fteActive,
   fteStarted,
@@ -86,10 +111,13 @@ const EXPLAINER_KEY = 'currency-explainer'
 const { t } = useI18n()
 const auth = useAuthStore()
 const currency = useCurrencyStore()
+const teller = useTellerStore()
 const router = useRouter()
 const route = useRoute()
 const showExplainer = ref(false)
 const showCurrencyDropdown = ref(false)
+const showBankDropdown = ref(false)
+const tellerConnectRef = ref<InstanceType<typeof TellerConnect> | null>(null)
 const devMode = ref(false)
 const resetting = ref(false)
 
@@ -106,6 +134,11 @@ onMounted(async () => {
     // Not critical -- default to hidden.
   }
 
+  // Fetch Teller connection status if authenticated.
+  if (auth.isAuthenticated) {
+    teller.fetchStatus()
+  }
+
   document.addEventListener('click', onClickOutside)
 })
 
@@ -117,6 +150,9 @@ function onClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
   if (!target.closest('.nav-currency-wrap')) {
     showCurrencyDropdown.value = false
+  }
+  if (!target.closest('.nav-bank-wrap')) {
+    showBankDropdown.value = false
   }
 }
 
@@ -232,6 +268,34 @@ async function handleDevReset() {
     resetting.value = false
   }
 }
+
+// -- Bank connection -------------------------------------------------------
+
+function handleBankClick() {
+  if (teller.isConnected || teller.hasError) {
+    showBankDropdown.value = !showBankDropdown.value
+  } else {
+    tellerConnectRef.value?.open()
+  }
+}
+
+function handleReconnect() {
+  showBankDropdown.value = false
+  tellerConnectRef.value?.open()
+}
+
+async function handleDisconnect() {
+  showBankDropdown.value = false
+  await teller.disconnect()
+}
+
+function onBankConnected() {
+  teller.fetchStatus()
+}
+
+function onBankCancelled() {
+  // No action needed — widget closed without completing.
+}
 </script>
 
 <style scoped>
@@ -346,6 +410,103 @@ async function handleDevReset() {
 .nav-spacer {
   flex: 1;
 }
+
+/* -- Bank button & dropdown --------------------------------------------- */
+
+.nav-bank-wrap {
+  position: relative;
+}
+
+.nav-bank {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  background: none;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  margin-right: 4px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-bank:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.nav-bank.connected {
+  color: var(--safe);
+  border-color: color-mix(in srgb, var(--safe) 30%, transparent);
+}
+
+.nav-bank.syncing {
+  color: var(--dim);
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.nav-bank.error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.nav-bank-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--safe);
+  flex-shrink: 0;
+}
+
+.nav-bank.error .nav-bank-dot {
+  background: var(--danger);
+}
+
+.nav-bank-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  z-index: 20;
+  padding: 4px;
+  min-width: 140px;
+}
+
+.nav-bank-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.nav-bank-item:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.nav-bank-disconnect:hover {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+/* -- Currency toggle ---------------------------------------------------- */
 
 .nav-currency-wrap {
   position: relative;
