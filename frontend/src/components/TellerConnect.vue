@@ -1,38 +1,59 @@
 <template>
   <Teleport to="body">
-    <div v-if="showAccountPicker" class="tc-overlay">
+    <!-- Pre-flow error modal (SDK not configured / can't load) -->
+    <div v-if="showErrorModal" class="tc-overlay" @click.self="dismissError">
       <div class="tc-modal">
-        <div class="tc-title">Select an account</div>
-        <p class="tc-subtitle">Choose which account Athena should track:</p>
-
-        <div v-if="teller.loading" class="tc-loading">Connecting...</div>
-
-        <div v-else class="tc-accounts">
-          <button
-            v-for="acct in teller.pendingAccounts"
-            :key="acct.id"
-            class="tc-account"
-            :class="{ selected: selectedAccountId === acct.id }"
-            @click="selectedAccountId = acct.id"
-          >
-            <span class="tc-acct-name">{{ acct.name }}</span>
-            <span class="tc-acct-meta">{{ acct.subtype }} · {{ acct.currency }}</span>
-            <span class="tc-acct-inst">{{ acct.institution_name }}</span>
-          </button>
-        </div>
-
-        <div v-if="teller.error" class="tc-error">{{ teller.error }}</div>
-
+        <div class="tc-title">Connection unavailable</div>
+        <p class="tc-subtitle">Internal error. Please try again later.</p>
         <div class="tc-actions">
-          <button class="btn btn-cancel" @click="handleCancel">Cancel</button>
-          <button
-            class="btn btn-save"
-            :disabled="!selectedAccountId || teller.loading"
-            @click="handleConfirm"
-          >
-            {{ teller.loading ? 'Connecting...' : 'Connect' }}
-          </button>
+          <button class="btn btn-cancel" @click="dismissError">Close</button>
         </div>
+      </div>
+    </div>
+
+    <!-- In-flow modal (account picker OR error during connection) -->
+    <div v-if="showFlowModal" class="tc-overlay">
+      <div class="tc-modal">
+        <!-- Error replaces picker content when something goes wrong mid-flow -->
+        <template v-if="flowError">
+          <div class="tc-title">Connection failed</div>
+          <div class="tc-error">{{ flowError }}</div>
+          <div class="tc-actions">
+            <button class="btn btn-cancel" @click="dismissFlow">Close</button>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="tc-title">Select an account</div>
+          <p class="tc-subtitle">Choose which account Athena should track:</p>
+
+          <div v-if="teller.loading" class="tc-loading">Connecting...</div>
+
+          <div v-else class="tc-accounts">
+            <button
+              v-for="acct in teller.pendingAccounts"
+              :key="acct.id"
+              class="tc-account"
+              :class="{ selected: selectedAccountId === acct.id }"
+              @click="selectedAccountId = acct.id"
+            >
+              <span class="tc-acct-name">{{ acct.name }}</span>
+              <span class="tc-acct-meta">{{ acct.subtype }} · {{ acct.currency }}</span>
+              <span class="tc-acct-inst">{{ acct.institution_name }}</span>
+            </button>
+          </div>
+
+          <div class="tc-actions">
+            <button class="btn btn-cancel" @click="handleCancel">Cancel</button>
+            <button
+              class="btn btn-save"
+              :disabled="!selectedAccountId || teller.loading"
+              @click="handleConfirm"
+            >
+              {{ teller.loading ? 'Connecting...' : 'Connect' }}
+            </button>
+          </div>
+        </template>
       </div>
     </div>
   </Teleport>
@@ -48,9 +69,9 @@ const TELLER_ENVIRONMENT = import.meta.env.VITE_TELLER_ENVIRONMENT ?? 'sandbox'
 const teller = useTellerStore()
 const selectedAccountId = ref<string | null>(null)
 
-const showAccountPicker = computed(
-  () => teller.pendingAccounts.length > 0,
-)
+const showErrorModal = ref(false)
+const showFlowModal = ref(false)
+const flowError = ref<string | null>(null)
 
 const emit = defineEmits<{
   connected: []
@@ -75,23 +96,35 @@ function loadTellerScript(): Promise<void> {
  */
 async function open() {
   teller.error = null
+  flowError.value = null
+
+  if (!TELLER_APP_ID) {
+    console.error('VITE_TELLER_APP_ID is not set — bank connection unavailable')
+    showErrorModal.value = true
+    return
+  }
+
   try {
     await loadTellerScript()
-  } catch {
-    teller.error = 'Could not load bank connection. Please try again.'
+  } catch (err) {
+    console.error('Failed to load Teller Connect SDK:', err)
+    showErrorModal.value = true
     return
   }
 
   const win = window as any
   if (!win.TellerConnect) {
-    teller.error = 'Bank connection unavailable.'
+    console.error('TellerConnect global not found after script loaded')
+    showErrorModal.value = true
     return
   }
 
   const tellerConnect = win.TellerConnect.setup({
     applicationId: TELLER_APP_ID,
     environment: TELLER_ENVIRONMENT,
+    selectAccount: 'disabled',
     onSuccess: async (enrollment: any) => {
+      showFlowModal.value = true
       try {
         await teller.enroll({
           access_token: enrollment.accessToken,
@@ -99,14 +132,15 @@ async function open() {
           institution: enrollment.enrollment.institution.name,
         })
       } catch {
-        // Error already set on the store.
+        flowError.value = teller.error ?? 'Something went wrong connecting your bank.'
       }
     },
     onFailure: (failure: any) => {
-      teller.error = failure?.message ?? 'Bank connection failed'
+      flowError.value = failure?.message ?? 'Bank connection failed. Please try again.'
+      showFlowModal.value = true
     },
     onExit: () => {
-      if (!teller.pendingAccounts.length && !teller.error) {
+      if (!showFlowModal.value) {
         emit('cancelled')
       }
     },
@@ -119,16 +153,31 @@ async function handleConfirm() {
   try {
     await teller.confirmAccount(selectedAccountId.value)
     selectedAccountId.value = null
+    showFlowModal.value = false
     emit('connected')
   } catch {
-    // Error already set on the store.
+    flowError.value = teller.error ?? 'Failed to connect the selected account.'
   }
 }
 
 function handleCancel() {
   teller.pendingAccounts = []
   selectedAccountId.value = null
+  showFlowModal.value = false
+  flowError.value = null
   emit('cancelled')
+}
+
+function dismissFlow() {
+  teller.pendingAccounts = []
+  selectedAccountId.value = null
+  showFlowModal.value = false
+  flowError.value = null
+  teller.error = null
+}
+
+function dismissError() {
+  showErrorModal.value = false
 }
 
 defineExpose({ open })
