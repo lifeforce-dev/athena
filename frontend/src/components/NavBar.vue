@@ -68,6 +68,9 @@
       </div>
     </div>
     <span v-if="auth.user" class="nav-user">{{ auth.user.username }}</span>
+    <button class="nav-settings" @click="showSettings = true" :title="t('settings.title')">
+      &#9881;
+    </button>
     <button v-if="devMode" class="nav-dev-reset" :disabled="resetting" @click="handleDevReset">
       {{ resetting ? 'Resetting...' : 'Reset' }}
     </button>
@@ -80,6 +83,8 @@
     :display-ccy="currency.displayCurrency"
     @dismiss="onExplainerDismiss"
   />
+
+  <AccountSettings :open="showSettings" @close="showSettings = false" />
 </template>
 
 <script setup lang="ts">
@@ -92,6 +97,7 @@ import { fetchDevStatus, resetUser } from '@/api/dev'
 import { useI18n } from '@/composables/useI18n'
 import { getCurrencyConfig, CURRENCIES, CURRENCY_CODES, type CurrencyCode } from '@/config/currencies'
 import CurrencyExplainer from '@/components/CurrencyExplainer.vue'
+import AccountSettings from '@/components/AccountSettings.vue'
 import TellerConnect from '@/components/TellerConnect.vue'
 import { useTellerStore } from '@/stores/teller'
 import {
@@ -120,6 +126,7 @@ const showBankDropdown = ref(false)
 const tellerConnectRef = ref<InstanceType<typeof TellerConnect> | null>(null)
 const devMode = ref(false)
 const resetting = ref(false)
+const showSettings = ref(false)
 
 const currencyOptions = CURRENCY_CODES.map((code) => ({
   code,
@@ -602,6 +609,21 @@ function onBankCancelled() {
   color: var(--dim);
   padding: 0 8px;
   white-space: nowrap;
+}
+
+.nav-settings {
+  font-size: 14px;
+  color: var(--dim);
+  background: none;
+  border: none;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+
+.nav-settings:hover {
+  color: var(--text);
 }
 
 .nav-logout {

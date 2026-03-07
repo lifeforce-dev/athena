@@ -41,3 +41,12 @@ export const LANGUAGE_LABELS: Record<string, string> = {
 
 /** All locale codes that have (or will have) translation support. */
 export const AVAILABLE_LOCALES = Object.keys(LANGUAGE_LABELS)
+
+/**
+ * Locale codes with actual translation files.
+ * Only these should appear in the settings language picker.
+ */
+export const IMPLEMENTED_LOCALES: Record<string, string> = {
+  en_US: 'English',
+  ko_KR: '\ud55c\uad6d\uc5b4',
+}

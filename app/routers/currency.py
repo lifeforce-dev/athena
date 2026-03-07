@@ -2,16 +2,17 @@
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user_id
-from app.models.orm import User
+from app.models.orm import BalanceSnapshot, Commitment, User
 from app.services.currency_service import get_rate
 
 logger = logging.getLogger(__name__)
@@ -157,3 +158,109 @@ async def get_exchange_rate(
         )
 
     return ExchangeRateResponse(base=base, target=target, rate=rate)
+
+
+# -- Account currency change -----------------------------------------------
+
+class ChangeAccountCurrencyRequest(BaseModel):
+    currency: str
+
+    @field_validator("currency")
+    @classmethod
+    def validate_currency(cls, value: str) -> str:
+        upper = value.upper()
+        if upper not in ALLOWED_CURRENCIES:
+            raise ValueError(f"Currency must be one of: {', '.join(sorted(ALLOWED_CURRENCIES))}")
+        return upper
+
+
+class ChangeAccountCurrencyResponse(BaseModel):
+    account_currency: str
+    rate_used: float
+    commitments_converted: int
+    snapshots_converted: int
+
+
+@router.post("/change-account", response_model=ChangeAccountCurrencyResponse)
+async def change_account_currency(
+    body: ChangeAccountCurrencyRequest,
+    user_id: Annotated[int, Depends(get_current_user_id)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ChangeAccountCurrencyResponse:
+    """Change the user's account currency, converting all stored amounts.
+
+    This is a destructive operation — all commitment amounts and balance
+    snapshots are multiplied by the current exchange rate. Historic accuracy
+    is not guaranteed. The operation cannot be undone.
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    old_currency = user.account_currency or "USD"
+    new_currency = body.currency
+
+    if old_currency == new_currency:
+        return ChangeAccountCurrencyResponse(
+            account_currency=new_currency,
+            rate_used=1.0,
+            commitments_converted=0,
+            snapshots_converted=0,
+        )
+
+    # Fetch exchange rate before modifying anything.
+    try:
+        rate = await get_rate(old_currency, new_currency)
+    except Exception:
+        logger.exception("Failed to fetch exchange rate for currency change")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Exchange rate service unavailable. Please try again later.",
+        )
+
+    rate_decimal = Decimal(str(rate))
+
+    # Determine target decimal precision.
+    # KRW and JPY use zero decimal places.
+    zero_decimal = {"KRW", "JPY"}
+    quantize_to = Decimal("1") if new_currency in zero_decimal else Decimal("0.01")
+
+    # Convert all commitments.
+    commit_result = await db.execute(
+        select(Commitment).where(Commitment.user_id == user_id)
+    )
+    commitments = commit_result.scalars().all()
+    for commitment in commitments:
+        commitment.amount = (commitment.amount * rate_decimal).quantize(quantize_to)
+    commitments_count = len(commitments)
+
+    # Convert all balance snapshots.
+    snap_result = await db.execute(
+        select(BalanceSnapshot).where(BalanceSnapshot.user_id == user_id)
+    )
+    snapshots = snap_result.scalars().all()
+    for snapshot in snapshots:
+        snapshot.balance = (snapshot.balance * rate_decimal).quantize(quantize_to)
+    snapshots_count = len(snapshots)
+
+    # Update user currency fields.
+    user.account_currency = new_currency
+    user.display_currency = new_currency
+    # Auto-update language to the new currency's default.
+    user.account_language = CURRENCY_DEFAULT_LANG.get(new_currency, user.account_language or "en_US")
+
+    await db.commit()
+
+    logger.info(
+        "User %s changed account currency %s -> %s (rate=%.6f, %d commitments, %d snapshots)",
+        user_id, old_currency, new_currency, rate, commitments_count, snapshots_count,
+    )
+
+    return ChangeAccountCurrencyResponse(
+        account_currency=new_currency,
+        rate_used=rate,
+        commitments_converted=commitments_count,
+        snapshots_converted=snapshots_count,
+    )

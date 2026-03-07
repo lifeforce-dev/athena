@@ -772,6 +772,58 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'Choose your currency and start adding your own data.',
     context: 'Secondary text explaining what the setup button does.',
   },
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Account Settings
+  // ══════════════════════════════════════════════════════════════════════
+  'settings.title': {
+    text: 'Account Settings',
+    context: 'Title of the settings panel that slides out from the top navigation bar.',
+  },
+  'settings.language': {
+    text: 'Language',
+    context: 'Label for the language selector dropdown in account settings.',
+  },
+  'settings.language_desc': {
+    text: 'Choose the display language for the application.',
+    context: 'Help text below the language selector explaining what it controls.',
+  },
+  'settings.account_currency': {
+    text: 'Account Currency',
+    context: 'Label for the account currency selector in settings.',
+  },
+  'settings.account_currency_desc': {
+    text: 'The currency in which all your data is stored.',
+    context: 'Help text below the account currency selector.',
+  },
+  'settings.change_currency': {
+    text: 'Change Currency',
+    context: 'Button label to initiate changing the account currency.',
+  },
+  'settings.currency_warning_title': {
+    text: 'Change Account Currency',
+    context: 'Title of the confirmation dialog when changing account currency.',
+  },
+  'settings.currency_warning': {
+    text: 'Changing your account currency will convert all commitment amounts and balance data to the new currency using the latest exchange rate. This may not accurately reflect historic values. This action cannot be undone.',
+    context: 'Warning message shown in the confirmation dialog before changing account currency. Must clearly communicate the irreversibility and potential inaccuracy.',
+  },
+  'settings.currency_confirm': {
+    text: 'Convert to {currency}',
+    context: 'Confirmation button in the currency change dialog. {currency} is the target currency code like "KRW".',
+  },
+  'settings.currency_cancel': {
+    text: 'Cancel',
+    context: 'Cancel button in the currency change confirmation dialog.',
+  },
+  'settings.currency_converting': {
+    text: 'Converting...',
+    context: 'Button label shown while the currency conversion is in progress.',
+  },
+  'settings.saved': {
+    text: 'Saved',
+    context: 'Brief confirmation shown after a setting is successfully saved.',
+  },
 }
 
 export default en_US

@@ -16,8 +16,7 @@ export type BaseLocale = Record<string, LocaleEntry>
 export type SupportedLocale = 'en_US' | 'ko_KR'
 
 const LOCALE_LOADERS: Record<string, () => Promise<{ default: FlatLocale }>> = {
-  // Future locales go here:
-  // ko_KR: () => import('./ko_KR'),
+  ko_KR: () => import('./ko_KR'),
 }
 
 /** Already-resolved locales. en_US is always available. */

@@ -25,3 +25,14 @@ export const setDisplayCurrency = (currency: string) =>
 /** Fetch the exchange rate between any two supported currencies (1hr server cache). */
 export const fetchExchangeRate = (base: string, target: string) =>
   api.get<ExchangeRateResponse>(`/currency/rate?base=${base}&target=${target}`)
+
+export interface ChangeAccountCurrencyResponse {
+  account_currency: string
+  rate_used: number
+  commitments_converted: number
+  snapshots_converted: number
+}
+
+/** Change the user's account currency, converting all stored amounts. Destructive. */
+export const changeAccountCurrency = (currency: string) =>
+  api.post<ChangeAccountCurrencyResponse>('/currency/change-account', { currency })
