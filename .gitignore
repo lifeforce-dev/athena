@@ -53,3 +53,6 @@ frontend/dist/
 
 # Real config data (use data.example.json as a template)
 data.json
+
+# Scratch notes that may contain tokens or secrets
+notes/
