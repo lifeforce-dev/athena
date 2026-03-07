@@ -12,6 +12,7 @@ from alembic import context
 
 # Import all ORM models so Alembic's autogenerate can detect them.
 from app.database import Base
+from app.models import orm as _orm_models  # noqa: F401  # pyright: ignore[reportUnusedImport]
 
 config = context.config
 

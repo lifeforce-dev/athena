@@ -7,6 +7,7 @@ by callers (router / background sync task).
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import logging
@@ -291,7 +292,7 @@ def verify_token_signatures(
     try:
         key_bytes = base64.b64decode(public_key_b64)
         public_key = Ed25519PublicKey.from_public_bytes(key_bytes)
-    except (ValueError, Exception):
+    except (ValueError, binascii.Error):
         logger.error("Invalid Ed25519 public key — cannot verify enrollment signatures")
         return False
 

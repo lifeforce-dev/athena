@@ -31,7 +31,7 @@
         <div class="gauge-verdict" :class="statusClass">{{ verdict }}</div>
         <div>
           <span class="gauge-days">{{ daysCovered }}</span>
-          <span class="gauge-days-lbl"> {{ t('hero.days_projected', { count: daysCovered }) }}</span>
+          <span class="gauge-days-lbl"> {{ t('hero.days_projected_lbl') }}</span>
         </div>
       </div>
       <div class="gauge-track" :style="{ '--gauge-pct': gaugePct + '%' }">

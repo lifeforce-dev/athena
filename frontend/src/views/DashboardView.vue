@@ -51,12 +51,6 @@
         <EventList :ledger="ledger" @hover-date="highlightDate = $event" @click-date="onClickDate" />
       </template>
 
-      <!-- Balance-only: bank connected but no commitments yet. -->
-      <div v-else-if="hasInitialBalance" class="empty">
-        <h3>{{ t('dash.no_data_title') }}</h3>
-        <p>{{ t('dash.no_data_desc') }}</p>
-      </div>
-
       <div v-else class="empty">
         <h3>{{ t('dash.no_data_title') }}</h3>
         <p>{{ t('dash.no_data_desc') }}</p>
