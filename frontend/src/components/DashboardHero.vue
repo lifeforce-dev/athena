@@ -29,10 +29,7 @@
     <div v-if="!balanceOnly" class="gauge-wrap" data-tour="gauge">
       <div class="gauge-header">
         <div class="gauge-verdict" :class="statusClass">{{ verdict }}</div>
-        <div>
-          <span class="gauge-days">{{ daysCovered }}</span>
-          <span class="gauge-days-lbl"> {{ t('hero.days_projected_lbl') }}</span>
-        </div>
+        <span class="gauge-days-lbl">{{ t('hero.days_projected', { count: daysCovered }) }}</span>
       </div>
       <div class="gauge-track" :style="{ '--gauge-pct': gaugePct + '%' }">
         <div class="gauge-marker" :style="{ left: gaugePct + '%' }" />
@@ -285,12 +282,6 @@ const gaugePct = computed(() => {
 .gauge-verdict.safe { color: var(--safe); }
 .gauge-verdict.tight { color: var(--tight); }
 .gauge-verdict.danger { color: var(--danger); }
-
-.gauge-days {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--bright);
-}
 
 .gauge-days-lbl {
   font-size: 9px;

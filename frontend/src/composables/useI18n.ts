@@ -8,7 +8,7 @@ import { useLanguageStore } from '@/stores/language'
  * Basic usage:
  *   const { t } = useI18n()
  *   t('hero.current_balance')             // "Current Balance"
- *   t('hero.days_projected_lbl')              // "days projected"
+ *   t('hero.days_projected', { count: 90 }) // "90 days projected"
  *
  * ICU plurals work automatically:
  *   t('shortfall.at_risk', { count: 3 })  // "3 commitments at risk"

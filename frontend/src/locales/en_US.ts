@@ -115,9 +115,9 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'Comfortable',
     context: 'Financial health verdict when the projected lowest balance is healthy. Shown in the shield gauge.',
   },
-  'hero.days_projected_lbl': {
-    text: 'days projected',
-    context: 'Label next to the numeric day count in the shield gauge. The number is rendered separately with distinct styling.',
+  'hero.days_projected': {
+    text: '{count} days projected',
+    context: 'Shows how many days the projection covers. Appears next to the shield gauge. {count} is a number like 90.',
   },
   'hero.after_window': {
     text: 'After Window',
