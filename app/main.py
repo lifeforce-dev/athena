@@ -4,16 +4,14 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from datetime import UTC
 from importlib.metadata import entry_points
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.common.logging import setup_logging
-from app.config import Settings, get_settings
+from app.config import get_settings
 from app.database import build_engine, build_session_factory
 from app.routers.auth import router as auth_router
 from app.routers.balance import router as balance_router
@@ -26,120 +24,6 @@ from app.routers.teller import router as teller_router
 from app.routers.transactions import router as transactions_router
 
 logger = logging.getLogger(__name__)
-
-
-# -- Teller daily balance sync --------------------------------------------
-
-
-async def _sync_teller_balances(
-    factory: async_sessionmaker[AsyncSession],
-    settings: Settings,
-    cert_path: str,
-    key_path: str,
-) -> None:
-    """Fetch and store latest balance for all active Teller enrollments.
-
-    Runs once per daily cycle. Each enrollment is handled independently so
-    a single failure does not block the rest.
-    """
-    from datetime import datetime
-    from decimal import Decimal, InvalidOperation
-
-    from app.common.encryption import decrypt_token
-    from app.repositories import balance_repository, teller_repository
-    from app.services.currency_service import convert_amount, get_user_account_currency
-    from app.services.teller_service import (
-        TellerApiError,
-        build_teller_client,
-        fetch_balances,
-    )
-
-    async with factory() as db:
-        enrollments = await teller_repository.get_all_active(db)
-
-    for enrollment in enrollments:
-        try:
-            token = decrypt_token(
-                enrollment.access_token_encrypted, settings.teller_encryption_key
-            )
-
-            async with build_teller_client(cert_path, key_path, token) as client:
-                balance_data = await fetch_balances(client, enrollment.account_id)  # type: ignore[arg-type]
-
-            try:
-                raw_balance = Decimal(balance_data.available).quantize(Decimal("0.01"))
-            except (InvalidOperation, ValueError):
-                raw_balance = Decimal("0.00")
-
-            # Single DB session for currency lookup + balance write + sync timestamp.
-            async with factory() as db:
-                user_currency = await get_user_account_currency(enrollment.user_id, db)
-
-                converted_balance = await convert_amount(
-                    raw_balance, enrollment.account_currency, user_currency
-                )
-
-                now = datetime.now(UTC)
-                await balance_repository.create_from_teller(
-                    db,
-                    user_id=enrollment.user_id,
-                    balance=converted_balance,
-                    observed_at=now,
-                    account_label=enrollment.account_name,
-                )
-                await teller_repository.update_last_synced(db, enrollment.id)
-                await db.commit()
-
-            logger.info("Daily sync complete for enrollment %s", enrollment.id)
-
-        except TellerApiError as exc:
-            logger.warning(
-                "Teller API error during daily sync (enrollment %s): %s",
-                enrollment.id,
-                exc.detail,
-            )
-            if exc.status_code in (401, 403):
-                async with factory() as db:
-                    await teller_repository.mark_disconnected(db, enrollment.id)
-                    await db.commit()
-
-        except Exception:
-            logger.exception("Daily sync failed for enrollment %s", enrollment.id)
-
-
-async def _periodic_teller_sync(
-    factory: async_sessionmaker[AsyncSession],
-    settings: Settings,
-    cert_path: str,
-    key_path: str,
-) -> None:
-    """Background loop: sync Teller balances every 24 hours."""
-    while True:
-        await asyncio.sleep(24 * 3600)
-        try:
-            await _sync_teller_balances(factory, settings, cert_path, key_path)
-        except Exception:
-            logger.exception("Error in periodic Teller balance sync")
-
-
-async def _reconcile_stale_enrollments(
-    factory: async_sessionmaker[AsyncSession],
-) -> None:
-    """Transition SYNCING enrollments to ERROR on startup.
-
-    If the process crashed between committing SYNCING and the background
-    task completing, these rows are stranded. There is no in-process task
-    to finish the sync, so we mark them ERROR so the user can retry.
-    """
-    from app.repositories import teller_repository
-
-    async with factory() as db:
-        count = await teller_repository.reconcile_stale_syncing(db)
-        await db.commit()
-    if count:
-        logger.warning(
-            "Recovered %d enrollment(s) stranded in SYNCING → marked ERROR", count
-        )
 
 
 # -- Application lifecycle -------------------------------------------------
@@ -163,10 +47,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
 
         # Recover enrollments stranded in SYNCING by a previous crash.
         factory = application.state.db_session_factory
-        await _reconcile_stale_enrollments(factory)
+
+        from app.services.teller_sync import reconcile_stale_enrollments
+        await reconcile_stale_enrollments(factory)
 
         if settings.teller_app_id and settings.teller_certificate_b64:
             from app.common.encryption import decode_cert_to_tempfile
+            from app.services import teller_sync
 
             application.state.teller_cert_path = decode_cert_to_tempfile(
                 settings.teller_certificate_b64
@@ -177,7 +64,7 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
             logger.info("Teller mTLS certificates decoded to temp files")
 
             teller_sync_task = asyncio.create_task(
-                _periodic_teller_sync(
+                teller_sync.periodic_sync(
                     factory,
                     settings,
                     application.state.teller_cert_path,
