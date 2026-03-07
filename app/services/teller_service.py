@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+from typing import Literal
 
 import httpx
 
@@ -85,7 +86,7 @@ def build_teller_client(
 
 async def call_teller_api(
     client: httpx.AsyncClient,
-    method: str,
+    method: Literal["get", "post", "delete"],
     path: str,
     **kwargs: object,
 ) -> httpx.Response:

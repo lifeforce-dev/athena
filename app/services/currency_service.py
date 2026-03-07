@@ -152,3 +152,26 @@ async def to_account_currency(amount: Decimal, info: UserCurrencyInfo) -> Decima
 
     rate = await get_rate(info.display, info.account)
     return (amount * Decimal(str(rate))).quantize(Decimal("0.01"))
+
+
+async def convert_amount(
+    amount: Decimal,
+    source_currency: str,
+    target_currency: str,
+) -> Decimal:
+    """Convert an amount between any two currencies.
+
+    When source and target are the same, get_rate_with_fallback returns 1.0
+    and the multiplication is a no-op — no branching needed by callers.
+    """
+    rate = await get_rate_with_fallback(source_currency, target_currency)
+    return (amount * Decimal(str(rate))).quantize(Decimal("0.01"))
+
+
+async def get_user_account_currency(user_id: int, db: AsyncSession) -> str:
+    """Return the user's account currency, defaulting to USD."""
+    result = await db.execute(
+        select(User.account_currency).where(User.id == user_id)
+    )
+    row = result.scalar_one_or_none()
+    return row if row else "USD"

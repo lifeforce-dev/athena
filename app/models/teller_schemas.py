@@ -23,9 +23,34 @@ class TellerEnrollRequest(BaseModel):
     institution: str
 
 
+class TellerSelectAccountRequest(BaseModel):
+    """Payload sent by the frontend when the user picks a bank account."""
+
+    account_id: str
+
+
 # ---------------------------------------------------------------------------
 # Response schemas (backend → frontend)
 # ---------------------------------------------------------------------------
+
+
+class TellerAccountOption(BaseModel):
+    """A bank account choice presented to the user after enrollment."""
+
+    id: str
+    name: str
+    type: str
+    subtype: str
+    currency: str
+    institution_name: str
+
+
+class TellerEnrollResponse(BaseModel):
+    """Returned by POST /enroll with available accounts for user selection."""
+
+    status: str  # TellerStatus value
+    institution_name: str
+    accounts: list[TellerAccountOption]
 
 
 class TellerStatusResponse(BaseModel):
@@ -35,7 +60,7 @@ class TellerStatusResponse(BaseModel):
     institution_name: str | None = None
     account_name: str | None = None
     last_synced_at: datetime | None = None
-    status: str  # syncing | active | disconnected | error
+    status: str  # TellerStatus value
 
 
 # ---------------------------------------------------------------------------
