@@ -26,6 +26,12 @@
                 <span v-if="langSaved" class="sp-saved">{{ t('settings.saved') }}</span>
               </Transition>
             </div>
+            <Transition name="sp-fade">
+              <p v-if="showRefreshHint" class="sp-refresh-hint">
+                {{ t('settings.language_refresh') }}
+                <button class="sp-refresh-btn" @click="reloadPage">&#x21bb;</button>
+              </p>
+            </Transition>
           </div>
 
           <!-- Account Currency -->
@@ -118,6 +124,7 @@ const implementedLocales = IMPLEMENTED_LOCALES
 const currentCurrencySymbol = ref(getCurrencyConfig(currency.accountCurrency).symbol)
 
 const langSaved = ref(false)
+const showRefreshHint = ref(false)
 let langSaveTimeout: ReturnType<typeof setTimeout> | undefined
 
 const showCurrencyChange = ref(false)
@@ -128,6 +135,10 @@ const currencyOptions = CURRENCY_CODES.map((code) => ({
   code,
   symbol: CURRENCIES[code].symbol,
 }))
+
+function reloadPage() {
+  location.reload()
+}
 
 async function onLanguageChange(event: Event) {
   const select = event.target as HTMLSelectElement
@@ -141,6 +152,7 @@ async function onLanguageChange(event: Event) {
 
   // Flash "Saved" indicator.
   langSaved.value = true
+  showRefreshHint.value = true
   clearTimeout(langSaveTimeout)
   langSaveTimeout = setTimeout(() => { langSaved.value = false }, 2000)
 }
@@ -287,6 +299,31 @@ async function confirmCurrencyChange() {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--safe);
+}
+
+.sp-refresh-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sp-refresh-btn {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  color: var(--bright);
+  font-size: 14px;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.sp-refresh-btn:hover {
+  background: var(--panel);
+  border-color: var(--income);
 }
 
 .sp-currency-row {

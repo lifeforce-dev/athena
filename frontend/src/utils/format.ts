@@ -5,6 +5,25 @@
 import { shallowRef } from 'vue'
 import { getCurrencyConfig } from '@/config/currencies'
 
+// -- Locale display state (pushed in by the language store) ------------------
+
+const LOCALE_MAP: Record<string, string> = {
+  en_US: 'en-US',
+  ko_KR: 'ko-KR',
+}
+
+const _locale = shallowRef<string>('en-US')
+
+/** Called by the language store whenever the display locale changes. */
+export function setDisplayLocale(appLocale: string): void {
+  _locale.value = LOCALE_MAP[appLocale] ?? 'en-US'
+}
+
+/** BCP-47 locale tag for use in date/number formatters. */
+export function getDateLocale(): string {
+  return _locale.value
+}
+
 export interface CurrencyDisplay {
   code: string
   rate: number  // 1.0 for base currency, exchange rate otherwise
@@ -86,9 +105,9 @@ export const formatCents = (value: number): string => {
   return prefix() + converted.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })
 }
 
-/** Short date display: "Feb 17". */
+/** Short date display: "Feb 17" (locale-aware). */
 export const shortDate = (dateStr: string): string =>
-  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  parseLocalDate(dateStr).toLocaleDateString(_locale.value, { month: 'short', day: 'numeric' })
 
 /** Calendar days between two YYYY-MM-DD strings. */
 export const daysBetween = (startDate: string, endDate: string): number =>

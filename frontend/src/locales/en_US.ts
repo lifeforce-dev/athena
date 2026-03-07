@@ -199,6 +199,18 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'hover chart to inspect',
     context: 'Placeholder text in the info bar above the chart, shown when the user is not hovering over any data point.',
   },
+  'chart.range_days': {
+    text: '{count} days',
+    context: 'Day count shown in the chart range label, e.g. "Mar 8 → May 2 · 55 days". {count} is a number.',
+  },
+  'chart.today': {
+    text: 'today',
+    context: 'X-axis label on the chart for the current day.',
+  },
+  'chart.day_offset': {
+    text: '+{count}d',
+    context: 'X-axis sub-label showing how many days into the future a chart point is. {count} is a number.',
+  },
 
   // ══════════════════════════════════════════════════════════════════════
   // Event List
@@ -823,6 +835,10 @@ const en_US: Record<string, LocaleEntry> = {
   'settings.saved': {
     text: 'Saved',
     context: 'Brief confirmation shown after a setting is successfully saved.',
+  },
+  'settings.language_refresh': {
+    text: 'Refresh the page to fully apply the new language.',
+    context: 'Hint shown after changing display language, informing the user a page refresh is needed for all elements (dates, charts) to update.',
   },
 }
 

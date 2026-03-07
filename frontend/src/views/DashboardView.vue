@@ -73,7 +73,7 @@ import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import { useI18n } from '@/composables/useI18n'
 import { useTellerStore } from '@/stores/teller'
 import { createManualBalance } from '@/api/balance'
-import { parseLocalDate } from '@/utils/format'
+import { parseLocalDate, getDateLocale } from '@/utils/format'
 const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
 const highlightedCause = ref<number | null>(null)
@@ -147,7 +147,7 @@ const {
 const nextWeekLabel = computed(() => {
   const start = billsAnalysis.value.nextWeekStart
   if (!start) return ''
-  return parseLocalDate(start).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return parseLocalDate(start).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 })
 </script>
 

@@ -19,7 +19,7 @@
           </div>
           <div class="rail-info">
             <span class="rail-name">{{ item.name }}</span>
-            <span class="rail-freq">{{ item.frequency }}</span>
+            <span class="rail-freq">{{ freqLabel(item.frequency) }}</span>
           </div>
           <div class="rail-amt pos">
             <input
@@ -53,7 +53,7 @@
           </div>
           <div class="rail-info">
             <span class="rail-name">{{ item.name }}</span>
-            <span class="rail-freq">{{ item.frequency }}</span>
+            <span class="rail-freq">{{ freqLabel(item.frequency) }}</span>
           </div>
           <div class="rail-amt neg">
             <input
@@ -112,6 +112,18 @@ import { parseMoney, formatDollars } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
+
+const freqLabel = (frequency: string): string => {
+  const labels: Record<string, string> = {
+    monthly: t('freq.monthly'),
+    biweekly: t('freq.biweekly'),
+    weekly: t('freq.weekly'),
+    daily: t('freq.daily'),
+    day_interval: t('freq.custom'),
+    once: t('freq.once'),
+  }
+  return labels[frequency] ?? frequency
+}
 
 const props = defineProps<{
   commitments: CommitmentResponse[]

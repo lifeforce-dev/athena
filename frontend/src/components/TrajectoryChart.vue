@@ -31,7 +31,7 @@ import InfoBar from '@/components/InfoBar.vue'
 import { parseLocalDate, daysBetween } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 import {
-  type ChartLayout, type HoverState, type HoveredBand,
+  type ChartLayout, type HoverState, type HoveredBand, type ChartLabels,
   buildLayout, buildRangeLabel,
   drawZoneBands, drawExpenseWave, drawTrajectoryFill,
   drawThresholdLines, drawGrid, drawTrajectoryLine,
@@ -97,6 +97,18 @@ function startPulse() {
   pulseAnimId = requestAnimationFrame(tick)
 }
 
+function chartLabels(): ChartLabels {
+  const slice = currentLayout?.slice
+  const calDays = slice && slice.length >= 2
+    ? daysBetween(slice[0].date, slice[slice.length - 1].date)
+    : 0
+  return {
+    rangeDays: t('chart.range_days', { count: calDays }),
+    today: t('chart.today'),
+    dayOffset: t('chart.day_offset', { count: '__COUNT__' }).replace('__COUNT__', '{count}'),
+  }
+}
+
 // ── Drawing ──
 
 function draw(pulseElapsed?: number) {
@@ -109,7 +121,9 @@ function draw(pulseElapsed?: number) {
   if (!layout) return
 
   currentLayout = layout
-  rangeLabel.value = buildRangeLabel(layout.slice)
+
+  const labels = chartLabels()
+  rangeLabel.value = buildRangeLabel(layout.slice, labels)
 
   drawZoneBands(layout)
 
@@ -135,7 +149,7 @@ function draw(pulseElapsed?: number) {
   })
 
   drawLowestPoint(layout)
-  drawXAxis(layout, props.data[0].date)
+  drawXAxis(layout, props.data[0].date, labels)
 }
 
 // ── Info bar update on hover ──

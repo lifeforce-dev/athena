@@ -173,7 +173,7 @@ import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import ScenarioCommitments from '@/components/ScenarioCommitments.vue'
 import { useScenario } from '@/composables/useScenario'
 import { useTabOnboarding } from '@/composables/useTabOnboarding'
-import { parseLocalDate, formatDollars } from '@/utils/format'
+import { parseLocalDate, formatDollars, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -215,7 +215,7 @@ const {
 } = useScenario()
 
 const shortDate = (dateStr: string) =>
-  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  parseLocalDate(dateStr).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 
 const maxAbsNet = computed(() => Math.max(...monthBreaks.value.map(month => Math.abs(month.net)), 1))
 

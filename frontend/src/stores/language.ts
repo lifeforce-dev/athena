@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { loadLocale, getLocaleSync, type FlatLocale } from '@/locales'
 import { setLanguage } from '@/api/auth'
+import { setDisplayLocale } from '@/utils/format'
 
 export const useLanguageStore = defineStore('language', () => {
   const locale = ref('en_US')
@@ -23,10 +24,11 @@ export const useLanguageStore = defineStore('language', () => {
     await setLanguage(newLocale)
   }
 
-  // Reload message bundle when locale changes.
+  // Reload message bundle and push to date formatters when locale changes.
   watch(locale, async (next) => {
+    setDisplayLocale(next)
     messages.value = await loadLocale(next)
-  })
+  }, { immediate: true })
 
   return { locale, messages, initFromUser, changeLocale }
 })

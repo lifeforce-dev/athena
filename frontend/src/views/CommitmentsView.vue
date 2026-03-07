@@ -109,7 +109,7 @@ import CommitmentModal from '@/components/CommitmentModal.vue'
 import { useCommitments } from '@/composables/useCommitments'
 import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import type { CommitmentCreate } from '@/types/commitment'
-import { parseMoney, parseLocalDate, formatDollars, formatCents } from '@/utils/format'
+import { parseMoney, parseLocalDate, formatDollars, formatCents, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -219,7 +219,7 @@ const oneTimeTotal = computed(() =>
 )
 
 const fmtDate = (dateStr: string) =>
-  parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  parseLocalDate(dateStr).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric', year: 'numeric' })
 
 function openAdd() {
   editTarget.value = null

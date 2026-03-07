@@ -5,7 +5,7 @@ import { fetchDemoCommitments } from '@/api/demo-data'
 import { demoTourActive } from '@/stores/demoTour'
 import { fetchScenarioProjection, type ScenarioRequest } from '@/api/projection'
 import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
-import { toLocalDateString, parseLocalDate, parseMoney } from '@/utils/format'
+import { toLocalDateString, parseLocalDate, parseMoney, getDateLocale } from '@/utils/format'
 import type { ParsedLedgerEntry } from '@/types/projection'
 
 export interface ScenarioOverride {
@@ -239,7 +239,7 @@ export function useScenario() {
     let monthStartIdx = 0
 
     const shortLabel = (dateStr: string) =>
-      parseLocalDate(dateStr).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
+      parseLocalDate(dateStr).toLocaleDateString(getDateLocale(), { month: 'short', year: '2-digit' })
 
     for (let i = 1; i < points.length; i++) {
       const monthKey = points[i].date.slice(0, 7)

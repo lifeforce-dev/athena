@@ -75,6 +75,9 @@ const ko_KR: Record<string, string> = {
   // ══════════════════════════════════════════════════════════════════════
   'chart.title': '잔액 추이',
   'chart.hover_hint': '차트 위에 마우스를 올려 확인하십시오',
+  'chart.range_days': '{count}일',
+  'chart.today': '오늘',
+  'chart.day_offset': '+{count}일',
 
   // ══════════════════════════════════════════════════════════════════════
   // Event List
@@ -270,6 +273,7 @@ const ko_KR: Record<string, string> = {
   'settings.currency_cancel': '취소',
   'settings.currency_converting': '변환 중...',
   'settings.saved': '저장됨',
+  'settings.language_refresh': '새 언어를 완전히 적용하려면 페이지를 새로고침하십시오.',
 }
 
 export default ko_KR

@@ -47,6 +47,13 @@ export interface HoveredBand {
   color: string
 }
 
+/** Translated strings needed by pure canvas rendering functions. */
+export interface ChartLabels {
+  rangeDays: string    // e.g. "55 days" or "55일"
+  today: string        // e.g. "today" or "오늘"
+  dayOffset: string    // e.g. "+14d" or "+14일" — contains {count} placeholder
+}
+
 export interface ExpenseWaveOpts {
   worstWindow: WorstWindow | null
   expenseWave: number[]
@@ -143,11 +150,10 @@ export function buildLayout(
 }
 
 /** Build the range label string for the current view. */
-export function buildRangeLabel(slice: TrajectoryPoint[]): string {
+export function buildRangeLabel(slice: TrajectoryPoint[], labels: ChartLabels): string {
   const first = slice[0].date
   const last = slice[slice.length - 1].date
-  const calDays = daysBetween(first, last)
-  return `${shortDate(first)} \u2192 ${shortDate(last)} \u00B7 ${calDays} days`
+  return `${shortDate(first)} \u2192 ${shortDate(last)} \u00B7 ${labels.rangeDays}`
 }
 
 // ── Drawing functions ──────────────────────────────────────────────────────
@@ -417,7 +423,7 @@ export function drawLowestPoint(layout: ChartLayout): void {
 }
 
 /** X-axis date labels with day offsets. */
-export function drawXAxis(layout: ChartLayout, firstDate: string): void {
+export function drawXAxis(layout: ChartLayout, firstDate: string, labels: ChartLabels): void {
   const { ctx, xPos, bottom, slice } = layout
 
   ctx.textAlign = 'center'
@@ -431,7 +437,7 @@ export function drawXAxis(layout: ChartLayout, firstDate: string): void {
     const days = daysBetween(firstDate, point.date)
     ctx.fillStyle = 'rgba(90,99,120,.22)'
     ctx.font = '8px IBM Plex Mono'
-    ctx.fillText(days === 0 ? 'today' : `+${days}d`, labelX, bottom + 25)
+    ctx.fillText(days === 0 ? labels.today : labels.dayOffset.replace('{count}', String(days)), labelX, bottom + 25)
   })
   ctx.textAlign = 'left'
 }
