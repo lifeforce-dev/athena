@@ -29,13 +29,12 @@ def generate_fernet_key() -> str:
 def decode_cert_to_tempfile(b64_content: str) -> str:
     """Decode a base64-encoded certificate to a temp file, return its path.
 
-    Sets 0o600 permissions on Linux (no-op on Windows where ACLs are used
-    instead). Production runs on Linux/Render where this is effective.
+    NamedTemporaryFile (via mkstemp) creates the file with mode 0o600 at
+    the OS level, so the private key is never world-readable.
     Caller is responsible for calling os.unlink() on shutdown.
     """
     content = base64.b64decode(b64_content)
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pem")
     tmp.write(content)
     tmp.close()
-    os.chmod(tmp.name, 0o600)
     return tmp.name
