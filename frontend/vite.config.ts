@@ -15,7 +15,7 @@ export default defineConfig({
       '/api': {
         target: 'https://athena-api-hgu4.onrender.com',
         changeOrigin: true,
-        secure: true,
+        secure: false,
       },
     },
   },
