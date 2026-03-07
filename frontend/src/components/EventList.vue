@@ -134,7 +134,7 @@ const groupedEvents = computed<MonthGroup[]>(() => {
 
 .ev-hdr {
   display: grid;
-  grid-template-columns: 44px 1fr auto 80px;
+  grid-template-columns: minmax(44px, auto) 1fr auto 80px;
   gap: 10px;
   padding: 9px 18px;
   border-bottom: 1px solid var(--border);
@@ -147,7 +147,7 @@ const groupedEvents = computed<MonthGroup[]>(() => {
 
 .ev-r {
   display: grid;
-  grid-template-columns: 44px 1fr auto 80px;
+  grid-template-columns: minmax(44px, auto) 1fr auto 80px;
   gap: 10px;
   align-items: center;
   padding: 7px 18px;
@@ -168,6 +168,7 @@ const groupedEvents = computed<MonthGroup[]>(() => {
   text-align: center;
   color: var(--dim);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .ev-n { color: var(--text); }
@@ -192,7 +193,7 @@ const groupedEvents = computed<MonthGroup[]>(() => {
 
 @media (max-width: 700px) {
   .ev-hdr, .ev-r {
-    grid-template-columns: 36px 1fr auto;
+    grid-template-columns: minmax(36px, auto) 1fr auto;
   }
   .ev-b, .ev-hdr > span:last-child {
     display: none;
