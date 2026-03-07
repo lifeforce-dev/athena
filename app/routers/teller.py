@@ -480,13 +480,17 @@ async def webhook(
     event_type: str = payload.get("type", "")
 
     factory: async_sessionmaker[AsyncSession] = request.app.state.db_session_factory
+    cert_path: str = getattr(request.app.state, "teller_cert_path", "")
+    key_path: str = getattr(request.app.state, "teller_key_path", "")
 
     try:
         async with factory() as db:
             if event_type == "enrollment.disconnected":
                 await _handle_enrollment_disconnected(db, payload)
             elif event_type == "transactions.processed":
-                await _handle_transactions_processed(db, payload, settings)
+                await _handle_transactions_processed(
+                    db, payload, settings, cert_path, key_path,
+                )
             else:
                 logger.info("Ignoring unknown Teller webhook event: %s", event_type)
 
@@ -524,8 +528,10 @@ async def _handle_transactions_processed(
     db: AsyncSession,
     payload: dict,
     settings: Settings,
+    cert_path: str,
+    key_path: str,
 ) -> None:
-    """Ingest new transactions from a Teller webhook."""
+    """Ingest new transactions from a Teller webhook and refresh the balance."""
     account_id = payload.get("payload", {}).get("account_id", "")
     if not account_id:
         logger.warning("transactions.processed webhook missing account_id")
@@ -554,6 +560,76 @@ async def _handle_transactions_processed(
             teller_currency=teller_currency,
             user_currency=user_currency,
         )
+
+    # Fetch fresh balance from Teller so the dashboard reflects the spend.
+    await _refresh_balance_from_teller(
+        db,
+        enrollment=enrollment,
+        settings=settings,
+        cert_path=cert_path,
+        key_path=key_path,
+        user_currency=user_currency,
+    )
+
+
+async def _refresh_balance_from_teller(
+    db: AsyncSession,
+    *,
+    enrollment: TellerEnrollment,
+    settings: Settings,
+    cert_path: str,
+    key_path: str,
+    user_currency: str,
+) -> None:
+    """Fetch current balance from Teller API and store a new snapshot.
+
+    Called after ingesting webhook transactions so the user's dashboard
+    balance stays current. Failures are logged but do not propagate —
+    the transactions are already persisted, and the daily sync will
+    reconcile the balance eventually.
+    """
+    if not cert_path or not key_path:
+        logger.warning("Cannot refresh balance: mTLS cert paths not available")
+        return
+
+    try:
+        token = decrypt_token(
+            enrollment.access_token_encrypted, settings.teller_encryption_key
+        )
+
+        async with build_teller_client(cert_path, key_path, token) as client:
+            balance_data = await fetch_balances(client, enrollment.account_id)  # type: ignore[arg-type]
+
+        try:
+            raw_balance = Decimal(balance_data.available).quantize(Decimal("0.01"))
+        except (InvalidOperation, ValueError):
+            logger.warning("Invalid balance value from Teller: %s", balance_data.available)
+            return
+
+        converted_balance = await convert_amount(
+            raw_balance, enrollment.account_currency, user_currency
+        )
+
+        now = datetime.now(UTC)
+        await balance_repository.create_from_teller(
+            db,
+            user_id=enrollment.user_id,
+            balance=converted_balance,
+            observed_at=now,
+            account_label=enrollment.account_name,
+        )
+        await teller_repository.update_last_synced(db, enrollment.id)
+        logger.info(
+            "Webhook balance refresh: stored %s %s for user %d",
+            converted_balance, user_currency, enrollment.user_id,
+        )
+
+    except TellerApiError as exc:
+        logger.warning(
+            "Balance refresh failed for enrollment %s: %s", enrollment.id, exc.detail
+        )
+    except Exception:
+        logger.exception("Unexpected error during webhook balance refresh")
 
 
 async def _ingest_transaction(

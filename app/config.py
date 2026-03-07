@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     @property
     def secure_cookies(self) -> bool:
         """True when frontend is served over HTTPS (i.e. not local dev)."""
-        return not self.frontend_url.startswith("http://localhost")
+        return not self.frontend_url.startswith("http://localhost:")
 
     model_config = {"env_prefix": "ATHENA_"}
 
