@@ -14,7 +14,7 @@
       "@/*": ["src/*"]
     },
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": []
+    "types": ["vite/client"]
   },
   "include": ["src/**/*.ts", "src/**/*.vue"],
   "exclude": ["src/**/__tests__/**"]
