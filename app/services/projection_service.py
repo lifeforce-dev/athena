@@ -22,19 +22,24 @@ async def _load_from_db(
 ) -> tuple[Decimal, list[CashFlowTemplate], bool] | None:
     """Try to load projection inputs from the database.
 
-    Returns (initial_balance, templates) if the user has ever created
-    commitments (even if all are now inactive). Returns None only when
-    the user has zero commitment rows, signaling JSON fallback for
-    users who have not yet set up their data.
+    Returns (initial_balance, templates, has_initial_balance) when the
+    user has commitments OR a balance snapshot (e.g. from a bank
+    connection). Returns None only when the user has neither,
+    signaling JSON fallback for brand-new users.
     """
-    # Distinguish 'never set up' from 'cleared all commitments'.
-    if not await commitment_repository.has_any(db, user_id):
+    has_commitments = await commitment_repository.has_any(db, user_id)
+    latest_snapshot = await balance_repository.get_latest(db, user_id)
+
+    # User has never set up commitments and has no balance data at all.
+    if not has_commitments and latest_snapshot is None:
         return None
 
-    templates = await commitment_repository.list_as_templates(db, user_id)
+    templates = (
+        await commitment_repository.list_as_templates(db, user_id)
+        if has_commitments
+        else []
+    )
 
-    # Use the latest balance snapshot as the starting balance, or 0.
-    latest_snapshot = await balance_repository.get_latest(db, user_id)
     initial_balance = latest_snapshot.balance if latest_snapshot else Decimal(0)
     has_initial_balance = latest_snapshot is not None
 

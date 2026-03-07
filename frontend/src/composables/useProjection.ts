@@ -22,6 +22,8 @@ export function useProjection() {
 
   const currentBalance = computed(() => parseMoney(data.value?.current_balance ?? '0'))
 
+  const hasInitialBalance = computed(() => data.value?.has_initial_balance ?? false)
+
   const ledger = computed<ParsedLedgerEntry[]>(() =>
     (data.value?.ledger ?? []).map((entry) => ({
       date: entry.date,
@@ -44,5 +46,5 @@ export function useProjection() {
     }))
   )
 
-  return { data, loading, error, load, currentBalance, payPeriods, ledger }
+  return { data, loading, error, load, currentBalance, hasInitialBalance, payPeriods, ledger }
 }

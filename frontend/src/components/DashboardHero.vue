@@ -25,8 +25,8 @@
       </template>
     </div>
 
-    <!-- Shield gauge -->
-    <div class="gauge-wrap" data-tour="gauge">
+    <!-- Shield gauge (hidden in balance-only mode) -->
+    <div v-if="!balanceOnly" class="gauge-wrap" data-tour="gauge">
       <div class="gauge-header">
         <div class="gauge-verdict" :class="statusClass">{{ verdict }}</div>
         <div>
@@ -44,8 +44,8 @@
       </div>
     </div>
 
-    <!-- Stats strip -->
-    <div class="stats-strip">
+    <!-- Stats strip (hidden in balance-only mode) -->
+    <div v-if="!balanceOnly" class="stats-strip">
       <div class="stat-cell">
         <div class="stat-val" :style="{ color: endColor }">{{ formatDollars(endBalance) }}</div>
         <div class="stat-lbl">{{ t('hero.after_window') }}</div>
@@ -75,6 +75,7 @@ const props = defineProps<{
   lowestBalance: number
   lowestDate: string
   daysCovered: number
+  balanceOnly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -110,6 +111,7 @@ function saveBalance() {
 }
 
 const statusClass = computed(() => {
+  if (props.balanceOnly) return 'neutral'
   if (props.lowestBalance < 0) return 'danger'
   if (props.lowestBalance < 3000) return 'tight'
   return 'safe'
@@ -171,6 +173,10 @@ const gaugePct = computed(() => {
 
 .hero.danger::before {
   background: radial-gradient(ellipse 50% 35% at 50% 0%, var(--danger-glow), transparent);
+}
+
+.hero.neutral::before {
+  background: radial-gradient(ellipse 50% 35% at 50% 0%, rgba(148, 163, 184, 0.10), transparent);
 }
 
 /* ── Balance headline ── */

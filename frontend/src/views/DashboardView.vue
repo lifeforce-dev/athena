@@ -2,13 +2,14 @@
   <div>
     <div class="wrap">
       <DashboardHero
-        v-if="!loading && trajectory.length"
+        v-if="!loading && (trajectory.length || hasInitialBalance)"
         :current-balance="currentBalance"
         :end-balance="endBalance"
         :net-change="netChange"
         :lowest-balance="lowestPoint?.balance ?? 0"
         :lowest-date="lowestPoint?.date ?? ''"
         :days-covered="daysCovered"
+        :balance-only="hasInitialBalance && !trajectory.length"
         @update-balance="onUpdateBalance"
       />
 
@@ -50,6 +51,12 @@
         <EventList :ledger="ledger" @hover-date="highlightDate = $event" @click-date="onClickDate" />
       </template>
 
+      <!-- Balance-only: bank connected but no commitments yet. -->
+      <div v-else-if="hasInitialBalance" class="empty">
+        <h3>{{ t('dash.no_data_title') }}</h3>
+        <p>{{ t('dash.no_data_desc') }}</p>
+      </div>
+
       <div v-else class="empty">
         <h3>{{ t('dash.no_data_title') }}</h3>
         <p>{{ t('dash.no_data_desc') }}</p>
@@ -59,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import DashboardHero from '@/components/DashboardHero.vue'
 import TrajectoryChart from '@/components/TrajectoryChart.vue'
 import EventList from '@/components/EventList.vue'
@@ -70,6 +77,7 @@ import { useDashboard } from '@/composables/useDashboard'
 import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import { useI18n } from '@/composables/useI18n'
+import { useTellerStore } from '@/stores/teller'
 import { createManualBalance } from '@/api/balance'
 import { parseLocalDate } from '@/utils/format'
 const highlightDate = ref<string | null>(null)
@@ -116,12 +124,21 @@ const {
   trajectory,
   lowestPoint,
   currentBalance,
+  hasInitialBalance,
   endBalance,
   netChange,
   daysCovered,
   ledger,
   refresh,
 } = useDashboard()
+
+// Re-fetch dashboard data when a bank enrollment completes.
+const teller = useTellerStore()
+watch(() => teller.status, (newStatus, oldStatus) => {
+  if (oldStatus === 'syncing' && newStatus === 'active') {
+    refresh()
+  }
+})
 
 const {
   worstWindow,
