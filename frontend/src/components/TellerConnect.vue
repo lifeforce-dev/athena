@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useTellerStore } from '@/stores/teller'
 import { getTellerNonce } from '@/api/teller'
 
@@ -181,15 +181,19 @@ async function handleConfirm() {
   }
 }
 
-function handleCancel() {
-  teller.pendingAccounts = []
+async function handleCancel() {
+  // Clean up the backend enrollment so it doesn't strand in awaiting_account.
+  await teller.disconnect()
   selectedAccountId.value = null
   showFlowModal.value = false
   flowError.value = null
   emit('cancelled')
 }
 
-function dismissFlow() {
+async function dismissFlow() {
+  if (teller.isAwaitingAccount) {
+    await teller.disconnect()
+  }
   teller.pendingAccounts = []
   selectedAccountId.value = null
   showFlowModal.value = false
@@ -202,6 +206,17 @@ function dismissError() {
 }
 
 defineExpose({ open })
+
+// Resume the account picker after a page reload when the store
+// re-fetches accounts for an awaiting_account enrollment.
+watch(
+  () => teller.isAwaitingAccount && teller.pendingAccounts.length > 0,
+  (shouldShow) => {
+    if (shouldShow && !showFlowModal.value) {
+      showFlowModal.value = true
+    }
+  },
+)
 </script>
 
 <style scoped>

@@ -109,6 +109,14 @@ class TestEnrollmentNonce:
         assert len(nonce) > 20
         assert len(mac) == 64  # SHA-256 hex digest
 
+    def test_nonce_contains_timestamp(self):
+        nonce, _ = generate_enrollment_nonce(JWT_SECRET)
+
+        # Format: {random}:{unix_epoch}
+        parts = nonce.rsplit(":", 1)
+        assert len(parts) == 2
+        assert parts[1].isdigit()
+
     def test_verify_accepts_own_nonce(self):
         nonce, mac = generate_enrollment_nonce(JWT_SECRET)
 
@@ -128,6 +136,18 @@ class TestEnrollmentNonce:
         nonce, mac = generate_enrollment_nonce(JWT_SECRET)
 
         assert verify_nonce_mac(nonce + "x", mac, JWT_SECRET) is False
+
+    def test_verify_rejects_expired_nonce(self):
+        """Nonce issued > 5 minutes ago should be rejected."""
+        import hmac as hmac_mod
+        import hashlib
+
+        expired_nonce = f"faketoken:{int(__import__('time').time()) - 600}"
+        expired_mac = hmac_mod.new(
+            JWT_SECRET.encode(), expired_nonce.encode(), hashlib.sha256
+        ).hexdigest()
+
+        assert verify_nonce_mac(expired_nonce, expired_mac, JWT_SECRET) is False
 
     def test_nonces_are_unique(self):
         nonce_a, _ = generate_enrollment_nonce(JWT_SECRET)

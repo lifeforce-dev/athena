@@ -20,8 +20,10 @@ from app.common.encryption import decrypt_token, encrypt_token
 from app.config import Settings, get_settings
 from app.database import get_db
 from app.dependencies import get_current_user_id
+from app.models.orm import TellerEnrollment
 from app.models.teller_constants import TellerStatus
 from app.models.teller_schemas import (
+    TellerAccount,
     TellerAccountOption,
     TellerEnrollRequest,
     TellerEnrollResponse,
@@ -30,7 +32,11 @@ from app.models.teller_schemas import (
     TellerStatusResponse,
 )
 from app.repositories import balance_repository, teller_repository, transaction_repository
-from app.services.currency_service import convert_amount, get_user_account_currency
+from app.services.currency_service import (
+    CurrencyConversionError,
+    convert_amount,
+    get_user_account_currency,
+)
 from app.services.teller_service import (
     TellerApiError,
     build_teller_client,
@@ -49,11 +55,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/teller", tags=["teller"])
 
 
-# ---------------------------------------------------------------------------
-# GET /teller/nonce
-# ---------------------------------------------------------------------------
-
-
 @router.get("/nonce")
 async def get_nonce(
     user_id: Annotated[int, Depends(get_current_user_id)],
@@ -69,9 +70,157 @@ async def get_nonce(
     return TellerNonceResponse(nonce=nonce, nonce_mac=mac)
 
 
-# ---------------------------------------------------------------------------
-# POST /teller/enroll
-# ---------------------------------------------------------------------------
+def _verify_enrollment_tokens(body: TellerEnrollRequest, settings: Settings) -> None:
+    """Validate nonce freshness and Ed25519 token signatures.
+
+    No-op when the token signing key is not configured (dev environments).
+    Raises HTTPException on any verification failure.
+    """
+    signing_key = settings.teller_token_signing_key
+    if not signing_key:
+        return
+
+    if not body.nonce or not body.nonce_mac:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Token signing verification requires nonce and nonce_mac.",
+        )
+    if not verify_nonce_mac(body.nonce, body.nonce_mac, settings.jwt_secret):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Invalid or expired enrollment nonce.",
+        )
+    if not verify_token_signatures(
+        access_token=body.access_token,
+        nonce=body.nonce,
+        teller_user_id=body.teller_user_id,
+        enrollment_id=body.enrollment_id,
+        environment=settings.teller_environment,
+        signatures=body.signatures,
+        public_key_b64=signing_key,
+    ):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "Enrollment signature verification failed.",
+        )
+
+
+_ALLOWED_ACCOUNT_TYPES = frozenset({"depository"})
+
+
+async def _fetch_eligible_accounts(
+    enrollment_id: int,
+    cert_path: str,
+    key_path: str,
+    access_token: str,
+    db: AsyncSession,
+) -> list[TellerAccount]:
+    """Fetch accounts from Teller and return only depository types.
+
+    Marks the enrollment as ERROR and raises HTTPException when Teller
+    returns no accounts or none of the supported type.
+    """
+    try:
+        async with build_teller_client(cert_path, key_path, access_token) as client:
+            accounts = await fetch_accounts(client)
+    except TellerApiError as exc:
+        logger.error("Failed to fetch accounts for enrollment %s: %s", enrollment_id, exc.detail)
+        await teller_repository.update_status(db, enrollment_id, TellerStatus.ERROR)
+        await db.commit()
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Could not fetch accounts from your bank. Please try again.",
+        ) from exc
+
+    if not accounts:
+        await teller_repository.update_status(db, enrollment_id, TellerStatus.ERROR)
+        await db.commit()
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "No accounts were returned by your bank.",
+        )
+
+    eligible = [a for a in accounts if a.type in _ALLOWED_ACCOUNT_TYPES]
+    if not eligible:
+        await teller_repository.update_status(db, enrollment_id, TellerStatus.ERROR)
+        await db.commit()
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "No supported checking or savings accounts found at your bank.",
+        )
+
+    return eligible
+
+
+async def _verify_account_selection(
+    enrollment_id: int,
+    account_id: str,
+    cert_path: str,
+    key_path: str,
+    access_token: str,
+) -> TellerAccount:
+    """Fetch accounts from Teller and validate the user's selection.
+
+    Raises HTTPException if the account doesn't exist or isn't depository.
+    """
+    try:
+        async with build_teller_client(cert_path, key_path, access_token) as client:
+            accounts = await fetch_accounts(client)
+    except TellerApiError as exc:
+        logger.error(
+            "Failed to verify account selection for enrollment %s: %s",
+            enrollment_id,
+            exc.detail,
+        )
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "Could not verify account with your bank. Please try again.",
+        ) from exc
+
+    selected = next((a for a in accounts if a.id == account_id), None)
+    if selected is None:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            "Selected account not found. It may have been closed.",
+        )
+
+    if selected.type != "depository":
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Only checking and savings accounts are supported.",
+        )
+
+    return selected
+
+
+def _launch_initial_sync(
+    *,
+    request: Request,
+    enrollment: TellerEnrollment,
+    access_token: str,
+    cert_path: str,
+    key_path: str,
+    user_id: int,
+    selected: TellerAccount,
+) -> None:
+    """Create the background sync task and register it for cancellation."""
+    factory: async_sessionmaker[AsyncSession] = request.app.state.db_session_factory
+    ctx = _SyncContext(
+        factory=factory,
+        enrollment_id=enrollment.id,
+        teller_enrollment_id=enrollment.enrollment_id,
+        access_token=access_token,
+        cert_path=cert_path,
+        key_path=key_path,
+        user_id=user_id,
+        account_id=selected.id,
+        account_name=selected.name,
+        account_currency=selected.currency,
+    )
+    task = asyncio.create_task(_initial_sync(ctx))
+    sync_tasks: dict[int, asyncio.Task[None]] = request.app.state.teller_sync_tasks
+    sync_tasks[enrollment.id] = task
+    task.add_done_callback(lambda _: sync_tasks.pop(enrollment.id, None))
 
 
 @router.post("/enroll", status_code=status.HTTP_201_CREATED)
@@ -83,32 +232,7 @@ async def enroll(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TellerEnrollResponse:
     """Store a new Teller enrollment and return available accounts."""
-    # -- Token signing verification (skip if key not configured) --------
-    signing_key = settings.teller_token_signing_key
-    if signing_key:
-        if not body.nonce or not body.nonce_mac:
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                "Token signing verification requires nonce and nonce_mac.",
-            )
-        if not verify_nonce_mac(body.nonce, body.nonce_mac, settings.jwt_secret):
-            raise HTTPException(
-                status.HTTP_400_BAD_REQUEST,
-                "Invalid or expired enrollment nonce.",
-            )
-        if not verify_token_signatures(
-            access_token=body.access_token,
-            nonce=body.nonce,
-            teller_user_id=body.teller_user_id,
-            enrollment_id=body.enrollment_id,
-            environment=settings.teller_environment,
-            signatures=body.signatures,
-            public_key_b64=signing_key,
-        ):
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN,
-                "Enrollment signature verification failed.",
-            )
+    _verify_enrollment_tokens(body, settings)
 
     existing = await teller_repository.get_active_enrollment(db, user_id)
     if existing is not None:
@@ -125,35 +249,18 @@ async def enroll(
     )
     try:
         await db.commit()
-    except DBIntegrityError:
+    except DBIntegrityError as exc:
         await db.rollback()
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             "An enrollment is already in progress. Please complete or cancel it first.",
-        )
+        ) from exc
 
     cert_path: str = request.app.state.teller_cert_path
     key_path: str = request.app.state.teller_key_path
-
-    try:
-        async with build_teller_client(cert_path, key_path, body.access_token) as client:
-            accounts = await fetch_accounts(client)
-    except TellerApiError as exc:
-        logger.error("Failed to fetch accounts for enrollment %s: %s", enrollment.id, exc.detail)
-        await teller_repository.update_status(db, enrollment.id, TellerStatus.ERROR)
-        await db.commit()
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            "Could not fetch accounts from your bank. Please try again.",
-        ) from exc
-
-    if not accounts:
-        await teller_repository.update_status(db, enrollment.id, TellerStatus.ERROR)
-        await db.commit()
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            "No accounts were returned by your bank.",
-        )
+    eligible = await _fetch_eligible_accounts(
+        enrollment.id, cert_path, key_path, body.access_token, db
+    )
 
     account_options = [
         TellerAccountOption(
@@ -164,7 +271,7 @@ async def enroll(
             currency=a.currency,
             institution_name=a.institution.name,
         )
-        for a in accounts
+        for a in eligible
     ]
 
     return TellerEnrollResponse(
@@ -174,9 +281,50 @@ async def enroll(
     )
 
 
-# ---------------------------------------------------------------------------
-# POST /teller/select-account
-# ---------------------------------------------------------------------------
+@router.get("/accounts")
+async def get_pending_accounts(
+    user_id: Annotated[int, Depends(get_current_user_id)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> TellerEnrollResponse:
+    """Re-fetch selectable accounts for an enrollment awaiting account choice.
+
+    Used after a page reload to restore the account picker when the
+    enrollment is in AWAITING_ACCOUNT but the client lost the list.
+    """
+    enrollment = await teller_repository.get_active_enrollment(db, user_id)
+    if enrollment is None or enrollment.status != TellerStatus.AWAITING_ACCOUNT:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "No enrollment awaiting account selection.",
+        )
+
+    access_token = decrypt_token(
+        enrollment.access_token_encrypted, settings.teller_encryption_key
+    )
+    cert_path: str = request.app.state.teller_cert_path
+    key_path: str = request.app.state.teller_key_path
+
+    eligible = await _fetch_eligible_accounts(
+        enrollment.id, cert_path, key_path, access_token, db
+    )
+
+    return TellerEnrollResponse(
+        status=TellerStatus.AWAITING_ACCOUNT,
+        institution_name=enrollment.institution_name,
+        accounts=[
+            TellerAccountOption(
+                id=a.id,
+                name=a.name,
+                type=a.type,
+                subtype=a.subtype,
+                currency=a.currency,
+                institution_name=a.institution.name,
+            )
+            for a in eligible
+        ],
+    )
 
 
 @router.post("/select-account")
@@ -204,26 +352,9 @@ async def select_account(
     cert_path: str = request.app.state.teller_cert_path
     key_path: str = request.app.state.teller_key_path
 
-    try:
-        async with build_teller_client(cert_path, key_path, access_token) as client:
-            accounts = await fetch_accounts(client)
-    except TellerApiError as exc:
-        logger.error(
-            "Failed to verify account selection for enrollment %s: %s",
-            enrollment.id,
-            exc.detail,
-        )
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            "Could not verify account with your bank. Please try again.",
-        ) from exc
-
-    selected = next((a for a in accounts if a.id == body.account_id), None)
-    if selected is None:
-        raise HTTPException(
-            status.HTTP_404_NOT_FOUND,
-            "Selected account not found. It may have been closed.",
-        )
+    selected = await _verify_account_selection(
+        enrollment.id, body.account_id, cert_path, key_path, access_token
+    )
 
     transitioned = await teller_repository.transition_status(
         db, enrollment.id, TellerStatus.AWAITING_ACCOUNT, TellerStatus.SYNCING
@@ -243,23 +374,15 @@ async def select_account(
     )
     await db.commit()
 
-    factory: async_sessionmaker[AsyncSession] = request.app.state.db_session_factory
-    ctx = _SyncContext(
-        factory=factory,
-        enrollment_id=enrollment.id,
-        teller_enrollment_id=enrollment.enrollment_id,
+    _launch_initial_sync(
+        request=request,
+        enrollment=enrollment,
         access_token=access_token,
         cert_path=cert_path,
         key_path=key_path,
         user_id=user_id,
-        account_id=selected.id,
-        account_name=selected.name,
-        account_currency=selected.currency,
+        selected=selected,
     )
-    task = asyncio.create_task(_initial_sync(ctx))
-    sync_tasks: dict[int, asyncio.Task[None]] = request.app.state.teller_sync_tasks
-    sync_tasks[enrollment.id] = task
-    task.add_done_callback(lambda _: sync_tasks.pop(enrollment.id, None))
 
     return TellerStatusResponse(
         is_connected=True,
@@ -268,11 +391,6 @@ async def select_account(
         last_synced_at=None,
         status=TellerStatus.SYNCING,
     )
-
-
-# ---------------------------------------------------------------------------
-# GET /teller/status
-# ---------------------------------------------------------------------------
 
 
 @router.get("/status")
@@ -298,11 +416,6 @@ async def get_status(
         last_synced_at=enrollment.last_synced_at,
         status=enrollment.status,
     )
-
-
-# ---------------------------------------------------------------------------
-# DELETE /teller/disconnect
-# ---------------------------------------------------------------------------
 
 
 @router.delete("/disconnect", status_code=status.HTTP_204_NO_CONTENT)
@@ -343,11 +456,6 @@ async def disconnect(
     await db.commit()
 
 
-# ---------------------------------------------------------------------------
-# POST /teller/webhook
-# ---------------------------------------------------------------------------
-
-
 @router.post("/webhook")
 async def webhook(
     request: Request,
@@ -365,7 +473,7 @@ async def webhook(
 
     try:
         payload = await request.json()
-    except Exception:
+    except ValueError:
         logger.warning("Webhook received malformed JSON payload")
         return {"status": "ok"}
 
@@ -373,22 +481,22 @@ async def webhook(
 
     factory: async_sessionmaker[AsyncSession] = request.app.state.db_session_factory
 
-    async with factory() as db:
-        if event_type == "enrollment.disconnected":
-            await _handle_enrollment_disconnected(db, payload)
-        elif event_type == "transactions.processed":
-            await _handle_transactions_processed(db, payload, settings)
-        else:
-            logger.info("Ignoring unknown Teller webhook event: %s", event_type)
+    try:
+        async with factory() as db:
+            if event_type == "enrollment.disconnected":
+                await _handle_enrollment_disconnected(db, payload)
+            elif event_type == "transactions.processed":
+                await _handle_transactions_processed(db, payload, settings)
+            else:
+                logger.info("Ignoring unknown Teller webhook event: %s", event_type)
 
-        await db.commit()
+            await db.commit()
+    except CurrencyConversionError:
+        logger.exception("FX conversion failed during webhook %s — event acknowledged", event_type)
+    except Exception:
+        logger.exception("Error processing webhook event %s — event acknowledged", event_type)
 
     return {"status": "ok"}
-
-
-# ---------------------------------------------------------------------------
-# Webhook event handlers
-# ---------------------------------------------------------------------------
 
 
 async def _handle_enrollment_disconnected(
@@ -439,41 +547,59 @@ async def _handle_transactions_processed(
     user_currency = await get_user_account_currency(enrollment.user_id, db)
 
     for txn in transactions:
-        teller_txn_id = txn.get("id", "")
-        if not teller_txn_id:
-            logger.warning("Skipping transaction with empty id in webhook")
-            continue
-
-        raw_amount = txn.get("amount", "0")
-        try:
-            # Teller: negative = debit. Our DB: positive = money spent.
-            amount = abs(Decimal(raw_amount).quantize(Decimal("0.01")))
-        except (InvalidOperation, ValueError):
-            logger.warning("Skipping transaction with invalid amount: %s", raw_amount)
-            continue
-
-        amount = await convert_amount(amount, teller_currency, user_currency)
-
-        date_str = txn.get("date", "")
-        try:
-            purchase_date = datetime.fromisoformat(date_str).replace(tzinfo=UTC)
-        except (ValueError, TypeError):
-            purchase_date = datetime.now(UTC)
-
-        await transaction_repository.create_from_teller(
+        await _ingest_transaction(
             db,
             user_id=enrollment.user_id,
-            amount=amount,
-            purchase_date=purchase_date,
-            teller_transaction_id=teller_txn_id,
-            merchant=txn.get("description"),
-            category=txn.get("category"),
+            txn_data=txn,
+            teller_currency=teller_currency,
+            user_currency=user_currency,
         )
 
 
-# ---------------------------------------------------------------------------
-# Background initial sync
-# ---------------------------------------------------------------------------
+async def _ingest_transaction(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    txn_data: dict,
+    teller_currency: str,
+    user_currency: str,
+    fallback_date: datetime | None = None,
+) -> None:
+    """Parse and store a single Teller transaction.
+
+    Used by both the initial sync and webhook handler to avoid duplicating
+    amount parsing, currency conversion, and date handling logic.
+    """
+    teller_txn_id = txn_data.get("id", "")
+    if not teller_txn_id:
+        logger.warning("Skipping transaction with empty id")
+        return
+
+    raw_amount = txn_data.get("amount", "0")
+    try:
+        # Teller: negative = debit.  Our DB: positive = money spent.
+        amount = abs(Decimal(raw_amount).quantize(Decimal("0.01")))
+    except (InvalidOperation, ValueError):
+        logger.warning("Skipping transaction with invalid amount: %s", raw_amount)
+        return
+
+    amount = await convert_amount(amount, teller_currency, user_currency)
+
+    date_str = txn_data.get("date", "")
+    try:
+        purchase_date = datetime.fromisoformat(date_str).replace(tzinfo=UTC)
+    except (ValueError, TypeError):
+        purchase_date = fallback_date or datetime.now(UTC)
+
+    await transaction_repository.create_from_teller(
+        db,
+        user_id=user_id,
+        amount=amount,
+        purchase_date=purchase_date,
+        teller_transaction_id=teller_txn_id,
+        merchant=txn_data.get("description"),
+        category=txn_data.get("category"),
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -511,62 +637,7 @@ async def _initial_sync(ctx: _SyncContext) -> None:
 
             teller_transactions = await fetch_transactions(client, ctx.account_id)
 
-        # All Teller API work is done. Write balance + transactions atomically.
-        async with ctx.factory() as db:
-            user_currency = await get_user_account_currency(ctx.user_id, db)
-
-            converted_balance = await convert_amount(
-                raw_balance, ctx.account_currency, user_currency
-            )
-
-            await balance_repository.create_from_teller(
-                db,
-                user_id=ctx.user_id,
-                balance=converted_balance,
-                observed_at=now,
-                account_label=ctx.account_name,
-            )
-
-            for txn in teller_transactions:
-                try:
-                    amount = abs(Decimal(txn.amount).quantize(Decimal("0.01")))
-                except (InvalidOperation, ValueError):
-                    continue
-
-                amount = await convert_amount(amount, ctx.account_currency, user_currency)
-
-                try:
-                    purchase_date = datetime.fromisoformat(txn.date).replace(
-                        tzinfo=UTC
-                    )
-                except (ValueError, TypeError):
-                    purchase_date = now
-
-                await transaction_repository.create_from_teller(
-                    db,
-                    user_id=ctx.user_id,
-                    amount=amount,
-                    purchase_date=purchase_date,
-                    teller_transaction_id=txn.id,
-                    merchant=txn.description,
-                    category=txn.category,
-                )
-            await db.commit()
-
-        async with ctx.factory() as db:
-            activated = await teller_repository.transition_status(
-                db, ctx.enrollment_id, TellerStatus.SYNCING, TellerStatus.ACTIVE
-            )
-            if activated:
-                await teller_repository.update_last_synced(db, ctx.enrollment_id)
-            else:
-                logger.info(
-                    "Enrollment %s status changed during sync (likely disconnected), "
-                    "skipping activation",
-                    ctx.teller_enrollment_id,
-                )
-            await db.commit()
-
+        await _persist_sync_data(ctx, raw_balance, teller_transactions, now)
         logger.info("Initial Teller sync complete for enrollment %s", ctx.teller_enrollment_id)
 
     except asyncio.CancelledError:
@@ -599,3 +670,59 @@ async def _initial_sync(ctx: _SyncContext) -> None:
                 db, ctx.enrollment_id, TellerStatus.SYNCING, TellerStatus.ERROR
             )
             await db.commit()
+
+
+async def _persist_sync_data(
+    ctx: _SyncContext,
+    raw_balance: Decimal,
+    teller_transactions: list,
+    observed_at: datetime,
+) -> None:
+    """Write balance, transactions, and status transition in one atomic commit.
+
+    Keeps the DB work isolated from the Teller API calls so that a crash
+    cannot strand the enrollment in 'syncing'.
+    """
+    async with ctx.factory() as db:
+        user_currency = await get_user_account_currency(ctx.user_id, db)
+
+        converted_balance = await convert_amount(
+            raw_balance, ctx.account_currency, user_currency
+        )
+
+        await balance_repository.create_from_teller(
+            db,
+            user_id=ctx.user_id,
+            balance=converted_balance,
+            observed_at=observed_at,
+            account_label=ctx.account_name,
+        )
+
+        for txn in teller_transactions:
+            await _ingest_transaction(
+                db,
+                user_id=ctx.user_id,
+                txn_data={
+                    "id": txn.id,
+                    "amount": txn.amount,
+                    "date": txn.date,
+                    "description": txn.description,
+                    "category": txn.category,
+                },
+                teller_currency=ctx.account_currency,
+                user_currency=user_currency,
+                fallback_date=observed_at,
+            )
+
+        activated = await teller_repository.transition_status(
+            db, ctx.enrollment_id, TellerStatus.SYNCING, TellerStatus.ACTIVE
+        )
+        if activated:
+            await teller_repository.update_last_synced(db, ctx.enrollment_id)
+        else:
+            logger.info(
+                "Enrollment %s status changed during sync (likely disconnected), "
+                "skipping activation",
+                ctx.teller_enrollment_id,
+            )
+        await db.commit()

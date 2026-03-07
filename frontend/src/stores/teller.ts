@@ -4,6 +4,7 @@ import {
   enrollTeller,
   selectTellerAccount,
   getTellerStatus,
+  getTellerAccounts,
   disconnectTeller,
 } from '@/api/teller'
 import type {
@@ -50,8 +51,27 @@ export const useTellerStore = defineStore('teller', () => {
       const res = await getTellerStatus()
       applyStatus(res.is_connected, res.institution_name, res.account_name, res.last_synced_at, res.status)
       error.value = null
+
+      // Restore the account picker after a page reload.
+      if (res.status === 'awaiting_account' && pendingAccounts.value.length === 0) {
+        await resumeAccountSelection()
+      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch status'
+    }
+  }
+
+  /**
+   * Re-fetch selectable accounts for an enrollment stuck in awaiting_account.
+   * Called automatically by fetchStatus() after a page reload.
+   */
+  async function resumeAccountSelection() {
+    try {
+      const res = await getTellerAccounts()
+      institutionName.value = res.institution_name
+      pendingAccounts.value = res.accounts
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to restore account list'
     }
   }
 

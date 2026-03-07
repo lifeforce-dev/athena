@@ -102,6 +102,21 @@ async def get_all_active(db: AsyncSession) -> list[TellerEnrollment]:
     return list(result.scalars().all())
 
 
+async def reconcile_stale_syncing(db: AsyncSession) -> int:
+    """Transition any SYNCING enrollments to ERROR.
+
+    Called at startup to recover enrollments stranded by a process crash
+    between the commit that set SYNCING and the background task completing.
+    Returns the number of rows affected.
+    """
+    result: CursorResult = await db.execute(  # type: ignore[assignment]
+        update(TellerEnrollment)
+        .where(TellerEnrollment.status == TellerStatus.SYNCING)
+        .values(status=TellerStatus.ERROR, updated_at=datetime.now(UTC))
+    )
+    return result.rowcount
+
+
 async def update_status(
     db: AsyncSession,
     enrollment_id: int,
