@@ -62,6 +62,9 @@ export function useDashboard() {
   /** Current balance from projection. */
   const currentBalance = computed(() => projection.currentBalance.value)
 
+  /** Whether the user has a real balance (from bank or manual entry). */
+  const hasInitialBalance = computed(() => projection.hasInitialBalance.value)
+
   /** End balance (last trajectory point). */
   const endBalance = computed(() => {
     const points = trajectory.value
@@ -86,6 +89,7 @@ export function useDashboard() {
     trajectory,
     lowestPoint,
     currentBalance,
+    hasInitialBalance,
     endBalance,
     netChange,
     daysCovered,
