@@ -188,25 +188,45 @@ async def delete_enrollment(
 
 def verify_webhook_signature(
     payload: bytes,
-    signature: str,
+    signature_header: str,
     secret: str,
 ) -> bool:
     """Verify a Teller webhook HMAC-SHA256 signature.
 
+    Teller sends signatures in the format ``t=<timestamp>,v1=<hmac>``.
+    The HMAC is computed over ``{timestamp}.{body}``.
+
     Args:
         payload: Raw request body bytes.
-        signature: Value of the X-Teller-Signature header.
+        signature_header: Value of the ``teller-signature`` header.
         secret: ATHENA_TELLER_WEBHOOK_SECRET from settings.
 
     Returns:
         True if the computed HMAC matches the provided signature.
     """
+    if not signature_header:
+        return False
+
+    # Parse "t=<timestamp>,v1=<hex>" into parts.
+    parts: dict[str, str] = {}
+    for segment in signature_header.split(","):
+        if "=" in segment:
+            key, value = segment.split("=", 1)
+            parts[key.strip()] = value.strip()
+
+    timestamp = parts.get("t", "")
+    their_hmac = parts.get("v1", "")
+    if not timestamp or not their_hmac:
+        return False
+
+    # Teller signs "{timestamp}.{body}".
+    signed_payload = f"{timestamp}.".encode() + payload
     expected = hmac.new(
         secret.encode(),
-        payload,
+        signed_payload,
         hashlib.sha256,
     ).hexdigest()
-    return hmac.compare_digest(expected, signature)
+    return hmac.compare_digest(expected, their_hmac)
 
 
 # ---------------------------------------------------------------------------
