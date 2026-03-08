@@ -6,6 +6,7 @@ import { demoTourActive } from '@/stores/demoTour'
 import { fetchScenarioProjection, type ScenarioRequest } from '@/api/projection'
 import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString, parseLocalDate, parseMoney, getDateLocale } from '@/utils/format'
+import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import type { ParsedLedgerEntry } from '@/types/projection'
 
 export interface ScenarioOverride {
@@ -219,10 +220,8 @@ export function useScenario() {
     return points.length ? points[points.length - 1].balance : 0
   })
 
-  const lowestPoint = computed(() => {
-    if (!trajectory.value.length) return null
-    return trajectory.value.reduce((min, pt) => (pt.balance < min.balance ? pt : min))
-  })
+  // Use expenses-before-income walk for the true intra-day lowest point.
+  const { trueLowestPoint: lowestPoint } = useExpenseAnalysis(trajectory, currentBalance)
 
   const avgGainedPerMonth = computed(() => {
     const net = afterBalance.value - currentBalance.value

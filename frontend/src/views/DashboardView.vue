@@ -6,8 +6,9 @@
         :current-balance="currentBalance"
         :end-balance="endBalance"
         :net-change="netChange"
-        :lowest-balance="lowestPoint?.balance ?? 0"
-        :lowest-date="lowestPoint?.date ?? ''"
+        :lowest-balance="trueLowestBalance"
+        :lowest-date="trueLowestDate"
+        :total-outflows="totalOutflows"
         :days-covered="daysCovered"
         :balance-only="hasInitialBalance && !trajectory.length"
         @update-balance="onUpdateBalance"
@@ -143,7 +144,13 @@ const {
   masterColorMap,
   billsAnalysis,
   shortfall,
+  trueLowestPoint,
+  totalOutflows,
 } = useExpenseAnalysis(trajectory, currentBalance)
+
+/** True lowest balance using expenses-before-income ordering. */
+const trueLowestBalance = computed(() => trueLowestPoint.value?.balance ?? 0)
+const trueLowestDate = computed(() => trueLowestPoint.value?.date ?? '')
 
 const nextWeekLabel = computed(() => {
   const start = billsAnalysis.value.nextWeekStart

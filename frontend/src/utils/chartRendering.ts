@@ -130,7 +130,8 @@ export function buildLayout(
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
   const { red: redThreshold, yellow: yellowThreshold } = computeThresholds(slice)
-  const minValue = 0
+  const rawMin = Math.min(...slice.map(point => point.balance))
+  const minValue = rawMin < 0 ? rawMin * 1.15 : 0
   const maxValue = Math.max(Math.max(...slice.map(point => point.balance)), yellowThreshold) * 1.1
   const xPos = (index: number) =>
     padding.left + (index / Math.max(slice.length - 1, 1)) * chartWidth
@@ -257,9 +258,9 @@ export function drawTrajectoryFill(layout: ChartLayout): void {
   zoneFill(yYellow, yRed, 'rgba(251,191,36,.06)')
 }
 
-/** Dashed threshold lines for red and yellow zones. */
+/** Dashed threshold lines for red and yellow zones, plus a $0 baseline when the chart goes negative. */
 export function drawThresholdLines(layout: ChartLayout): void {
-  const { ctx, padding, chartWidth, yRed, yYellow, redThreshold, yellowThreshold, minValue, maxValue } = layout
+  const { ctx, padding, chartWidth, yRed, yYellow, yPos, redThreshold, yellowThreshold, minValue, maxValue } = layout
 
   ctx.setLineDash([4, 6])
   if (redThreshold > minValue && redThreshold < maxValue) {
@@ -272,6 +273,16 @@ export function drawThresholdLines(layout: ChartLayout): void {
     ctx.lineWidth = 1
     ctx.beginPath(); ctx.moveTo(padding.left, yYellow); ctx.lineTo(padding.left + chartWidth, yYellow); ctx.stroke()
   }
+
+  // Draw a solid $0 baseline when the chart extends into negative territory.
+  if (minValue < 0) {
+    ctx.setLineDash([])
+    ctx.strokeStyle = 'rgba(248,113,113,.45)'
+    ctx.lineWidth = 1
+    const yZero = yPos(0)
+    ctx.beginPath(); ctx.moveTo(padding.left, yZero); ctx.lineTo(padding.left + chartWidth, yZero); ctx.stroke()
+  }
+
   ctx.setLineDash([])
 }
 
