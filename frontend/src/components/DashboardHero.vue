@@ -3,8 +3,17 @@
     <!-- Balance headline -->
     <div class="hero-top" data-tour="balance" @click="startEdit">
       <template v-if="!editing">
-        <div class="hero-balance">{{ formatDollars(currentBalance) }}</div>
-        <div class="hero-bal-lbl">{{ t('hero.current_balance') }}</div>
+        <div class="hero-balance">{{ formatDollars(displayBalance) }}</div>
+        <div class="hero-bal-lbl">
+          {{ t('hero.current_balance') }}
+          <CooldownButton
+            v-if="teller.isConnected"
+            :remaining="teller.cooldownRemaining"
+            :total="teller.cooldownSeconds"
+            :refreshing="teller.refreshing"
+            @refresh="onRefresh"
+          />
+        </div>
       </template>
       <template v-else>
         <input
@@ -61,9 +70,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { parseLocalDate, formatDollars, toDisplayCurrency, getDateLocale } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
+import { useTellerStore } from '@/stores/teller'
+import CooldownButton from './CooldownButton.vue'
 
 const props = defineProps<{
   currentBalance: number
@@ -77,13 +88,60 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   updateBalance: [balance: number]
+  /** Emitted after a successful Teller refresh so parent can re-project. */
+  refreshed: []
 }>()
 
 const { t } = useI18n()
+const teller = useTellerStore()
 
 const editing = ref(false)
 const editValue = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)
+
+// ── Animated balance display ──────────────────────────────────────────
+const displayBalance = ref(props.currentBalance)
+let animFrame: ReturnType<typeof requestAnimationFrame> | null = null
+
+function animateBalance(from: number, to: number) {
+  if (animFrame) cancelAnimationFrame(animFrame)
+  const duration = 600 // ms
+  const start = performance.now()
+
+  function tick(now: number) {
+    const elapsed = now - start
+    const progress = Math.min(elapsed / duration, 1)
+    // Ease-out cubic for a satisfying deceleration.
+    const eased = 1 - Math.pow(1 - progress, 3)
+    displayBalance.value = from + (to - from) * eased
+    if (progress < 1) {
+      animFrame = requestAnimationFrame(tick)
+    } else {
+      displayBalance.value = to
+      animFrame = null
+    }
+  }
+
+  animFrame = requestAnimationFrame(tick)
+}
+
+watch(() => props.currentBalance, (newVal, oldVal) => {
+  if (oldVal !== undefined && newVal !== oldVal) {
+    animateBalance(oldVal, newVal)
+  } else {
+    displayBalance.value = newVal
+  }
+})
+
+async function onRefresh() {
+  const newBalance = await teller.doRefreshBalance()
+  if (newBalance !== null) {
+    // Animate from current display to new value immediately.
+    animateBalance(displayBalance.value, newBalance)
+    // Tell parent to re-fetch projection (which will also update currentBalance prop).
+    emit('refreshed')
+  }
+}
 
 function startEdit() {
   if (editing.value) return
@@ -206,6 +264,9 @@ const gaugePct = computed(() => {
   text-transform: uppercase;
   letter-spacing: 0.12em;
   margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .hero-input {

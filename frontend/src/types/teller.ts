@@ -50,7 +50,15 @@ export interface TellerStatusResponse {
   institution_name: string | null
   account_name: string | null
   last_synced_at: string | null
+  last_manual_refresh_at: string | null
   status: TellerStatusValue
+}
+
+/** Response from POST /api/teller/refresh-balance. */
+export interface RefreshBalanceResponse {
+  balance: string
+  cooldown_started_at: string
+  cooldown_seconds: number
 }
 
 /** Response from GET /api/teller/nonce. */

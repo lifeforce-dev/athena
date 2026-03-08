@@ -11,6 +11,7 @@
         :days-covered="daysCovered"
         :balance-only="hasInitialBalance && !trajectory.length"
         @update-balance="onUpdateBalance"
+        @refreshed="refresh"
       />
 
         <div class="sh" data-tour="bills" style="margin-top: 20px">

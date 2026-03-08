@@ -192,3 +192,16 @@ async def mark_disconnected(
 ) -> None:
     """Mark an enrollment as disconnected (token revoked or user action)."""
     await update_status(db, enrollment_id, TellerStatus.DISCONNECTED)
+
+
+async def update_last_manual_refresh(
+    db: AsyncSession,
+    enrollment_id: int,
+) -> None:
+    """Stamp the last_manual_refresh_at timestamp after a user-triggered refresh."""
+    now = datetime.now(UTC)
+    await db.execute(
+        update(TellerEnrollment)
+        .where(TellerEnrollment.id == enrollment_id)
+        .values(last_manual_refresh_at=now, updated_at=now)
+    )

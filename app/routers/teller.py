@@ -23,6 +23,7 @@ from app.dependencies import get_current_user_id
 from app.models.orm import TellerEnrollment
 from app.models.teller_constants import TellerStatus
 from app.models.teller_schemas import (
+    RefreshBalanceResponse,
     TellerAccount,
     TellerAccountOption,
     TellerEnrollRequest,
@@ -406,6 +407,7 @@ async def get_status(
             institution_name=None,
             account_name=None,
             last_synced_at=None,
+            last_manual_refresh_at=None,
             status=TellerStatus.DISCONNECTED,
         )
 
@@ -414,7 +416,111 @@ async def get_status(
         institution_name=enrollment.institution_name,
         account_name=enrollment.account_name,
         last_synced_at=enrollment.last_synced_at,
+        last_manual_refresh_at=enrollment.last_manual_refresh_at,
         status=enrollment.status,
+    )
+
+
+# ── Manual balance refresh ────────────────────────────────────────────
+
+MANUAL_REFRESH_COOLDOWN_SECONDS = 3600  # 1 hour
+
+
+def _enforce_cooldown(enrollment: TellerEnrollment) -> None:
+    """Raise 429 if the manual refresh cooldown has not elapsed."""
+    if enrollment.last_manual_refresh_at is None:
+        return
+    elapsed = (datetime.now(UTC) - enrollment.last_manual_refresh_at).total_seconds()
+    if elapsed >= MANUAL_REFRESH_COOLDOWN_SECONDS:
+        return
+    raise HTTPException(
+        status.HTTP_429_TOO_MANY_REQUESTS,
+        detail={
+            "message": "Refresh on cooldown",
+            "cooldown_started_at": enrollment.last_manual_refresh_at.isoformat(),
+            "cooldown_seconds": MANUAL_REFRESH_COOLDOWN_SECONDS,
+        },
+    )
+
+
+async def _fetch_and_store_balance(
+    enrollment: TellerEnrollment,
+    user_id: int,
+    db: AsyncSession,
+    cert_path: str,
+    key_path: str,
+    settings: Settings,
+) -> Decimal:
+    """Call Teller API for the latest balance, convert, and persist a snapshot.
+
+    Returns the converted balance. Marks the enrollment disconnected if
+    the token has been revoked.
+    """
+    token = decrypt_token(
+        enrollment.access_token_encrypted, settings.teller_encryption_key
+    )
+
+    try:
+        async with build_teller_client(cert_path, key_path, token) as client:
+            balance_data = await fetch_balances(client, enrollment.account_id)  # type: ignore[arg-type]
+    except TellerApiError as exc:
+        if exc.status_code in (401, 403):
+            await teller_repository.mark_disconnected(db, enrollment.id)
+            await db.commit()
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Bank connection expired — please reconnect")
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Teller API error: {exc.detail}")
+
+    try:
+        raw_balance = Decimal(balance_data.available).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        raw_balance = Decimal("0.00")
+
+    try:
+        user_currency = await get_user_account_currency(user_id, db)
+        converted = await convert_amount(raw_balance, enrollment.account_currency, user_currency)
+    except CurrencyConversionError:
+        converted = raw_balance
+
+    now = datetime.now(UTC)
+    await balance_repository.create_from_teller(
+        db, user_id=user_id, balance=converted, observed_at=now, account_label=enrollment.account_name,
+    )
+    await teller_repository.update_last_synced(db, enrollment.id)
+    return converted
+
+
+@router.post("/refresh-balance", response_model=RefreshBalanceResponse)
+async def refresh_balance(
+    user_id: Annotated[int, Depends(get_current_user_id)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> RefreshBalanceResponse:
+    """Manually refresh the balance from the user's connected bank account.
+
+    Enforces a server-side cooldown of 1 hour. Returns the new balance
+    and the cooldown start timestamp so the client can render a
+    real-time countdown.
+    """
+    enrollment = await teller_repository.get_active_enrollment(db, user_id)
+    if enrollment is None or enrollment.status != TellerStatus.ACTIVE:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No active bank connection")
+
+    _enforce_cooldown(enrollment)
+
+    cert_path: str = request.app.state.teller_cert_path
+    key_path: str = request.app.state.teller_key_path
+    converted_balance = await _fetch_and_store_balance(
+        enrollment, user_id, db, cert_path, key_path, settings,
+    )
+
+    await teller_repository.update_last_manual_refresh(db, enrollment.id)
+    await db.commit()
+
+    return RefreshBalanceResponse(
+        balance=str(converted_balance),
+        cooldown_started_at=datetime.now(UTC).isoformat(),
+        cooldown_seconds=MANUAL_REFRESH_COOLDOWN_SECONDS,
     )
 
 

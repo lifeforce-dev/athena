@@ -46,6 +46,9 @@ const ko_KR: Record<string, string> = {
   'hero.after_window': '기간 후',
   'hero.lowest_point': '최저점',
   'hero.net_change': '순 변동',
+  'hero.refresh_balance': '은행에서 잔액 새로고침',
+  'hero.refresh_loading': '새로고침 중…',
+  'hero.refresh_cooldown': '다음 새로고침까지 {minutes, plural, other {#분}}',
 
   // ══════════════════════════════════════════════════════════════════════
   // Bills This Week panel

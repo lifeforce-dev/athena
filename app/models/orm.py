@@ -170,6 +170,7 @@ class TellerEnrollment(Base):
     )
 
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_manual_refresh_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

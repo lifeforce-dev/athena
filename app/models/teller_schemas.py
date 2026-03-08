@@ -71,7 +71,16 @@ class TellerStatusResponse(BaseModel):
     institution_name: str | None = None
     account_name: str | None = None
     last_synced_at: datetime | None = None
+    last_manual_refresh_at: datetime | None = None
     status: str  # TellerStatus value
+
+
+class RefreshBalanceResponse(BaseModel):
+    """Returned by POST /teller/refresh-balance after a manual balance refresh."""
+
+    balance: str
+    cooldown_started_at: str  # ISO-8601 UTC timestamp
+    cooldown_seconds: int
 
 
 # ---------------------------------------------------------------------------

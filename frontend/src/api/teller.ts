@@ -5,6 +5,7 @@ import type {
   TellerNonceResponse,
   TellerSelectAccountRequest,
   TellerStatusResponse,
+  RefreshBalanceResponse,
 } from '@/types/teller'
 
 export function getTellerNonce() {
@@ -29,4 +30,8 @@ export function getTellerStatus() {
 
 export function disconnectTeller() {
   return api.del('/teller/disconnect')
+}
+
+export function refreshBalance() {
+  return api.post<RefreshBalanceResponse>('/teller/refresh-balance', {})
 }

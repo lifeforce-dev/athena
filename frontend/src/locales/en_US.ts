@@ -131,6 +131,18 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'Net Change',
     context: 'Label for the stat showing the total gain or loss over the projection window.',
   },
+  'hero.refresh_balance': {
+    text: 'Refresh balance from bank',
+    context: 'Tooltip text on the manual refresh button next to Current Balance when the cooldown is not active.',
+  },
+  'hero.refresh_loading': {
+    text: 'Refreshing…',
+    context: 'Tooltip text shown while the manual balance refresh API call is in flight.',
+  },
+  'hero.refresh_cooldown': {
+    text: '{minutes, plural, one {# minute} other {# minutes}} until next refresh',
+    context: 'Tooltip text on the refresh button when the 1-hour cooldown is active. {minutes} is the minutes remaining.',
+  },
 
   // ══════════════════════════════════════════════════════════════════════
   // Bills This Week panel
