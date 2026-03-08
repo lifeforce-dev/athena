@@ -123,10 +123,10 @@ const tooltipText = computed(() => {
   z-index: 3;
   background: conic-gradient(
     from 0deg,
-    transparent 0deg,
-    transparent calc(360deg - var(--cd-angle)),
-    rgba(0, 0, 0, 0.65) calc(360deg - var(--cd-angle)),
-    rgba(0, 0, 0, 0.65) 360deg
+    rgba(52, 211, 153, 0.08) 0deg,
+    rgba(52, 211, 153, 0.08) calc(360deg - var(--cd-angle)),
+    rgba(0, 0, 0, 0.82) calc(360deg - var(--cd-angle)),
+    rgba(0, 0, 0, 0.82) 360deg
   );
   pointer-events: none;
 }
