@@ -572,13 +572,7 @@ async def webhook(
     Always returns 200 to prevent Teller retry storms.
     """
     raw_body = await request.body()
-    signature = request.headers.get("x-teller-signature", "")
-
-    # Temporary debug: log all teller-related headers and signature details.
-    teller_headers = {k: v for k, v in request.headers.items() if "teller" in k.lower() or "signature" in k.lower()}
-    logger.info("Webhook headers (teller/signature): %s", teller_headers)
-    logger.info("Webhook signature from header: %r", signature)
-    logger.info("Webhook body length: %d", len(raw_body))
+    signature = request.headers.get("teller-signature", "")
 
     if not verify_webhook_signature(raw_body, signature, settings.teller_webhook_secret):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid webhook signature")
