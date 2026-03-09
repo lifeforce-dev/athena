@@ -57,7 +57,7 @@
         <div class="stat-lbl">{{ t('hero.after_window') }}</div>
       </div>
       <div class="stat-cell">
-        <div class="stat-val" style="color: var(--danger)">{{ formatDollars(lowestBalance) }}</div>
+        <div class="stat-val" style="color: var(--danger)">{{ lowestLabel }}</div>
         <div class="stat-lbl">{{ t('hero.lowest_point') }}</div>
         <div class="stat-sub">{{ lowestDate }}</div>
       </div>
@@ -200,6 +200,13 @@ const netColor = computed(() =>
 const netLabel = computed(() => {
   const sign = props.netChange >= 0 ? '+' : '-'
   return `${sign}${formatDollars(props.netChange)}`
+})
+
+/** Lowest balance displayed with sign (formatDollars always abs()). */
+const lowestLabel = computed(() => {
+  const lb = props.lowestBalance
+  if (lb < 0) return '-' + formatDollars(lb)
+  return formatDollars(lb)
 })
 
 const lowestDate = computed(() => {

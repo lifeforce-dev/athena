@@ -411,7 +411,8 @@ export function drawLowestPoint(layout: ChartLayout): void {
   ctx.fillStyle = '#F87171'; ctx.fill()
 
   // Pill background.
-  const lowText = formatDollars(slice[lowestIndex].balance)
+  const lowBalance = slice[lowestIndex].balance
+  const lowText = (lowBalance < 0 ? '-' : '') + formatDollars(lowBalance)
   ctx.font = '700 13px IBM Plex Mono'
   const lowTextWidth = ctx.measureText(lowText).width
   ctx.font = '600 9px Sora'

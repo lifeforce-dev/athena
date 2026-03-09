@@ -20,7 +20,7 @@
           </div>
           <div class="hs-card">
             <div class="hs-val" style="color: var(--danger)">
-              {{ lowestPoint ? formatDollars(lowestPoint.balance) : '-' }}
+              {{ lowestPoint ? (lowestPoint.balance < 0 ? '-' : '') + formatDollars(lowestPoint.balance) : '-' }}
             </div>
             <div v-if="lowestPoint" class="hs-sub">{{ shortDate(lowestPoint.date) }}</div>
             <div class="hs-lbl">{{ t('sim.lowest_point') }}</div>
