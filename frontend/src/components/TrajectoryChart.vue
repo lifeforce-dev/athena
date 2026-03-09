@@ -121,7 +121,7 @@ function draw(pulseElapsed?: number) {
   if (!canvas || !wrap || !props.data.length) return
 
   clampView()
-  const layout = buildLayout(canvas, wrap, props.data, viewStart, viewCount, props.backendLowestBalance)
+  const layout = buildLayout(canvas, wrap, props.data, viewStart, viewCount)
   if (!layout) return
 
   currentLayout = layout

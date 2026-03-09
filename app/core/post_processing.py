@@ -93,9 +93,9 @@ def process_ledger(
 
     result = tracker.result()
 
-    # Perform an expenses-before-income walk to find the true intra-day lowest
-    # and derive risk classification.  Bills often post before direct deposit,
-    # so this ordering exposes dips that end-of-day balances would mask.
+    # Compose risk analysis from single-responsibility pieces.
+    # lowest_balance/lowest_date = end-of-day minimum (matches chart line).
+    # risk_level/cushion_ratio = from conservative intra-day walk.
     risk = _analyze_risk(raw_ledger, initial_balance, names, window_start, window_end)
     result.lowest_balance = risk.lowest_balance
     result.lowest_date = risk.lowest_date
@@ -280,15 +280,47 @@ class _AccumulationTracker:
 
 
 # ---------------------------------------------------------------------------
-# Risk analysis — expenses-before-income walk
+# Risk analysis — composable pieces
+#
+# Each function answers ONE question about the projection.  They are
+# composed by ``_analyze_risk`` which the rest of the codebase calls.
 # ---------------------------------------------------------------------------
+
+from collections import defaultdict
+
+
+@dataclass
+class _FlowTotals:
+    """Absolute sums of money in and money out."""
+
+    total_outflows: Decimal
+    total_inflows: Decimal
+
+
+@dataclass
+class _EodLowest:
+    """End-of-day lowest balance — the minimum visible on the chart line."""
+
+    balance: Decimal
+    day: date | None
+
+
+@dataclass
+class _IntradayRisk:
+    """Expenses-before-income worst-case assessment for risk classification."""
+
+    goes_negative: bool
+    negative_date: date | None
+    negative_balance: Decimal | None
+    # The intra-day low used for cushion calculation (NOT displayed to user).
+    intraday_lowest: Decimal
 
 
 @dataclass
 class _RiskAnalysis:
-    """Result of the expenses-before-income risk walk."""
+    """Composite result — assembled from the pieces above."""
 
-    lowest_balance: Decimal
+    lowest_balance: Decimal       # End-of-day lowest (matches chart line).
     lowest_date: date | None
     risk_level: str
     cushion_ratio: Decimal
@@ -302,6 +334,127 @@ class _RiskAnalysis:
     lowest_ratio: Decimal
 
 
+# ── Piece 1: aggregate flows ───────────────────────────────────────────────
+
+def _sum_flows(
+    by_date: dict[date, list[tuple[str, Decimal]]],
+) -> _FlowTotals:
+    """Sum absolute outflows and inflows across all dates.
+
+    Order-independent — just counts money in and money out.
+    """
+    total_outflows = Decimal(0)
+    total_inflows = Decimal(0)
+    for entries in by_date.values():
+        for _, delta in entries:
+            if delta < 0:
+                total_outflows -= delta  # Negate to get positive absolute.
+            else:
+                total_inflows += delta
+    return _FlowTotals(total_outflows=total_outflows, total_inflows=total_inflows)
+
+
+# ── Piece 2: end-of-day lowest ─────────────────────────────────────────────
+
+def _find_eod_lowest(
+    by_date: dict[date, list[tuple[str, Decimal]]],
+    initial_balance: Decimal,
+) -> _EodLowest:
+    """Walk all transactions per day (no special ordering) and find the
+    minimum end-of-day balance.
+
+    This is exactly what the chart trajectory line plots — after all
+    transactions on a given day are settled, what is the balance?
+    """
+    balance = initial_balance
+    lowest = balance
+    lowest_day: date | None = None
+
+    for day in sorted(by_date.keys()):
+        for _, delta in by_date[day]:
+            balance += delta
+        if balance < lowest:
+            lowest = balance
+            lowest_day = day
+
+    return _EodLowest(balance=lowest, day=lowest_day)
+
+
+# ── Piece 3: intra-day risk walk ───────────────────────────────────────────
+
+def _assess_intraday_risk(
+    by_date: dict[date, list[tuple[str, Decimal]]],
+    initial_balance: Decimal,
+) -> _IntradayRisk:
+    """Walk each day with expenses applied before income.
+
+    Banks typically post debits before credits.  This ordering surfaces
+    intra-day dips that end-of-day balances hide.  The resulting values
+    drive risk classification but are NOT shown as the user-facing
+    "lowest point" (that comes from ``_find_eod_lowest``).
+    """
+    balance = initial_balance
+    intraday_lowest = balance
+    goes_negative = False
+    negative_date: date | None = None
+    negative_balance: Decimal | None = None
+
+    for day in sorted(by_date.keys()):
+        entries = by_date[day]
+        expenses = [d for _, d in entries if d < 0]
+        income = [d for _, d in entries if d >= 0]
+
+        # Expenses first.
+        for delta in expenses:
+            balance += delta
+
+        # Check after expenses, before income.
+        if balance < intraday_lowest:
+            intraday_lowest = balance
+
+        if balance < 0 and not goes_negative:
+            goes_negative = True
+            negative_date = day
+            negative_balance = balance
+
+        # Then income.
+        for delta in income:
+            balance += delta
+
+    return _IntradayRisk(
+        goes_negative=goes_negative,
+        negative_date=negative_date,
+        negative_balance=negative_balance,
+        intraday_lowest=intraday_lowest,
+    )
+
+
+# ── Piece 4: classify + derive ─────────────────────────────────────────────
+
+def _classify_risk(
+    intraday_lowest: Decimal,
+    total_outflows: Decimal,
+    goes_negative: bool,
+) -> tuple[str, Decimal]:
+    """Return ``(risk_level, cushion_ratio)`` from the intra-day walk values.
+
+    Uses module-level ``CUSHION_CRITICAL_THRESHOLD`` and
+    ``CUSHION_TIGHT_THRESHOLD`` constants.
+    """
+    if goes_negative or intraday_lowest < 0:
+        return "critical", Decimal(0)
+    if total_outflows <= 0:
+        return "comfortable", Decimal(1)
+    cushion_ratio = intraday_lowest / total_outflows
+    if cushion_ratio < CUSHION_CRITICAL_THRESHOLD:
+        return "critical", cushion_ratio
+    if cushion_ratio < CUSHION_TIGHT_THRESHOLD:
+        return "tight", cushion_ratio
+    return "comfortable", cushion_ratio
+
+
+# ── Orchestrator ────────────────────────────────────────────────────────────
+
 def _analyze_risk(
     raw_ledger: list[tuple[date, str, Decimal]],
     initial_balance: Decimal,
@@ -309,31 +462,23 @@ def _analyze_risk(
     window_start: date,
     window_end: date,
 ) -> _RiskAnalysis:
-    """Walk the raw ledger with expenses-before-income ordering per day.
+    """Compose the single-responsibility pieces into a full risk analysis.
 
-    For each calendar day, outflows are applied first, then inflows.  This
-    mirrors how banks typically post debits before credits and exposes
-    intra-day balance dips that end-of-day balances would hide.
+    - ``lowest_balance`` / ``lowest_date`` — end-of-day minimum, matching
+      the chart trajectory line.
 
-    Metrics returned (the "tuning knobs"):
+    - ``risk_level`` / ``cushion_ratio`` — derived from the conservative
+      expenses-before-income intra-day walk.
 
-    - **cushion_ratio** — ``lowest_balance / total_outflows``.  How much
-      buffer remains relative to total obligations.  The primary risk
-      input.  Thresholds: see ``CUSHION_CRITICAL_THRESHOLD`` and
-      ``CUSHION_TIGHT_THRESHOLD`` at module level.
+    - ``goes_negative`` / ``negative_date`` / ``negative_balance`` —
+      intra-day negative detection (bank posts debits first).
 
-    - **lowest_ratio** — ``lowest_balance / initial_balance``.  Fraction
-      of current balance consumed at the worst point.  Useful as a
-      secondary "how scary is this dip" indicator.
+    - ``total_outflows`` / ``total_inflows`` — absolute flow sums.
 
-    - **drain_rate** — ``(total_outflows - total_inflows) / days``.  Avg
-      daily net burn.  Positive = spending exceeds income.
+    - ``drain_rate`` — average daily net burn.
 
-    - **days_until_negative** — calendar days from ``window_start`` to
-      the first negative balance.  ``None`` = never.
-
-    - **goes_negative** / **negative_date** / **negative_balance** —
-      boolean flag plus the details of the first negative moment.
+    - ``lowest_ratio`` — fraction of starting balance consumed at the
+      end-of-day worst point.
     """
     if not raw_ledger:
         return _RiskAnalysis(
@@ -351,98 +496,41 @@ def _analyze_risk(
             lowest_ratio=Decimal(1),
         )
 
-    # Group entries by date, then split into expenses and income.
-    from collections import defaultdict
-
+    # Group once, reuse across all pieces.
     by_date: dict[date, list[tuple[str, Decimal]]] = defaultdict(list)
     for occ_date, name, delta in raw_ledger:
         by_date[occ_date].append((name, delta))
 
-    balance = initial_balance
-    lowest_balance = balance
-    lowest_date: date | None = None
-    total_outflows = Decimal(0)
-    total_inflows = Decimal(0)
-    goes_negative = False
-    negative_date: date | None = None
-    negative_balance: Decimal | None = None
+    flows = _sum_flows(by_date)
+    eod = _find_eod_lowest(by_date, initial_balance)
+    intraday = _assess_intraday_risk(by_date, initial_balance)
+    risk_level, cushion_ratio = _classify_risk(
+        intraday.intraday_lowest, flows.total_outflows, intraday.goes_negative,
+    )
 
-    for day in sorted(by_date.keys()):
-        entries = by_date[day]
-        expenses = [(n, d) for n, d in entries if d < 0]
-        income = [(n, d) for n, d in entries if d >= 0]
-
-        # Apply expenses first.
-        for _, delta in expenses:
-            balance += delta
-            total_outflows -= delta  # delta is negative, so negate for absolute value.
-
-        # Check for lowest after expenses, before income.
-        if balance < lowest_balance:
-            lowest_balance = balance
-            lowest_date = day
-
-        if balance < 0 and not goes_negative:
-            goes_negative = True
-            negative_date = day
-            negative_balance = balance
-
-        # Then apply income.
-        for _, delta in income:
-            balance += delta
-            total_inflows += delta
-
-        # Also check after income (unlikely to be lower, but thorough).
-        if balance < lowest_balance:
-            lowest_balance = balance
-            lowest_date = day
-
-    # ── Derived metrics ──
-
-    # Days until the first negative balance.
+    # Derived metrics.
     days_until_negative: int | None = None
-    if goes_negative and negative_date is not None:
-        days_until_negative = (negative_date - window_start).days
+    if intraday.goes_negative and intraday.negative_date is not None:
+        days_until_negative = (intraday.negative_date - window_start).days
 
-    # Average daily net burn (positive = spending more than earning).
     window_days = max((window_end - window_start).days, 1)
-    drain_rate = (total_outflows - total_inflows) / window_days
+    drain_rate = (flows.total_outflows - flows.total_inflows) / window_days
 
-    # What fraction of the starting balance gets consumed at the worst point.
     if initial_balance > 0:
-        lowest_ratio = lowest_balance / initial_balance
+        lowest_ratio = eod.balance / initial_balance
     else:
-        lowest_ratio = Decimal(0) if lowest_balance <= 0 else Decimal(1)
-
-    # ── Risk classification ──
-    #
-    # Uses CUSHION_CRITICAL_THRESHOLD and CUSHION_TIGHT_THRESHOLD from
-    # module level.  Change those constants to re-tune.
-    if goes_negative or lowest_balance < 0:
-        risk_level = "critical"
-        cushion_ratio = Decimal(0)
-    elif total_outflows <= 0:
-        risk_level = "comfortable"
-        cushion_ratio = Decimal(1)
-    else:
-        cushion_ratio = lowest_balance / total_outflows
-        if cushion_ratio < CUSHION_CRITICAL_THRESHOLD:
-            risk_level = "critical"
-        elif cushion_ratio < CUSHION_TIGHT_THRESHOLD:
-            risk_level = "tight"
-        else:
-            risk_level = "comfortable"
+        lowest_ratio = Decimal(0) if eod.balance <= 0 else Decimal(1)
 
     return _RiskAnalysis(
-        lowest_balance=lowest_balance,
-        lowest_date=lowest_date,
+        lowest_balance=eod.balance,
+        lowest_date=eod.day,
         risk_level=risk_level,
         cushion_ratio=cushion_ratio,
-        total_outflows=total_outflows,
-        total_inflows=total_inflows,
-        goes_negative=goes_negative,
-        negative_date=negative_date,
-        negative_balance=negative_balance,
+        total_outflows=flows.total_outflows,
+        total_inflows=flows.total_inflows,
+        goes_negative=intraday.goes_negative,
+        negative_date=intraday.negative_date,
+        negative_balance=intraday.negative_balance,
         days_until_negative=days_until_negative,
         drain_rate=drain_rate,
         lowest_ratio=lowest_ratio,

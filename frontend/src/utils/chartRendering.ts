@@ -102,19 +102,13 @@ export function computeThresholds(slice: TrajectoryPoint[]): { red: number; yell
   return { red, yellow: red + 1000 }
 }
 
-/** Set up the canvas and compute the drawing coordinate system.
- *
- *  @param backendLowestBalance - Optional intra-day low from the backend's
- *    expenses-before-income walk.  When provided, the y-axis range is
- *    extended so "risk wick" annotations are never clipped.
- */
+/** Set up the canvas and compute the drawing coordinate system. */
 export function buildLayout(
   canvas: HTMLCanvasElement,
   wrap: HTMLDivElement,
   data: TrajectoryPoint[],
   viewStart: number,
   viewCount: number,
-  backendLowestBalance?: number | null,
 ): ChartLayout | null {
   const slice = data.slice(viewStart, viewStart + viewCount)
   if (!slice.length) return null
@@ -136,11 +130,7 @@ export function buildLayout(
   const chartWidth = width - padding.left - padding.right
   const chartHeight = height - padding.top - padding.bottom
   const { red: redThreshold, yellow: yellowThreshold } = computeThresholds(slice)
-  // Include the intra-day low in the min so the risk wick is never clipped.
-  let rawMin = Math.min(...slice.map(point => point.balance))
-  if (backendLowestBalance != null && backendLowestBalance < rawMin) {
-    rawMin = backendLowestBalance
-  }
+  const rawMin = Math.min(...slice.map(point => point.balance))
   const minValue = rawMin < 0 ? rawMin * 1.15 : 0
   const maxValue = Math.max(Math.max(...slice.map(point => point.balance)), yellowThreshold) * 1.1
   const xPos = (index: number) =>
@@ -406,12 +396,10 @@ export function drawEventDots(layout: ChartLayout, opts: EventDotOpts): void {
 
 /** Lowest point marker with pill label.
  *
- *  When backend lowest values are provided, the annotation shows the
- *  backend's expenses-before-income intra-day lowest at the matching
- *  date.  If the intra-day low is below the end-of-day balance (i.e.
- *  income arrived later that day), a dashed "risk wick" connects the
- *  trajectory line point down to the annotation — like a candlestick
- *  wick on a stock chart.
+ *  When backend values are provided, the annotation is placed at the
+ *  matching trajectory point.  The backend now returns the end-of-day
+ *  lowest (matching the chart line), so the marker always sits directly
+ *  on the line — no gap, no wick needed.
  */
 export function drawLowestPoint(
   layout: ChartLayout,
@@ -424,10 +412,9 @@ export function drawLowestPoint(
   // a lowest date, find the closest trajectory point.  Otherwise fall
   // back to the minimum end-of-day balance in the visible slice.
   let lowestIndex: number
-  let intradayLow: number | null = null
+  let displayBalance: number
 
   if (backendLowestBalance != null && backendLowestDate) {
-    // Find the trajectory point at or nearest the backend's date.
     lowestIndex = 0
     let bestDist = Infinity
     for (let i = 0; i < slice.length; i++) {
@@ -435,47 +422,25 @@ export function drawLowestPoint(
       const dist = Math.abs(new Date(slice[i].date).getTime() - new Date(backendLowestDate).getTime())
       if (dist < bestDist) { bestDist = dist; lowestIndex = i }
     }
-    intradayLow = backendLowestBalance
+    // Use the trajectory point's balance (end-of-day) so the marker
+    // sits exactly on the line.  The backend's lowest_balance is now
+    // the EOD minimum so these should agree, but anchoring to the
+    // slice ensures pixel-perfect placement.
+    displayBalance = slice[lowestIndex].balance
   } else {
     lowestIndex = slice.reduce(
       (minIdx, point, idx) => point.balance < slice[minIdx].balance ? idx : minIdx, 0,
     )
+    displayBalance = slice[lowestIndex].balance
   }
-
-  // End-of-day balance at this date (where the trajectory line is).
-  const lineBalance = slice[lowestIndex].balance
-  // The displayed value: intra-day low if available, otherwise line balance.
-  const displayBalance = intradayLow ?? lineBalance
-  // Whether there's a gap between the line and the intra-day dip.
-  const hasWick = intradayLow != null && intradayLow < lineBalance
 
   const lowestX = xPos(lowestIndex)
-  const lineY = yPos(lineBalance)
-  // Annotation sits at the intra-day low (wick tip) or on the line.
-  const annotationY = hasWick ? yPos(intradayLow!) : lineY
+  const lowestY = yPos(displayBalance)
 
-  // ── Risk wick: dashed line from the trajectory point to intra-day low ──
-  if (hasWick) {
-    ctx.save()
-    ctx.setLineDash([4, 3])
-    ctx.beginPath()
-    ctx.moveTo(lowestX, lineY)
-    ctx.lineTo(lowestX, annotationY)
-    ctx.strokeStyle = 'rgba(248,113,113,.45)'
-    ctx.lineWidth = 1.5
-    ctx.stroke()
-    ctx.setLineDash([])
-    ctx.restore()
-
-    // Small anchor dot on the trajectory line.
-    ctx.beginPath(); ctx.arc(lowestX, lineY, 3, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(248,113,113,.5)'; ctx.fill()
-  }
-
-  // Circle markers at the annotation point (wick tip or line).
-  ctx.beginPath(); ctx.arc(lowestX, annotationY, 12, 0, Math.PI * 2)
+  // Circle markers.
+  ctx.beginPath(); ctx.arc(lowestX, lowestY, 12, 0, Math.PI * 2)
   ctx.strokeStyle = 'rgba(248,113,113,.25)'; ctx.lineWidth = 1.5; ctx.stroke()
-  ctx.beginPath(); ctx.arc(lowestX, annotationY, 4, 0, Math.PI * 2)
+  ctx.beginPath(); ctx.arc(lowestX, lowestY, 4, 0, Math.PI * 2)
   ctx.fillStyle = '#F87171'; ctx.fill()
 
   // Pill background.
@@ -488,16 +453,16 @@ export function drawLowestPoint(
   const pillWidth = pillContentWidth + 16
   const pillHeight = 32
   ctx.fillStyle = 'rgba(6,8,12,.85)'
-  ctx.fillRect(lowestX - pillWidth / 2, annotationY - 18 - pillHeight, pillWidth, pillHeight)
+  ctx.fillRect(lowestX - pillWidth / 2, lowestY - 18 - pillHeight, pillWidth, pillHeight)
   ctx.strokeStyle = 'rgba(248,113,113,.2)'
   ctx.lineWidth = 1
-  ctx.strokeRect(lowestX - pillWidth / 2, annotationY - 18 - pillHeight, pillWidth, pillHeight)
+  ctx.strokeRect(lowestX - pillWidth / 2, lowestY - 18 - pillHeight, pillWidth, pillHeight)
   ctx.fillStyle = '#F87171'
   ctx.textAlign = 'center'
   ctx.font = '700 13px IBM Plex Mono'
-  ctx.fillText(lowText, lowestX, annotationY - 22)
+  ctx.fillText(lowText, lowestX, lowestY - 22)
   ctx.font = '600 9px Sora'
-  ctx.fillText('LOWEST', lowestX, annotationY - 36)
+  ctx.fillText('LOWEST', lowestX, lowestY - 36)
   ctx.textAlign = 'left'
 }
 
