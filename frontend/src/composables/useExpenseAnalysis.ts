@@ -111,7 +111,13 @@ function analyzeWindow(points: TrajectoryPoint[], start: number, end: number): W
 
 // ── Composable ──
 
-export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>, currentBalance: Ref<number>) {
+export function useExpenseAnalysis(
+  trajectory: Ref<TrajectoryPoint[]>,
+  /** Backend-computed date when balance goes negative (expenses-before-income). */
+  negativeDate?: Ref<string | null>,
+  /** Backend-computed balance at the negative date. */
+  negativeBalance?: Ref<number | null>,
+) {
 
   // Segment trajectory into paycheck-to-paycheck windows.
   // If no paychecks exist, the entire trajectory is treated as one window.
@@ -259,84 +265,22 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>, currentBa
   })
 
   /**
-   * Walk the trajectory with expenses-before-income ordering per day.
-   *
-   * Returns the true intra-day minimum balance and the shortfall info.
-   * Bills often post before direct deposit in the real world, so this
-   * ordering exposes dips that end-of-day balances would mask.
-   */
-  const realisticWalk = computed<{
-    minBalance: number
-    minDate: string
-    brokeIdx: number
-    brokeBalance: number
-  }>(() => {
-    const points = trajectory.value
-    if (!points.length) return { minBalance: 0, minDate: '', brokeIdx: -1, brokeBalance: 0 }
-
-    let balance = currentBalance.value
-    let minBalance = balance
-    let minDate = points[0]?.date ?? ''
-    let brokeIdx = -1
-    let brokeBalance = 0
-
-    for (let i = 0; i < points.length; i++) {
-      const expenses = points[i].events.filter(e => e.amount < 0)
-      const income = points[i].events.filter(e => e.amount > 0)
-
-      // Apply expenses first — this is the intra-day dip.
-      for (const e of expenses) {
-        balance += e.amount
-      }
-
-      if (balance < minBalance) {
-        minBalance = balance
-        minDate = points[i].date
-      }
-
-      if (balance < 0 && brokeIdx < 0) {
-        brokeIdx = i
-        brokeBalance = balance
-      }
-
-      // Then apply income.
-      for (const e of income) {
-        balance += e.amount
-      }
-
-      // Check again after income (balance could still be a new min if
-      // income is negative, though unlikely).
-      if (balance < minBalance) {
-        minBalance = balance
-        minDate = points[i].date
-      }
-    }
-
-    return { minBalance, minDate, brokeIdx, brokeBalance }
-  })
-
-  /**
-   * True lowest point using expenses-before-income ordering.
-   * This is the number that should drive risk classification.
-   */
-  const trueLowestPoint = computed<{ balance: number; date: string } | null>(() => {
-    const points = trajectory.value
-    if (!points.length) return null
-    const { minBalance, minDate } = realisticWalk.value
-    return { balance: minBalance, date: minDate }
-  })
-
-  /**
    * Detect first point where balance goes negative.
    *
-   * Uses expenses-before-income ordering per day so that a same-day
-   * paycheck does not mask an intra-day shortfall.
+   * Uses the backend's expenses-before-income analysis (negativeDate)
+   * to identify the date, then scans the trajectory for affected
+   * commitments to build the missed-commitments list.
    */
   const shortfall = computed<Shortfall | null>(() => {
     const points = trajectory.value
     if (!points.length) return null
 
-    const { brokeIdx, brokeBalance } = realisticWalk.value
+    const brokeDate = negativeDate?.value
+    const brokeBal = negativeBalance?.value
+    if (!brokeDate || brokeBal == null) return null
+
+    // Find the trajectory index at or after the broke date.
+    const brokeIdx = points.findIndex(p => p.date >= brokeDate)
     if (brokeIdx < 0) return null
 
     const missed: { name: string; amount: number; date: string }[] = []
@@ -357,23 +301,12 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>, currentBa
     }
 
     return {
-      brokeDate: points[brokeIdx].date,
-      brokeBalance,
+      brokeDate,
+      brokeBalance: brokeBal,
       missedCommitments: missed,
       recoveryDate,
       totalMissed: missed.reduce((sum, m) => sum + m.amount, 0),
     }
-  })
-
-  /** Total outflows (absolute value of all negative events) across the projection window. */
-  const totalOutflows = computed(() => {
-    let total = 0
-    for (const point of trajectory.value) {
-      for (const event of point.events) {
-        if (event.amount < 0) total += Math.abs(event.amount)
-      }
-    }
-    return total
   })
 
   return {
@@ -384,7 +317,5 @@ export function useExpenseAnalysis(trajectory: Ref<TrajectoryPoint[]>, currentBa
     masterColorMap,
     billsAnalysis,
     shortfall,
-    trueLowestPoint,
-    totalOutflows,
   }
 }

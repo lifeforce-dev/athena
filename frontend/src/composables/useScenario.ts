@@ -6,7 +6,6 @@ import { demoTourActive } from '@/stores/demoTour'
 import { fetchScenarioProjection, type ScenarioRequest } from '@/api/projection'
 import { buildTrajectory, type TrajectoryPoint } from '@/utils/trajectory'
 import { toLocalDateString, parseLocalDate, parseMoney, getDateLocale } from '@/utils/format'
-import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import type { ParsedLedgerEntry } from '@/types/projection'
 
 export interface ScenarioOverride {
@@ -179,6 +178,11 @@ export function useScenario() {
   const ledger = ref<ParsedLedgerEntry[]>([])
   const apiBalance = ref<number | null>(null)
 
+  /** Backend-computed lowest balance for the scenario. */
+  const lowestBalance = ref<number>(0)
+  const lowestDate = ref<string | null>(null)
+  const riskLevel = ref<string>('comfortable')
+
   async function runSimulation() {
     hasRun.value = true
     loading.value = true
@@ -200,6 +204,11 @@ export function useScenario() {
         delta: parseMoney(entry.delta),
         balance: parseMoney(entry.balance),
       }))
+
+      // Parse backend risk fields.
+      lowestBalance.value = parseMoney(response.lowest_balance)
+      lowestDate.value = response.lowest_date ?? null
+      riskLevel.value = response.risk_level ?? 'comfortable'
     } catch (err) {
       error.value = err instanceof Error ? err.message : String(err)
     } finally {
@@ -220,8 +229,11 @@ export function useScenario() {
     return points.length ? points[points.length - 1].balance : 0
   })
 
-  // Use expenses-before-income walk for the true intra-day lowest point.
-  const { trueLowestPoint: lowestPoint } = useExpenseAnalysis(trajectory, currentBalance)
+  /** Backend-computed lowest point for the scenario projection. */
+  const lowestPoint = computed<{ balance: number; date: string } | null>(() => {
+    if (!lowestDate.value) return null
+    return { balance: lowestBalance.value, date: lowestDate.value }
+  })
 
   const avgGainedPerMonth = computed(() => {
     const net = afterBalance.value - currentBalance.value

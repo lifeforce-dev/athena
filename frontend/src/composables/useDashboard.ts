@@ -53,17 +53,14 @@ export function useDashboard() {
     buildTrajectory(projection.ledger.value)
   )
 
-  /** Lowest balance point in the trajectory. */
-  const lowestPoint = computed(() => {
-    if (!trajectory.value.length) return null
-    return trajectory.value.reduce((min, pt) => (pt.balance < min.balance ? pt : min))
-  })
-
   /** Current balance from projection. */
   const currentBalance = computed(() => projection.currentBalance.value)
 
   /** Whether the user has a real balance (from bank or manual entry). */
   const hasInitialBalance = computed(() => projection.hasInitialBalance.value)
+
+  /** Backend-computed risk analysis (expenses-before-income walk). */
+  const riskAnalysis = computed(() => projection.riskAnalysis.value)
 
   /** End balance (last trajectory point). */
   const endBalance = computed(() => {
@@ -87,7 +84,7 @@ export function useDashboard() {
     asOf,
     refresh,
     trajectory,
-    lowestPoint,
+    riskAnalysis,
     currentBalance,
     hasInitialBalance,
     endBalance,

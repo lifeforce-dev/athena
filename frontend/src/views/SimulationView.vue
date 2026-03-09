@@ -34,7 +34,11 @@
         </div>
 
         <!-- Trajectory chart -->
-        <TrajectoryChart :data="trajectory" />
+        <TrajectoryChart
+          :data="trajectory"
+          :backend-lowest-balance="lowestPoint?.balance ?? null"
+          :backend-lowest-date="lowestPoint?.date ?? null"
+        />
 
         <!-- Monthly breakdown -->
         <div class="sh">

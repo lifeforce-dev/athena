@@ -394,15 +394,47 @@ export function drawEventDots(layout: ChartLayout, opts: EventDotOpts): void {
   })
 }
 
-/** Lowest point marker with pill label. */
-export function drawLowestPoint(layout: ChartLayout): void {
+/** Lowest point marker with pill label.
+ *
+ *  When backend lowest values are provided, the annotation shows the
+ *  backend's expenses-before-income lowest at the matching date.  This
+ *  ensures the chart annotation matches the hero stat exactly.
+ */
+export function drawLowestPoint(
+  layout: ChartLayout,
+  backendLowestBalance: number | null,
+  backendLowestDate: string | null,
+): void {
   const { ctx, xPos, yPos, slice } = layout
 
-  const lowestIndex = slice.reduce(
-    (minIdx, point, idx) => point.balance < slice[minIdx].balance ? idx : minIdx, 0,
-  )
+  // Find the index to place the annotation.  If the backend provides
+  // a lowest date, find the closest trajectory point.  Otherwise fall
+  // back to the minimum end-of-day balance in the visible slice.
+  let lowestIndex: number
+  let displayBalance: number
+
+  if (backendLowestBalance != null && backendLowestDate) {
+    // Find the trajectory point at or nearest the backend's date.
+    lowestIndex = 0
+    let bestDist = Infinity
+    for (let i = 0; i < slice.length; i++) {
+      if (slice[i].date === backendLowestDate) { lowestIndex = i; break }
+      const dist = Math.abs(new Date(slice[i].date).getTime() - new Date(backendLowestDate).getTime())
+      if (dist < bestDist) { bestDist = dist; lowestIndex = i }
+    }
+    displayBalance = backendLowestBalance
+  } else {
+    lowestIndex = slice.reduce(
+      (minIdx, point, idx) => point.balance < slice[minIdx].balance ? idx : minIdx, 0,
+    )
+    displayBalance = slice[lowestIndex].balance
+  }
+
   const lowestX = xPos(lowestIndex)
-  const lowestY = yPos(slice[lowestIndex].balance)
+  // Y position: use the backend value for vertical placement so the
+  // annotation and value are consistent, even if the line at that point
+  // sits higher (because income arrived after expenses on the same day).
+  const lowestY = yPos(displayBalance)
 
   // Circle markers.
   ctx.beginPath(); ctx.arc(lowestX, lowestY, 12, 0, Math.PI * 2)
@@ -411,8 +443,7 @@ export function drawLowestPoint(layout: ChartLayout): void {
   ctx.fillStyle = '#F87171'; ctx.fill()
 
   // Pill background.
-  const lowBalance = slice[lowestIndex].balance
-  const lowText = (lowBalance < 0 ? '-' : '') + formatDollars(lowBalance)
+  const lowText = (displayBalance < 0 ? '-' : '') + formatDollars(displayBalance)
   ctx.font = '700 13px IBM Plex Mono'
   const lowTextWidth = ctx.measureText(lowText).width
   ctx.font = '600 9px Sora'

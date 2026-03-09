@@ -82,7 +82,8 @@ const props = defineProps<{
   netChange: number
   lowestBalance: number
   lowestDate: string
-  totalOutflows: number
+  riskLevel: string
+  cushionRatio: number
   daysCovered: number
   balanceOnly?: boolean
 }>()
@@ -166,20 +167,11 @@ function saveBalance() {
   emit('updateBalance', num)
 }
 
-/** Cushion ratio: lowest balance as a fraction of total outflows.
- *  Measures how close you are to not covering your commitments.
- *  Currency-agnostic — both sides are in the same currency. */
-const cushionRatio = computed(() => {
-  if (props.totalOutflows <= 0) return 1   // No expenses → fully comfortable.
-  if (props.lowestBalance <= 0) return 0   // Goes negative or zero → no cushion.
-  return props.lowestBalance / props.totalOutflows
-})
-
+/** Map backend risk_level to CSS class. */
 const statusClass = computed(() => {
   if (props.balanceOnly) return 'neutral'
-  if (props.lowestBalance < 0) return 'danger'       // Goes negative — always critical.
-  if (cushionRatio.value < 0.10) return 'danger'     // Less than 10% of obligations as buffer.
-  if (cushionRatio.value < 0.25) return 'tight'      // Less than 25% of obligations as buffer.
+  if (props.riskLevel === 'critical') return 'danger'
+  if (props.riskLevel === 'tight') return 'tight'
   return 'safe'
 })
 
@@ -214,10 +206,11 @@ const lowestDate = computed(() => {
   return parseLocalDate(props.lowestDate).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 })
 
-/** Gauge fill: maps cushion ratio to a visual scale.
- *  0% cushion = 3% gauge (tiny red sliver), ≥100% = full. */
+/** Gauge fill: smooth position from backend cushion_ratio.
+ *  0 = left edge (critical), 1.0+ = full right (comfortable).
+ *  Clamped to 3–100%. */
 const gaugePct = computed(() => {
-  return Math.min(100, Math.max(3, Math.round(cushionRatio.value * 100)))
+  return Math.min(100, Math.max(3, Math.round(props.cushionRatio * 100)))
 })
 </script>
 

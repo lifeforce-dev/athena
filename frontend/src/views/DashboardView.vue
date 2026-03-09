@@ -6,9 +6,10 @@
         :current-balance="currentBalance"
         :end-balance="endBalance"
         :net-change="netChange"
-        :lowest-balance="trueLowestBalance"
-        :lowest-date="trueLowestDate"
-        :total-outflows="totalOutflows"
+        :lowest-balance="riskAnalysis.lowestBalance"
+        :lowest-date="riskAnalysis.lowestDate ?? ''"
+        :risk-level="riskAnalysis.riskLevel"
+        :cushion-ratio="riskAnalysis.cushionRatio"
         :days-covered="daysCovered"
         :balance-only="hasInitialBalance && !trajectory.length"
         @update-balance="onUpdateBalance"
@@ -40,6 +41,8 @@
           :daily-expense-stack="dailyExpenseStack"
           :master-expense-order="masterExpenseOrder"
           :master-color-map="masterColorMap"
+          :backend-lowest-balance="riskAnalysis.lowestBalance"
+          :backend-lowest-date="riskAnalysis.lowestDate"
         />
 
         <ShortfallWarning :shortfall="shortfall" />
@@ -118,7 +121,7 @@ const {
   loading,
   error,
   trajectory,
-  lowestPoint,
+  riskAnalysis,
   currentBalance,
   hasInitialBalance,
   endBalance,
@@ -144,13 +147,11 @@ const {
   masterColorMap,
   billsAnalysis,
   shortfall,
-  trueLowestPoint,
-  totalOutflows,
-} = useExpenseAnalysis(trajectory, currentBalance)
-
-/** True lowest balance using expenses-before-income ordering. */
-const trueLowestBalance = computed(() => trueLowestPoint.value?.balance ?? 0)
-const trueLowestDate = computed(() => trueLowestPoint.value?.date ?? '')
+} = useExpenseAnalysis(
+  trajectory,
+  computed(() => riskAnalysis.value.negativeDate),
+  computed(() => riskAnalysis.value.negativeBalance),
+)
 
 const nextWeekLabel = computed(() => {
   const start = billsAnalysis.value.nextWeekStart

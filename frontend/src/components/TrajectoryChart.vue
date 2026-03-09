@@ -48,6 +48,10 @@ const props = defineProps<{
   dailyExpenseStack?: DailyExpenseEntry[][]
   masterExpenseOrder?: string[]
   masterColorMap?: Record<string, string>
+  /** Backend-computed lowest balance (expenses-before-income walk). */
+  backendLowestBalance?: number | null
+  /** Date of the backend-computed lowest point. */
+  backendLowestDate?: string | null
 }>()
 
 const { t } = useI18n()
@@ -148,7 +152,7 @@ function draw(pulseElapsed?: number) {
     pulseElapsed,
   })
 
-  drawLowestPoint(layout)
+  drawLowestPoint(layout, props.backendLowestBalance ?? null, props.backendLowestDate ?? null)
   drawXAxis(layout, props.data[0].date, labels)
 }
 

@@ -35,3 +35,19 @@ export interface ParsedPayPeriod {
   end_balance: number
   min_balance: number
 }
+
+/** Risk analysis fields parsed from the projection response. */
+export interface ParsedRiskAnalysis {
+  lowestBalance: number
+  lowestDate: string | null
+  riskLevel: string
+  cushionRatio: number
+  totalOutflows: number
+  totalInflows: number
+  goesNegative: boolean
+  negativeDate: string | null
+  negativeBalance: number | null
+  daysUntilNegative: number | null
+  drainRate: number
+  lowestRatio: number
+}

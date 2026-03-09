@@ -42,6 +42,18 @@ export interface components {
       ledger: components['schemas']['LedgerEntry'][]
       months: components['schemas']['MonthSummary'][]
       pay_periods: components['schemas']['PayPeriodSummary'][]
+      lowest_balance: string
+      lowest_date: string | null
+      risk_level: string
+      cushion_ratio: string
+      total_outflows: string
+      total_inflows: string
+      goes_negative: boolean
+      negative_date: string | null
+      negative_balance: string | null
+      days_until_negative: number | null
+      drain_rate: string
+      lowest_ratio: string
     }
     CommitmentResponse: {
       id: number

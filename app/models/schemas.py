@@ -43,6 +43,20 @@ class ProjectionResponse(BaseModel):
     months: list[MonthSummary]
     pay_periods: list[PayPeriodSummary]
 
+    # Risk analysis — computed via expenses-before-income walk.
+    lowest_balance: Decimal = Decimal(0)
+    lowest_date: date | None = None
+    risk_level: str = "comfortable"
+    cushion_ratio: Decimal = Decimal(1)
+    total_outflows: Decimal = Decimal(0)
+    total_inflows: Decimal = Decimal(0)
+    goes_negative: bool = False
+    negative_date: date | None = None
+    negative_balance: Decimal | None = None
+    days_until_negative: int | None = None
+    drain_rate: Decimal = Decimal(0)
+    lowest_ratio: Decimal = Decimal(1)
+
 
 class ScenarioRequest(BaseModel):
     """Request body for running a what-if scenario projection."""

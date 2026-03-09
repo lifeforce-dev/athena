@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import type { ProjectionResponse, ParsedLedgerEntry, ParsedPayPeriod } from '@/types/projection'
+import type { ProjectionResponse, ParsedLedgerEntry, ParsedPayPeriod, ParsedRiskAnalysis } from '@/types/projection'
 import { fetchProjection } from '@/api/projection'
 import { parseMoney } from '@/utils/format'
 
@@ -46,5 +46,21 @@ export function useProjection() {
     }))
   )
 
-  return { data, loading, error, load, currentBalance, hasInitialBalance, payPeriods, ledger }
+  /** Risk analysis fields computed by the backend (expenses-before-income walk). */
+  const riskAnalysis = computed<ParsedRiskAnalysis>(() => ({
+    lowestBalance: parseMoney(data.value?.lowest_balance ?? '0'),
+    lowestDate: data.value?.lowest_date ?? null,
+    riskLevel: data.value?.risk_level ?? 'comfortable',
+    cushionRatio: parseMoney(data.value?.cushion_ratio ?? '1'),
+    totalOutflows: parseMoney(data.value?.total_outflows ?? '0'),
+    totalInflows: parseMoney(data.value?.total_inflows ?? '0'),
+    goesNegative: data.value?.goes_negative ?? false,
+    negativeDate: data.value?.negative_date ?? null,
+    negativeBalance: data.value?.negative_balance != null ? parseMoney(data.value.negative_balance) : null,
+    daysUntilNegative: data.value?.days_until_negative ?? null,
+    drainRate: parseMoney(data.value?.drain_rate ?? '0'),
+    lowestRatio: parseMoney(data.value?.lowest_ratio ?? '1'),
+  }))
+
+  return { data, loading, error, load, currentBalance, hasInitialBalance, payPeriods, ledger, riskAnalysis }
 }
