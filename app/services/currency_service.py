@@ -19,7 +19,7 @@ from app.models.orm import User
 
 logger = logging.getLogger(__name__)
 
-EXCHANGE_RATE_URL = "https://api.frankfurter.app/latest"
+EXCHANGE_RATE_URL = "https://api.frankfurter.dev/v1/latest"
 
 ALLOWED_CURRENCIES = {"USD", "KRW", "JPY", "EUR", "GBP", "CNY", "BRL"}
 
