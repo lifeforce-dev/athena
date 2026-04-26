@@ -11,9 +11,16 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
+
+// FteWelcome is the splash view in the demo/FTE flow and doesn't run
+// useTabOnboarding, so it owns removing the CurrencyPrompt transition cover.
+onMounted(() => {
+  document.getElementById('demo-tour-cover')?.remove()
+})
 </script>
 
 <style scoped>
