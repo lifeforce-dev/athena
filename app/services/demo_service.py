@@ -14,6 +14,10 @@ from decimal import Decimal
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.post_processing import (
+    DEFAULT_CRITICAL_THRESHOLD,
+    DEFAULT_TIGHT_THRESHOLD,
+)
 from app.models.orm import BalanceSnapshot, Commitment, Transaction, User
 
 logger = logging.getLogger(__name__)
@@ -52,6 +56,18 @@ async def reset_demo_data(db: AsyncSession, user_id: int) -> None:
     await db.execute(delete(Transaction).where(Transaction.user_id == user_id))
     await db.execute(delete(BalanceSnapshot).where(BalanceSnapshot.user_id == user_id))
     await db.execute(delete(Commitment).where(Commitment.user_id == user_id))
+
+    # Shared demo row -- clear per-visitor User state so tour, currency,
+    # language, dismissed modals, and risk thresholds don't leak between sessions.
+    user = await db.get(User, user_id)
+    if user is not None:
+        user.completed_tours = None
+        user.dismissed_modals = None
+        user.account_currency = None
+        user.display_currency = None
+        user.account_language = None
+        user.risk_critical_threshold = DEFAULT_CRITICAL_THRESHOLD
+        user.risk_tight_threshold = DEFAULT_TIGHT_THRESHOLD
 
     # Seed balance snapshot.
     db.add(BalanceSnapshot(
