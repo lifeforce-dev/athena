@@ -1,9 +1,16 @@
 """Business logic for commitment management."""
 from __future__ import annotations
 
+from datetime import date
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.commitment_schemas import CommitmentCreate, CommitmentUpdate
+from app.core.projection import iter_occurrences
+from app.models.commitment_schemas import (
+    CommitmentCreate,
+    CommitmentResponse,
+    CommitmentUpdate,
+)
 from app.models.orm import Commitment
 from app.repositories import commitment_repository as repo
 
@@ -109,3 +116,41 @@ async def delete_commitment(
 ) -> bool:
     """Soft-delete a commitment. Returns True if found and deactivated."""
     return await repo.soft_delete(db, commitment_id, user_id)
+
+
+# How far ahead to search for the next occurrence.  Long enough to cover
+# any sensible recurrence (yearly events, custom day_intervals up to ~360d)
+# without burning cycles on infinite generators.
+_NEXT_OCCURRENCE_HORIZON_DAYS = 400
+
+
+def compute_next_occurrence(commitment: Commitment, today: date | None = None) -> date | None:
+    """Return the first occurrence date on or after today, or None.
+
+    None is returned when the commitment will never fire again — its
+    ``end_date`` is in the past, it's a past one-time event, or no
+    occurrence falls within the search horizon.
+    """
+    today = today or date.today()
+
+    if commitment.end_date is not None and commitment.end_date < today:
+        return None
+
+    template = repo.to_domain(commitment)
+
+    # Cap the search at end_date if set, otherwise a fixed horizon.
+    horizon = today.fromordinal(today.toordinal() + _NEXT_OCCURRENCE_HORIZON_DAYS)
+    limit = min(template.end_date, horizon) if template.end_date else horizon
+
+    for occ in iter_occurrences(template, up_to=limit):
+        if occ >= today:
+            return occ
+
+    return None
+
+
+def build_response(commitment: Commitment, today: date | None = None) -> CommitmentResponse:
+    """Build a CommitmentResponse with the computed next_occurrence field."""
+    response = CommitmentResponse.model_validate(commitment)
+    response.next_occurrence = compute_next_occurrence(commitment, today=today)
+    return response

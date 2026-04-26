@@ -139,8 +139,8 @@ class TestEnrollmentNonce:
 
     def test_verify_rejects_expired_nonce(self):
         """Nonce issued > 5 minutes ago should be rejected."""
-        import hmac as hmac_mod
         import hashlib
+        import hmac as hmac_mod
 
         expired_nonce = f"faketoken:{int(__import__('time').time()) - 600}"
         expired_mac = hmac_mod.new(

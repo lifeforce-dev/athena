@@ -69,6 +69,7 @@ export interface components {
       is_active: boolean
       created_at: string
       updated_at: string
+      next_occurrence: string | null
     }
     CommitmentCreate: {
       name: string

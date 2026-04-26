@@ -63,7 +63,7 @@
               {{ item.parsedAmount > 0 ? '+' : '-' }}{{ formatCents(item.parsedAmount) }}
             </span>
             <span class="c-freq">{{ freqLabel(item.frequency) }}</span>
-            <span class="c-next">{{ '-' }}</span>
+            <span class="c-next">{{ item.next_occurrence ? shortDate(item.next_occurrence) : '-' }}</span>
             <button class="c-del" @click="handleDelete(item.id)" :title="t('commit.remove')">&times;</button>
           </div>
         </div>
@@ -109,7 +109,7 @@ import CommitmentModal from '@/components/CommitmentModal.vue'
 import { useCommitments } from '@/composables/useCommitments'
 import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import type { CommitmentCreate } from '@/types/commitment'
-import { parseMoney, parseLocalDate, formatDollars, formatCents, getDateLocale } from '@/utils/format'
+import { parseMoney, parseLocalDate, formatDollars, formatCents, getDateLocale, shortDate } from '@/utils/format'
 import { useI18n } from '@/composables/useI18n'
 
 const { t } = useI18n()
@@ -424,12 +424,17 @@ async function handleDelete(id: number) {
 
 .c-amt-edit {
   cursor: pointer;
-  border-bottom: 1px dashed transparent;
-  transition: border-color 0.15s;
+  border-radius: 0;
+  transition: background 0.15s;
 }
 
-.c-amt-edit:hover {
-  border-bottom-color: currentColor;
+/* Tinted hover bg matches each amount's own color, mirroring .c-del:hover. */
+.c-amt-edit.neg:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.c-amt-edit.pos:hover {
+  background: rgba(167, 139, 250, 0.1);
 }
 
 .c-amt.neg { color: var(--danger); }

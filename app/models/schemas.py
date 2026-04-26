@@ -43,7 +43,7 @@ class ProjectionResponse(BaseModel):
     months: list[MonthSummary]
     pay_periods: list[PayPeriodSummary]
 
-    # Risk analysis — computed via expenses-before-income walk.
+    # Risk analysis — computed from the end-of-day trajectory walk.
     lowest_balance: Decimal = Decimal(0)
     lowest_date: date | None = None
     risk_level: str = "comfortable"

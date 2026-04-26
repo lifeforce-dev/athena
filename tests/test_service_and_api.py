@@ -211,6 +211,69 @@ class TestBalanceTracking:
 
 
 # ---------------------------------------------------------------------------
+# Risk analysis — end-of-day driven (matches chart trajectory)
+# ---------------------------------------------------------------------------
+
+
+class TestRiskAnalysis:
+    """The risk model must agree with the chart line at all times.
+
+    Same-day expenses that are immediately covered by same-day income should
+    NOT trigger a "goes negative" alert, because the chart trajectory never
+    actually dips below zero.
+    """
+
+    def test_same_day_expenses_offset_by_income_do_not_go_negative(self):
+        # Expenses ($3000) on the same day as the paycheck ($3000) leave EOD
+        # balance flat. The shortfall banner must NOT fire here.
+        raw_ledger = [
+            (date(2026, 5, 1), "Rent", Decimal("-3000")),
+            (date(2026, 5, 1), "Paycheck", Decimal("3000")),
+        ]
+
+        result = process_ledger(raw_ledger, Decimal("100"), date(2026, 5, 1), date(2026, 5, 31))
+
+        assert result.goes_negative is False
+        assert result.negative_date is None
+        assert result.negative_balance is None
+        assert result.lowest_balance == Decimal("100")
+
+    def test_eod_below_zero_is_critical_and_reports_first_negative_day(self):
+        # Day 1: -2000 (no income), starting balance 1500 → EOD -500.
+        raw_ledger = [
+            (date(2026, 5, 1), "Big Expense", Decimal("-2000")),
+            (date(2026, 5, 5), "Paycheck", Decimal("3000")),
+        ]
+
+        result = process_ledger(raw_ledger, Decimal("1500"), date(2026, 5, 1), date(2026, 5, 31))
+
+        assert result.goes_negative is True
+        assert result.negative_date == date(2026, 5, 1)
+        assert result.negative_balance == Decimal("-500")
+        assert result.risk_level == "critical"
+        assert result.lowest_balance == Decimal("-500")
+        assert result.lowest_date == date(2026, 5, 1)
+
+    def test_low_but_positive_eod_classifies_as_tight(self):
+        # Lowest EOD = 750 (between defaults: tight 1000, critical 500).
+        raw_ledger = [(date(2026, 5, 10), "Bill", Decimal("-1250"))]
+
+        result = process_ledger(raw_ledger, Decimal("2000"), date(2026, 5, 1), date(2026, 5, 31))
+
+        assert result.goes_negative is False
+        assert result.lowest_balance == Decimal("750")
+        assert result.risk_level == "tight"
+
+    def test_comfortable_when_eod_stays_above_tight_threshold(self):
+        raw_ledger = [(date(2026, 5, 10), "Bill", Decimal("-200"))]
+
+        result = process_ledger(raw_ledger, Decimal("3000"), date(2026, 5, 1), date(2026, 5, 31))
+
+        assert result.lowest_balance == Decimal("2800")
+        assert result.risk_level == "comfortable"
+
+
+# ---------------------------------------------------------------------------
 # Service layer: build_projection
 # ---------------------------------------------------------------------------
 

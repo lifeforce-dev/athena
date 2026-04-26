@@ -10,7 +10,7 @@ import logging
 from datetime import UTC, date, datetime, timedelta
 
 from app.core.post_processing import process_ledger
-from app.core.projection import project_cash_on
+from app.core.projection import iter_occurrences, project_cash_on
 from app.models.commitment_schemas import CommitmentResponse
 from app.models.domain import CashFlowTemplate, Direction, TemplateTag
 from app.models.schemas import ProjectionResponse
@@ -57,9 +57,19 @@ def _spec_to_template(spec: dict, today: date) -> CashFlowTemplate:
     )
 
 
-def _spec_to_commitment_response(spec: dict, idx: int) -> CommitmentResponse:
+def _spec_to_commitment_response(spec: dict, idx: int, today: date) -> CommitmentResponse:
     """Convert a raw seed spec dict into a CommitmentResponse."""
     now = datetime.now(UTC)
+    template = _spec_to_template(spec, today)
+
+    # Mirror the service-layer horizon: ~400 days, capped by end_date.
+    horizon = today + timedelta(days=400)
+    limit = min(template.end_date, horizon) if template.end_date else horizon
+    next_occurrence = next(
+        (occ for occ in iter_occurrences(template, up_to=limit) if occ >= today),
+        None,
+    )
+
     return CommitmentResponse(
         id=idx + 1,
         name=spec["name"],
@@ -69,12 +79,13 @@ def _spec_to_commitment_response(spec: dict, idx: int) -> CommitmentResponse:
         interval_days=spec.get("interval_days"),
         anchor_date=spec.get("anchor_date"),
         one_time_date=spec.get("one_time_date"),
-        start_date=spec.get("start_date", date.today()),
+        start_date=spec.get("start_date", today),
         end_date=spec.get("end_date"),
         is_paycheck=spec.get("is_paycheck", False),
         is_active=True,
         created_at=now,
         updated_at=now,
+        next_occurrence=next_occurrence,
     )
 
 
@@ -124,7 +135,7 @@ def build_demo_commitments(today: date | None = None) -> list[CommitmentResponse
     """Return the demo seed commitments as API response objects (no DB)."""
     today = today or date.today()
     specs = _seed_commitments(today)
-    result = [_spec_to_commitment_response(s, i) for i, s in enumerate(specs)]
+    result = [_spec_to_commitment_response(s, i, today) for i, s in enumerate(specs)]
     logger.info(
         "[TourDebug][demo_data_service] commitments ready today=%s count=%s",
         today,

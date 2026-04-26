@@ -85,4 +85,9 @@ class CommitmentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    # Computed by the service layer: the first occurrence on or after today.
+    # None when the commitment will never fire again (past one-time, expired
+    # end_date, or unsupported recurrence).
+    next_occurrence: date | None = None
+
     model_config = {"from_attributes": True}

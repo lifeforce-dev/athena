@@ -7,12 +7,12 @@ and CLI layers.
 from __future__ import annotations
 
 import calendar
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
 from app.models.schemas import LedgerEntry, MonthSummary, PayPeriodSummary
-
 
 # ---------------------------------------------------------------------------
 # Risk classification — defaults for new users
@@ -40,7 +40,7 @@ class ProcessedProjection:
     pay_periods: list[PayPeriodSummary]
     ending_balance: Decimal
 
-    # ── Risk analysis (expenses-before-income walk) ──
+    # ── Risk analysis (end-of-day walk; matches chart trajectory) ──
     lowest_balance: Decimal = Decimal(0)
     lowest_date: date | None = None
     risk_level: str = "comfortable"
@@ -101,8 +101,9 @@ def process_ledger(
     result = tracker.result()
 
     # Compose risk analysis from single-responsibility pieces.
-    # lowest_balance/lowest_date = end-of-day minimum (matches chart line).
-    # risk_level = from conservative intra-day walk vs. dollar thresholds.
+    # All risk fields (lowest, first-negative, classification) are derived
+    # from the same end-of-day walk that drives the chart trajectory line,
+    # so the alert never contradicts what the user sees on the chart.
     risk = _analyze_risk(
         raw_ledger,
         initial_balance,
@@ -297,9 +298,12 @@ class _AccumulationTracker:
 #
 # Each function answers ONE question about the projection.  They are
 # composed by ``_analyze_risk`` which the rest of the codebase calls.
+#
+# All risk fields (lowest balance, first-negative date, classification)
+# are derived from the same end-of-day walk that drives the chart line.
+# This guarantees the dashboard shortfall banner never contradicts the
+# trajectory the user actually sees.
 # ---------------------------------------------------------------------------
-
-from collections import defaultdict
 
 
 @dataclass
@@ -311,22 +315,15 @@ class _FlowTotals:
 
 
 @dataclass
-class _EodLowest:
-    """End-of-day lowest balance — the minimum visible on the chart line."""
+class _EodWalk:
+    """End-of-day walk results — both lowest and first-negative come from
+    the same trajectory the chart line plots."""
 
-    balance: Decimal
-    day: date | None
-
-
-@dataclass
-class _IntradayRisk:
-    """Expenses-before-income worst-case assessment for risk classification."""
-
+    lowest_balance: Decimal
+    lowest_day: date | None
     goes_negative: bool
     negative_date: date | None
     negative_balance: Decimal | None
-    # The intra-day low used for cushion calculation (NOT displayed to user).
-    intraday_lowest: Decimal
 
 
 @dataclass
@@ -366,100 +363,67 @@ def _sum_flows(
     return _FlowTotals(total_outflows=total_outflows, total_inflows=total_inflows)
 
 
-# ── Piece 2: end-of-day lowest ─────────────────────────────────────────────
+# ── Piece 2: end-of-day walk (lowest + first-negative) ─────────────────────
 
-def _find_eod_lowest(
+def _walk_eod(
     by_date: dict[date, list[tuple[str, Decimal]]],
     initial_balance: Decimal,
-) -> _EodLowest:
-    """Walk all transactions per day (no special ordering) and find the
-    minimum end-of-day balance.
+) -> _EodWalk:
+    """Walk all transactions per day (no special ordering) and capture both
+    the minimum end-of-day balance AND the first day it dipped below zero.
 
     This is exactly what the chart trajectory line plots — after all
-    transactions on a given day are settled, what is the balance?
+    transactions on a given day are settled, what is the balance?  Driving
+    every risk field from this single walk guarantees the dashboard alert
+    never contradicts the trajectory the user sees.
     """
     balance = initial_balance
     lowest = balance
     lowest_day: date | None = None
-
-    for day in sorted(by_date.keys()):
-        for _, delta in by_date[day]:
-            balance += delta
-        if balance < lowest:
-            lowest = balance
-            lowest_day = day
-
-    return _EodLowest(balance=lowest, day=lowest_day)
-
-
-# ── Piece 3: intra-day risk walk ───────────────────────────────────────────
-
-def _assess_intraday_risk(
-    by_date: dict[date, list[tuple[str, Decimal]]],
-    initial_balance: Decimal,
-) -> _IntradayRisk:
-    """Walk each day with expenses applied before income.
-
-    Banks typically post debits before credits.  This ordering surfaces
-    intra-day dips that end-of-day balances hide.  The resulting values
-    drive risk classification but are NOT shown as the user-facing
-    "lowest point" (that comes from ``_find_eod_lowest``).
-    """
-    balance = initial_balance
-    intraday_lowest = balance
     goes_negative = False
     negative_date: date | None = None
     negative_balance: Decimal | None = None
 
     for day in sorted(by_date.keys()):
-        entries = by_date[day]
-        expenses = [d for _, d in entries if d < 0]
-        income = [d for _, d in entries if d >= 0]
-
-        # Expenses first.
-        for delta in expenses:
+        for _, delta in by_date[day]:
             balance += delta
 
-        # Check after expenses, before income.
-        if balance < intraday_lowest:
-            intraday_lowest = balance
+        if balance < lowest:
+            lowest = balance
+            lowest_day = day
 
         if balance < 0 and not goes_negative:
             goes_negative = True
             negative_date = day
             negative_balance = balance
 
-        # Then income.
-        for delta in income:
-            balance += delta
-
-    return _IntradayRisk(
+    return _EodWalk(
+        lowest_balance=lowest,
+        lowest_day=lowest_day,
         goes_negative=goes_negative,
         negative_date=negative_date,
         negative_balance=negative_balance,
-        intraday_lowest=intraday_lowest,
     )
 
 
-# ── Piece 4: classify + derive ─────────────────────────────────────────────
+# ── Piece 3: classify ──────────────────────────────────────────────────────
 
 def _classify_risk(
-    intraday_lowest: Decimal,
+    eod_lowest: Decimal,
     critical_threshold: Decimal,
     tight_threshold: Decimal,
-    goes_negative: bool,
 ) -> str:
-    """Return the risk label by comparing the intra-day low to dollar thresholds.
+    """Return the risk label by comparing the end-of-day low to dollar thresholds.
 
-    Going negative (or the worst-case intra-day point dropping below zero) is
-    always critical, regardless of the configured thresholds.  Otherwise the
-    user-configured ``critical_threshold`` and ``tight_threshold`` decide.
+    A negative end-of-day balance is always critical regardless of the
+    configured thresholds.  Otherwise the user-configured
+    ``critical_threshold`` and ``tight_threshold`` decide.
     """
-    if goes_negative or intraday_lowest < 0:
+    if eod_lowest < 0:
         return "critical"
-    if intraday_lowest < critical_threshold:
+    if eod_lowest < critical_threshold:
         return "critical"
-    if intraday_lowest < tight_threshold:
+    if eod_lowest < tight_threshold:
         return "tight"
     return "comfortable"
 
@@ -476,14 +440,18 @@ def _analyze_risk(
 ) -> _RiskAnalysis:
     """Compose the single-responsibility pieces into a full risk analysis.
 
-    - ``lowest_balance`` / ``lowest_date`` — end-of-day minimum, matching
-      the chart trajectory line.
+    Every risk field comes from the same end-of-day trajectory walk, so
+    the reported lowest, the negative-balance alert, and the risk-level
+    classification are all internally consistent and consistent with the
+    chart line.
 
-    - ``risk_level`` — derived by comparing the conservative intra-day
-      lowest balance against the supplied dollar thresholds.
+    - ``lowest_balance`` / ``lowest_date`` — end-of-day minimum.
 
     - ``goes_negative`` / ``negative_date`` / ``negative_balance`` —
-      intra-day negative detection (bank posts debits first).
+      first day the end-of-day balance drops below zero (if any).
+
+    - ``risk_level`` — comparing the end-of-day low against the supplied
+      dollar thresholds.
 
     - ``total_outflows`` / ``total_inflows`` — absolute flow sums.
 
@@ -513,37 +481,31 @@ def _analyze_risk(
         by_date[occ_date].append((name, delta))
 
     flows = _sum_flows(by_date)
-    eod = _find_eod_lowest(by_date, initial_balance)
-    intraday = _assess_intraday_risk(by_date, initial_balance)
-    risk_level = _classify_risk(
-        intraday.intraday_lowest,
-        critical_threshold,
-        tight_threshold,
-        intraday.goes_negative,
-    )
+    eod = _walk_eod(by_date, initial_balance)
+    risk_level = _classify_risk(eod.lowest_balance, critical_threshold, tight_threshold)
 
     # Derived metrics.
     days_until_negative: int | None = None
-    if intraday.goes_negative and intraday.negative_date is not None:
-        days_until_negative = (intraday.negative_date - window_start).days
+    if eod.goes_negative and eod.negative_date is not None:
+        days_until_negative = (eod.negative_date - window_start).days
 
     window_days = max((window_end - window_start).days, 1)
     drain_rate = (flows.total_outflows - flows.total_inflows) / window_days
 
     if initial_balance > 0:
-        lowest_ratio = eod.balance / initial_balance
+        lowest_ratio = eod.lowest_balance / initial_balance
     else:
-        lowest_ratio = Decimal(0) if eod.balance <= 0 else Decimal(1)
+        lowest_ratio = Decimal(0) if eod.lowest_balance <= 0 else Decimal(1)
 
     return _RiskAnalysis(
-        lowest_balance=eod.balance,
-        lowest_date=eod.day,
+        lowest_balance=eod.lowest_balance,
+        lowest_date=eod.lowest_day,
         risk_level=risk_level,
         total_outflows=flows.total_outflows,
         total_inflows=flows.total_inflows,
-        goes_negative=intraday.goes_negative,
-        negative_date=intraday.negative_date,
-        negative_balance=intraday.negative_balance,
+        goes_negative=eod.goes_negative,
+        negative_date=eod.negative_date,
+        negative_balance=eod.negative_balance,
         days_until_negative=days_until_negative,
         drain_rate=drain_rate,
         lowest_ratio=lowest_ratio,

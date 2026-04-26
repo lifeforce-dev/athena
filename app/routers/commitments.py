@@ -26,7 +26,7 @@ async def list_commitments(
 ) -> list[CommitmentResponse]:
     """List all active commitments for the authenticated user."""
     rows = await service.list_commitments(db, user_id)
-    return [CommitmentResponse.model_validate(row) for row in rows]
+    return [service.build_response(row) for row in rows]
 
 
 @router.post("", response_model=CommitmentResponse, status_code=status.HTTP_201_CREATED)
@@ -41,7 +41,7 @@ async def create_commitment(
     data.amount = await to_account_currency(data.amount, info)
     row = await service.create_commitment(db, user_id, data)
     await db.commit()
-    return CommitmentResponse.model_validate(row)
+    return service.build_response(row)
 
 
 @router.put("/{commitment_id}", response_model=CommitmentResponse)
@@ -66,7 +66,7 @@ async def update_commitment(
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Commitment not found")
     await db.commit()
-    return CommitmentResponse.model_validate(row)
+    return service.build_response(row)
 
 
 @router.delete("/{commitment_id}", status_code=status.HTTP_204_NO_CONTENT)

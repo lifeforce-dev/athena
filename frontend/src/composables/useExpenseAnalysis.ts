@@ -113,9 +113,9 @@ function analyzeWindow(points: TrajectoryPoint[], start: number, end: number): W
 
 export function useExpenseAnalysis(
   trajectory: Ref<TrajectoryPoint[]>,
-  /** Backend-computed date when balance goes negative (expenses-before-income). */
+  /** Backend-computed date when end-of-day balance first drops below zero. */
   negativeDate?: Ref<string | null>,
-  /** Backend-computed balance at the negative date. */
+  /** Backend-computed end-of-day balance at the negative date. */
   negativeBalance?: Ref<number | null>,
 ) {
 
@@ -267,9 +267,9 @@ export function useExpenseAnalysis(
   /**
    * Detect first point where balance goes negative.
    *
-   * Uses the backend's expenses-before-income analysis (negativeDate)
-   * to identify the date, then scans the trajectory for affected
-   * commitments to build the missed-commitments list.
+   * Uses the backend's end-of-day analysis (negativeDate) to identify
+   * the date, then scans the trajectory for affected commitments to
+   * build the missed-commitments list.
    */
   const shortfall = computed<Shortfall | null>(() => {
     const points = trajectory.value
