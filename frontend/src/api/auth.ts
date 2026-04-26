@@ -26,3 +26,9 @@ export const dismissModal = (modalKey: string) =>
 /** Set the user's preferred UI language. */
 export const setLanguage = (language: string) =>
   api.patch<void>(`/auth/me/language?language=${encodeURIComponent(language)}`)
+
+/** Update the user's dashboard risk thresholds (dollar amounts). */
+export const setRiskThresholds = (critical: number, tight: number) =>
+  api.patch<void>(
+    `/auth/me/risk-thresholds?critical=${encodeURIComponent(critical)}&tight=${encodeURIComponent(tight)}`,
+  )

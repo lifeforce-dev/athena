@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response, status
@@ -132,6 +133,8 @@ async def me(
         "account_language": user.account_language if user else None,
         "completed_tours": json.loads(user.completed_tours) if user and user.completed_tours else [],
         "dismissed_modals": json.loads(user.dismissed_modals) if user and user.dismissed_modals else [],
+        "risk_critical_threshold": str(user.risk_critical_threshold) if user else "500.00",
+        "risk_tight_threshold": str(user.risk_tight_threshold) if user else "1000.00",
     }
 
 
@@ -217,6 +220,45 @@ async def set_language(
         raise HTTPException(status_code=404, detail="User not found")
 
     user.account_language = language
+    await db.commit()
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/me/risk-thresholds")
+async def set_risk_thresholds(
+    current_user: Annotated[dict, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    critical: str = Query(..., description="Dollar threshold below which the projection is 'critical'"),
+    tight: str = Query(..., description="Dollar threshold below which the projection is 'tight'"),
+) -> Response:
+    """Update the user's per-account dashboard risk thresholds.
+
+    ``critical`` must be < ``tight`` and both must be non-negative.
+    """
+    try:
+        critical_value = Decimal(critical)
+        tight_value = Decimal(tight)
+    except InvalidOperation:
+        raise HTTPException(status_code=400, detail="Thresholds must be numeric")
+
+    if critical_value < 0 or tight_value < 0:
+        raise HTTPException(status_code=400, detail="Thresholds must be non-negative")
+    if critical_value >= tight_value:
+        raise HTTPException(
+            status_code=400,
+            detail="Critical threshold must be less than tight threshold",
+        )
+
+    user_id = int(current_user["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.risk_critical_threshold = critical_value
+    user.risk_tight_threshold = tight_value
     await db.commit()
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

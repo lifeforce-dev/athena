@@ -9,7 +9,8 @@
         :lowest-balance="riskAnalysis.lowestBalance"
         :lowest-date="riskAnalysis.lowestDate ?? ''"
         :risk-level="riskAnalysis.riskLevel"
-        :cushion-ratio="riskAnalysis.cushionRatio"
+        :critical-threshold="criticalThreshold"
+        :tight-threshold="tightThreshold"
         :days-covered="daysCovered"
         :balance-only="hasInitialBalance && !trajectory.length"
         @update-balance="onUpdateBalance"
@@ -77,8 +78,9 @@ import { useExpenseAnalysis } from '@/composables/useExpenseAnalysis'
 import { useTabOnboarding } from '@/composables/useTabOnboarding'
 import { useI18n } from '@/composables/useI18n'
 import { useTellerStore } from '@/stores/teller'
+import { useAuthStore } from '@/stores/auth'
 import { createManualBalance } from '@/api/balance'
-import { parseLocalDate, getDateLocale } from '@/utils/format'
+import { parseLocalDate, getDateLocale, parseMoney } from '@/utils/format'
 const highlightDate = ref<string | null>(null)
 const pulseDate = ref<string | null>(null)
 const highlightedCause = ref<number | null>(null)
@@ -138,6 +140,12 @@ watch(() => teller.status, (newStatus, oldStatus) => {
     refresh()
   }
 })
+
+// User-configurable risk thresholds (Critical / Tight in dollars).
+// Defaults match the backend if the user hasn't overridden them.
+const auth = useAuthStore()
+const criticalThreshold = computed(() => parseMoney(auth.user?.risk_critical_threshold ?? '500'))
+const tightThreshold = computed(() => parseMoney(auth.user?.risk_tight_threshold ?? '1000'))
 
 const {
   worstWindow,

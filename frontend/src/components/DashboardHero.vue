@@ -83,7 +83,8 @@ const props = defineProps<{
   lowestBalance: number
   lowestDate: string
   riskLevel: string
-  cushionRatio: number
+  criticalThreshold: number
+  tightThreshold: number
   daysCovered: number
   balanceOnly?: boolean
 }>()
@@ -206,11 +207,37 @@ const lowestDate = computed(() => {
   return parseLocalDate(props.lowestDate).toLocaleDateString(getDateLocale(), { month: 'short', day: 'numeric' })
 })
 
-/** Gauge fill: smooth position from backend cushion_ratio.
- *  0 = left edge (critical), 1.0+ = full right (comfortable).
- *  Clamped to 3–100%. */
+/** Gauge fill: zone-aware position from the projected lowest balance.
+ *
+ *  The gauge has three visual zones — CRITICAL (0-33%), TIGHT (33-66%),
+ *  COMFORTABLE (66-100%).  The lowest balance is mapped piecewise so that
+ *  the zone boundaries align with the user-configured dollar thresholds:
+ *
+ *    $0                  → 0%   (far-left, deep critical)
+ *    $criticalThreshold  → 33%  (critical / tight boundary)
+ *    $tightThreshold     → 66%  (tight / comfortable boundary)
+ *    ≥ comfortable cap   → 100% (solidly comfortable, capped)
+ *
+ *  The comfortable cap is twice the tight threshold so the marker keeps
+ *  moving once you're solidly out of risk and pegs at the far right.
+ */
 const gaugePct = computed(() => {
-  return Math.min(100, Math.max(3, Math.round(props.cushionRatio * 100)))
+  const lb = props.lowestBalance
+  const crit = Math.max(props.criticalThreshold, 1)
+  const tight = Math.max(props.tightThreshold, crit + 1)
+  const comfortableCap = tight * 2
+
+  let pct: number
+  if (lb <= 0) {
+    pct = 0
+  } else if (lb <= crit) {
+    pct = (lb / crit) * 33
+  } else if (lb <= tight) {
+    pct = 33 + ((lb - crit) / (tight - crit)) * 33
+  } else {
+    pct = 66 + Math.min(1, (lb - tight) / (comfortableCap - tight)) * 34
+  }
+  return Math.min(100, Math.max(3, Math.round(pct)))
 })
 </script>
 

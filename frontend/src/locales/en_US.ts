@@ -868,6 +868,38 @@ const en_US: Record<string, LocaleEntry> = {
     text: 'Refresh the page to start the tour.',
     context: 'Hint shown after resetting the tour, telling the user to refresh so the walkthrough begins.',
   },
+  'settings.risk_thresholds': {
+    text: 'Risk Thresholds',
+    context: 'Label for the account-settings section that controls when the dashboard shows the Critical or Tight verdict. Each value is a dollar amount.',
+  },
+  'settings.risk_thresholds_desc': {
+    text: 'If your projected lowest balance ever falls below these amounts, the dashboard will flag the projection accordingly.',
+    context: 'Help text below the risk thresholds inputs explaining what they control.',
+  },
+  'settings.critical_below': {
+    text: 'Critical below',
+    context: 'Label next to the input for the dollar threshold below which the projection is considered critical. Shown alongside a dollar input field.',
+  },
+  'settings.tight_below': {
+    text: 'Tight below',
+    context: 'Label next to the input for the dollar threshold below which the projection is considered tight. Shown alongside a dollar input field.',
+  },
+  'settings.save': {
+    text: 'Save',
+    context: 'Button label that commits a settings change. Mirrors the verb used elsewhere in the app for short commit actions.',
+  },
+  'settings.threshold_error_negative': {
+    text: 'Thresholds must be zero or higher.',
+    context: 'Error message shown when a user enters a negative threshold value.',
+  },
+  'settings.threshold_error_order': {
+    text: 'Critical must be lower than Tight.',
+    context: 'Error message shown when the critical threshold is not strictly less than the tight threshold.',
+  },
+  'settings.threshold_error_generic': {
+    text: 'Could not save thresholds. Please try again.',
+    context: 'Generic error message shown when saving the risk thresholds fails (e.g. network issue).',
+  },
 }
 
 export default en_US

@@ -47,7 +47,6 @@ class ProjectionResponse(BaseModel):
     lowest_balance: Decimal = Decimal(0)
     lowest_date: date | None = None
     risk_level: str = "comfortable"
-    cushion_ratio: Decimal = Decimal(1)
     total_outflows: Decimal = Decimal(0)
     total_inflows: Decimal = Decimal(0)
     goes_negative: bool = False

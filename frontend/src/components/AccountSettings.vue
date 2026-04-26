@@ -48,6 +48,61 @@
             </div>
           </div>
 
+          <!-- Risk Thresholds -->
+          <div class="sp-section">
+            <label class="sp-label">{{ t('settings.risk_thresholds') }}</label>
+            <p class="sp-desc">{{ t('settings.risk_thresholds_desc') }}</p>
+            <div class="sp-threshold-grid">
+              <div class="sp-threshold-row">
+                <span class="sp-threshold-lbl" style="color: var(--danger)">
+                  {{ t('settings.critical_below') }}
+                </span>
+                <div class="sp-threshold-input-wrap">
+                  <span class="sp-threshold-prefix">$</span>
+                  <input
+                    v-model="criticalInput"
+                    class="sp-threshold-input"
+                    type="number"
+                    min="0"
+                    step="50"
+                    inputmode="numeric"
+                  />
+                </div>
+              </div>
+              <div class="sp-threshold-row">
+                <span class="sp-threshold-lbl" style="color: var(--tight)">
+                  {{ t('settings.tight_below') }}
+                </span>
+                <div class="sp-threshold-input-wrap">
+                  <span class="sp-threshold-prefix">$</span>
+                  <input
+                    v-model="tightInput"
+                    class="sp-threshold-input"
+                    type="number"
+                    min="0"
+                    step="50"
+                    inputmode="numeric"
+                  />
+                </div>
+              </div>
+            </div>
+            <div class="sp-threshold-actions">
+              <button
+                class="sp-change-btn"
+                :disabled="savingThresholds || !thresholdsDirty"
+                @click="saveThresholds"
+              >
+                {{ savingThresholds ? '...' : t('settings.save') }}
+              </button>
+              <Transition name="sp-fade">
+                <span v-if="thresholdsSaved" class="sp-saved">{{ t('settings.saved') }}</span>
+              </Transition>
+            </div>
+            <Transition name="sp-fade">
+              <p v-if="thresholdError" class="sp-threshold-error">{{ thresholdError }}</p>
+            </Transition>
+          </div>
+
           <!-- Replay Guided Tour -->
           <div class="sp-section">
             <label class="sp-label">{{ t('settings.replay_tour') }}</label>
@@ -121,13 +176,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useI18n } from '@/composables/useI18n'
 import { useLanguageStore } from '@/stores/language'
 import { useCurrencyStore } from '@/stores/currency'
 import { useAuthStore } from '@/stores/auth'
 import { changeAccountCurrency } from '@/api/currency'
-import { resetTours } from '@/api/auth'
+import { resetTours, setRiskThresholds } from '@/api/auth'
 import { resetTourSessionCache } from '@/composables/useTabOnboarding'
 import {
   CURRENCIES,
@@ -161,6 +216,30 @@ let tourResetTimeout: ReturnType<typeof setTimeout> | undefined
 const showCurrencyChange = ref(false)
 const newCurrency = ref<CurrencyCode | null>(null)
 const converting = ref(false)
+
+// Risk thresholds — seed from the auth store and track as integer dollars.
+const initialCritical = parseFloat(auth.user?.risk_critical_threshold ?? '500')
+const initialTight = parseFloat(auth.user?.risk_tight_threshold ?? '1000')
+const criticalInput = ref<number>(Math.round(initialCritical))
+const tightInput = ref<number>(Math.round(initialTight))
+const savingThresholds = ref(false)
+const thresholdsSaved = ref(false)
+const thresholdError = ref<string | null>(null)
+let thresholdSaveTimeout: ReturnType<typeof setTimeout> | undefined
+
+const thresholdsDirty = computed(() => {
+  return Number(criticalInput.value) !== Math.round(initialCritical)
+    || Number(tightInput.value) !== Math.round(initialTight)
+})
+
+// Re-seed if the auth user changes underneath us (e.g. after a fresh /auth/me).
+watch(
+  () => [auth.user?.risk_critical_threshold, auth.user?.risk_tight_threshold] as const,
+  ([crit, tight]) => {
+    if (crit != null) criticalInput.value = Math.round(parseFloat(crit))
+    if (tight != null) tightInput.value = Math.round(parseFloat(tight))
+  },
+)
 
 const currencyOptions = CURRENCY_CODES.map((code) => ({
   code,
@@ -206,6 +285,41 @@ async function onLanguageChange(event: Event) {
   showRefreshHint.value = true
   clearTimeout(langSaveTimeout)
   langSaveTimeout = setTimeout(() => { langSaved.value = false }, 2000)
+}
+
+async function saveThresholds() {
+  if (savingThresholds.value) return
+
+  const critical = Number(criticalInput.value)
+  const tight = Number(tightInput.value)
+
+  if (!Number.isFinite(critical) || !Number.isFinite(tight) || critical < 0 || tight < 0) {
+    thresholdError.value = t('settings.threshold_error_negative')
+    return
+  }
+  if (critical >= tight) {
+    thresholdError.value = t('settings.threshold_error_order')
+    return
+  }
+
+  thresholdError.value = null
+  savingThresholds.value = true
+
+  try {
+    await setRiskThresholds(critical, tight)
+    if (auth.user) {
+      auth.user.risk_critical_threshold = critical.toFixed(2)
+      auth.user.risk_tight_threshold = tight.toFixed(2)
+    }
+    thresholdsSaved.value = true
+    clearTimeout(thresholdSaveTimeout)
+    thresholdSaveTimeout = setTimeout(() => { thresholdsSaved.value = false }, 2000)
+  } catch (err) {
+    console.error('Threshold save failed:', err)
+    thresholdError.value = t('settings.threshold_error_generic')
+  } finally {
+    savingThresholds.value = false
+  }
 }
 
 async function confirmCurrencyChange() {
@@ -415,6 +529,83 @@ async function confirmCurrencyChange() {
 .sp-change-btn:hover {
   color: var(--text);
   border-color: var(--text);
+}
+
+/* Risk thresholds */
+
+.sp-threshold-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sp-threshold-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sp-threshold-lbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sp-threshold-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0 8px;
+  width: 120px;
+}
+
+.sp-threshold-input-wrap:focus-within {
+  border-color: var(--income);
+}
+
+.sp-threshold-prefix {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--dim);
+  margin-right: 4px;
+}
+
+.sp-threshold-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 8px 0;
+  width: 100%;
+  -moz-appearance: textfield;
+}
+
+.sp-threshold-input::-webkit-outer-spin-button,
+.sp-threshold-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.sp-threshold-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.sp-threshold-error {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--danger);
+  line-height: 1.5;
 }
 
 /* Currency change section */

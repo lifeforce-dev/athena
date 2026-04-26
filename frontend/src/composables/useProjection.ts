@@ -51,7 +51,6 @@ export function useProjection() {
     lowestBalance: parseMoney(data.value?.lowest_balance ?? '0'),
     lowestDate: data.value?.lowest_date ?? null,
     riskLevel: data.value?.risk_level ?? 'comfortable',
-    cushionRatio: parseMoney(data.value?.cushion_ratio ?? '1'),
     totalOutflows: parseMoney(data.value?.total_outflows ?? '0'),
     totalInflows: parseMoney(data.value?.total_inflows ?? '0'),
     goesNegative: data.value?.goes_negative ?? false,

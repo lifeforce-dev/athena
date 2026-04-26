@@ -4,11 +4,17 @@ import logging
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.post_processing import process_ledger
+from app.core.post_processing import (
+    DEFAULT_CRITICAL_THRESHOLD,
+    DEFAULT_TIGHT_THRESHOLD,
+    process_ledger,
+)
 from app.core.projection import project_cash_on
 from app.models.domain import CashFlowTemplate, TemplateTag
+from app.models.orm import User
 from app.models.schemas import ProjectionResponse
 from app.repositories import balance_repository, commitment_repository
 from app.repositories.commitment_repository import list_active, to_domain
@@ -46,6 +52,18 @@ async def _load_from_db(
     return initial_balance, templates, has_initial_balance
 
 
+async def _load_user_risk_thresholds(
+    db: AsyncSession,
+    user_id: int,
+) -> tuple[Decimal, Decimal]:
+    """Look up the user's configured risk thresholds, falling back to defaults."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if user is None:
+        return DEFAULT_CRITICAL_THRESHOLD, DEFAULT_TIGHT_THRESHOLD
+    return user.risk_critical_threshold, user.risk_tight_threshold
+
+
 async def build_projection(
     as_of: date,
     from_date: date | None,
@@ -71,6 +89,11 @@ async def build_projection(
         has_initial_balance = False
         logger.info(f'Projection empty — user has no commitments. user_id={user_id}')
 
+    if db is not None and user_id is not None:
+        critical_threshold, tight_threshold = await _load_user_risk_thresholds(db, user_id)
+    else:
+        critical_threshold, tight_threshold = DEFAULT_CRITICAL_THRESHOLD, DEFAULT_TIGHT_THRESHOLD
+
     if from_date is None:
         from_date = date.today()
 
@@ -85,7 +108,15 @@ async def build_projection(
     window_end = max(from_date, as_of)
 
     paycheck_names = {t.name for t in templates if TemplateTag.PAYCHECK in t.tags}
-    processed = process_ledger(raw_ledger, initial_balance, window_start, window_end, paycheck_names)
+    processed = process_ledger(
+        raw_ledger,
+        initial_balance,
+        window_start,
+        window_end,
+        paycheck_names,
+        critical_threshold=critical_threshold,
+        tight_threshold=tight_threshold,
+    )
 
     logger.info(
         f'Projection built. entries={len(processed.ledger)} '
@@ -103,7 +134,6 @@ async def build_projection(
         lowest_balance=processed.lowest_balance,
         lowest_date=processed.lowest_date,
         risk_level=processed.risk_level,
-        cushion_ratio=processed.cushion_ratio,
         total_outflows=processed.total_outflows,
         total_inflows=processed.total_inflows,
         goes_negative=processed.goes_negative,
@@ -143,6 +173,8 @@ async def build_scenario_projection(
     initial_balance = latest_snapshot.balance if latest_snapshot else Decimal(0)
     has_initial_balance = latest_snapshot is not None
 
+    critical_threshold, tight_threshold = await _load_user_risk_thresholds(db, user_id)
+
     if from_date is None:
         from_date = date.today()
 
@@ -157,7 +189,15 @@ async def build_scenario_projection(
     window_end = max(from_date, as_of)
 
     paycheck_names = {t.name for t in templates if TemplateTag.PAYCHECK in t.tags}
-    processed = process_ledger(raw_ledger, initial_balance, window_start, window_end, paycheck_names)
+    processed = process_ledger(
+        raw_ledger,
+        initial_balance,
+        window_start,
+        window_end,
+        paycheck_names,
+        critical_threshold=critical_threshold,
+        tight_threshold=tight_threshold,
+    )
 
     logger.info(
         f'Scenario projection built. user_id={user_id} excluded={len(excluded_ids)} '
@@ -175,7 +215,6 @@ async def build_scenario_projection(
         lowest_balance=processed.lowest_balance,
         lowest_date=processed.lowest_date,
         risk_level=processed.risk_level,
-        cushion_ratio=processed.cushion_ratio,
         total_outflows=processed.total_outflows,
         total_inflows=processed.total_inflows,
         goes_negative=processed.goes_negative,

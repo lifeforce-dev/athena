@@ -36,6 +36,17 @@ class User(Base):
     account_language: Mapped[str | None] = mapped_column(String(5))
     completed_tours: Mapped[str | None] = mapped_column(Text)
     dismissed_modals: Mapped[str | None] = mapped_column(Text)
+
+    # Dollar-based risk thresholds for the dashboard verdict (Critical / Tight /
+    # Comfortable). The lowest projected balance over the window is compared to
+    # these to pick a label.
+    risk_critical_threshold: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, server_default=text("500.00")
+    )
+    risk_tight_threshold: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, server_default=text("1000.00")
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

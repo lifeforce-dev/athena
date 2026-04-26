@@ -45,7 +45,6 @@ export interface components {
       lowest_balance: string
       lowest_date: string | null
       risk_level: string
-      cushion_ratio: string
       total_outflows: string
       total_inflows: string
       goes_negative: boolean
@@ -125,6 +124,8 @@ export interface components {
       account_language: string | null
       completed_tours: string[]
       dismissed_modals: string[]
+      risk_critical_threshold: string
+      risk_tight_threshold: string
     }
   }
 }

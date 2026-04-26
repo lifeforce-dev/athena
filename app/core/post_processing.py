@@ -15,18 +15,20 @@ from app.models.schemas import LedgerEntry, MonthSummary, PayPeriodSummary
 
 
 # ---------------------------------------------------------------------------
-# Risk classification — tuning knobs
+# Risk classification — defaults for new users
 #
-# Adjust these constants to change how aggressively the dashboard flags
-# a projection as "tight" or "critical".  All thresholds are based on
-# cushion_ratio = lowest_balance / total_outflows.
+# The dashboard verdict is dollar-based: if the projected lowest balance
+# falls below these thresholds at any point in the window, the projection
+# is flagged "tight" or "critical".  Each user can override these via
+# account settings; these values are the defaults used when no override
+# is supplied.
 # ---------------------------------------------------------------------------
 
-#: Below this ratio the projection is classified as "critical".
-CUSHION_CRITICAL_THRESHOLD = Decimal("0.10")
+#: Default: lowest balance below this dollar amount → "critical".
+DEFAULT_CRITICAL_THRESHOLD = Decimal("500.00")
 
-#: Below this ratio (but above critical) the projection is "tight".
-CUSHION_TIGHT_THRESHOLD = Decimal("0.25")
+#: Default: lowest balance below this dollar amount (but above critical) → "tight".
+DEFAULT_TIGHT_THRESHOLD = Decimal("1000.00")
 
 
 @dataclass
@@ -42,7 +44,6 @@ class ProcessedProjection:
     lowest_balance: Decimal = Decimal(0)
     lowest_date: date | None = None
     risk_level: str = "comfortable"
-    cushion_ratio: Decimal = Decimal(1)
     total_outflows: Decimal = Decimal(0)
     total_inflows: Decimal = Decimal(0)
     goes_negative: bool = False
@@ -61,6 +62,8 @@ def process_ledger(
     window_start: date,
     window_end: date,
     paycheck_names: set[str] | None = None,
+    critical_threshold: Decimal = DEFAULT_CRITICAL_THRESHOLD,
+    tight_threshold: Decimal = DEFAULT_TIGHT_THRESHOLD,
 ) -> ProcessedProjection:
     """Transform a raw projection ledger into structured display data.
 
@@ -73,6 +76,10 @@ def process_ledger(
         window_start: First date in the projection window.
         window_end: Last date in the projection window.
         paycheck_names: Template names tagged as paychecks. Used for pay-period grouping.
+        critical_threshold: Lowest balance below this dollar amount classifies the
+            projection as "critical".
+        tight_threshold: Lowest balance below this dollar amount (but above
+            ``critical_threshold``) classifies the projection as "tight".
 
     Returns:
         Structured projection with sorted ledger entries, month summaries,
@@ -95,12 +102,18 @@ def process_ledger(
 
     # Compose risk analysis from single-responsibility pieces.
     # lowest_balance/lowest_date = end-of-day minimum (matches chart line).
-    # risk_level/cushion_ratio = from conservative intra-day walk.
-    risk = _analyze_risk(raw_ledger, initial_balance, names, window_start, window_end)
+    # risk_level = from conservative intra-day walk vs. dollar thresholds.
+    risk = _analyze_risk(
+        raw_ledger,
+        initial_balance,
+        window_start,
+        window_end,
+        critical_threshold,
+        tight_threshold,
+    )
     result.lowest_balance = risk.lowest_balance
     result.lowest_date = risk.lowest_date
     result.risk_level = risk.risk_level
-    result.cushion_ratio = risk.cushion_ratio
     result.total_outflows = risk.total_outflows
     result.total_inflows = risk.total_inflows
     result.goes_negative = risk.goes_negative
@@ -323,7 +336,6 @@ class _RiskAnalysis:
     lowest_balance: Decimal       # End-of-day lowest (matches chart line).
     lowest_date: date | None
     risk_level: str
-    cushion_ratio: Decimal
     total_outflows: Decimal
     total_inflows: Decimal
     goes_negative: bool
@@ -433,24 +445,23 @@ def _assess_intraday_risk(
 
 def _classify_risk(
     intraday_lowest: Decimal,
-    total_outflows: Decimal,
+    critical_threshold: Decimal,
+    tight_threshold: Decimal,
     goes_negative: bool,
-) -> tuple[str, Decimal]:
-    """Return ``(risk_level, cushion_ratio)`` from the intra-day walk values.
+) -> str:
+    """Return the risk label by comparing the intra-day low to dollar thresholds.
 
-    Uses module-level ``CUSHION_CRITICAL_THRESHOLD`` and
-    ``CUSHION_TIGHT_THRESHOLD`` constants.
+    Going negative (or the worst-case intra-day point dropping below zero) is
+    always critical, regardless of the configured thresholds.  Otherwise the
+    user-configured ``critical_threshold`` and ``tight_threshold`` decide.
     """
     if goes_negative or intraday_lowest < 0:
-        return "critical", Decimal(0)
-    if total_outflows <= 0:
-        return "comfortable", Decimal(1)
-    cushion_ratio = intraday_lowest / total_outflows
-    if cushion_ratio < CUSHION_CRITICAL_THRESHOLD:
-        return "critical", cushion_ratio
-    if cushion_ratio < CUSHION_TIGHT_THRESHOLD:
-        return "tight", cushion_ratio
-    return "comfortable", cushion_ratio
+        return "critical"
+    if intraday_lowest < critical_threshold:
+        return "critical"
+    if intraday_lowest < tight_threshold:
+        return "tight"
+    return "comfortable"
 
 
 # ── Orchestrator ────────────────────────────────────────────────────────────
@@ -458,17 +469,18 @@ def _classify_risk(
 def _analyze_risk(
     raw_ledger: list[tuple[date, str, Decimal]],
     initial_balance: Decimal,
-    paycheck_names: set[str],
     window_start: date,
     window_end: date,
+    critical_threshold: Decimal,
+    tight_threshold: Decimal,
 ) -> _RiskAnalysis:
     """Compose the single-responsibility pieces into a full risk analysis.
 
     - ``lowest_balance`` / ``lowest_date`` — end-of-day minimum, matching
       the chart trajectory line.
 
-    - ``risk_level`` / ``cushion_ratio`` — derived from the conservative
-      expenses-before-income intra-day walk.
+    - ``risk_level`` — derived by comparing the conservative intra-day
+      lowest balance against the supplied dollar thresholds.
 
     - ``goes_negative`` / ``negative_date`` / ``negative_balance`` —
       intra-day negative detection (bank posts debits first).
@@ -485,7 +497,6 @@ def _analyze_risk(
             lowest_balance=initial_balance,
             lowest_date=None,
             risk_level="comfortable",
-            cushion_ratio=Decimal(1),
             total_outflows=Decimal(0),
             total_inflows=Decimal(0),
             goes_negative=False,
@@ -504,8 +515,11 @@ def _analyze_risk(
     flows = _sum_flows(by_date)
     eod = _find_eod_lowest(by_date, initial_balance)
     intraday = _assess_intraday_risk(by_date, initial_balance)
-    risk_level, cushion_ratio = _classify_risk(
-        intraday.intraday_lowest, flows.total_outflows, intraday.goes_negative,
+    risk_level = _classify_risk(
+        intraday.intraday_lowest,
+        critical_threshold,
+        tight_threshold,
+        intraday.goes_negative,
     )
 
     # Derived metrics.
@@ -525,7 +539,6 @@ def _analyze_risk(
         lowest_balance=eod.balance,
         lowest_date=eod.day,
         risk_level=risk_level,
-        cushion_ratio=cushion_ratio,
         total_outflows=flows.total_outflows,
         total_inflows=flows.total_inflows,
         goes_negative=intraday.goes_negative,

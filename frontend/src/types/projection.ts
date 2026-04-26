@@ -41,7 +41,6 @@ export interface ParsedRiskAnalysis {
   lowestBalance: number
   lowestDate: string | null
   riskLevel: string
-  cushionRatio: number
   totalOutflows: number
   totalInflows: number
   goesNegative: boolean

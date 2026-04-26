@@ -281,6 +281,14 @@ const ko_KR: Record<string, string> = {
   'settings.replay_tour_desc': '앱의 각 섹션을 소개하는 가이드 둘러보기를 다시 확인하십시오.',
   'settings.replay_tour_btn': '둘러보기 다시 보기',
   'settings.replay_tour_refresh': '둘러보기를 시작하려면 페이지를 새로고침하십시오.',
+  'settings.risk_thresholds': '위험 임계값',
+  'settings.risk_thresholds_desc': '예상 최저 잔액이 이 금액 아래로 내려가면 대시보드가 그에 맞게 상태를 표시합니다.',
+  'settings.critical_below': '위험 기준',
+  'settings.tight_below': '빠듯함 기준',
+  'settings.save': '저장',
+  'settings.threshold_error_negative': '임계값은 0 이상이어야 합니다.',
+  'settings.threshold_error_order': '위험 기준은 빠듯함 기준보다 작아야 합니다.',
+  'settings.threshold_error_generic': '임계값을 저장할 수 없습니다. 다시 시도하십시오.',
 }
 
 export default ko_KR
